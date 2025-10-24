@@ -1,0 +1,55 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.5 Chrome/138.0.7204.251 Electron/37.6.1 Safari/537.36" version="28.2.5">
+  <diagram name="Seite-1" id="RmuUUWe32UJhOYSocBII">
+    <mxGraphModel dx="719" dy="542" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rjTUl5XIVZ2fF6Fhq3_S-1" target="rjTUl5XIVZ2fF6Fhq3_S-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" edge="1" parent="1" source="rjTUl5XIVZ2fF6Fhq3_S-1" target="rjTUl5XIVZ2fF6Fhq3_S-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-1" value="Projekt&lt;div&gt;(Präsentation für Schule etc.)&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="208" y="193" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-2" value="Textquellen&lt;div&gt;&lt;font face=&quot;monospace&quot;&gt;html/txt/md&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="48" y="343" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-3" value="Bildquellen&lt;div&gt;&lt;font face=&quot;monospace&quot;&gt;jpeg/png&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="368" y="343" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-9" value="Download&lt;div&gt;als Dateien&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="228" y="463" width="80" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-10" value="" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;rotation=90;size=30;position=0.42;base=20;" vertex="1" parent="1">
+          <mxGeometry x="365.5" y="425.5" width="90" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-11" value="Metadaten wie:&lt;div&gt;- Zeitpunkt vom Aufruf&lt;/div&gt;&lt;div&gt;- URL der Webseite&lt;/div&gt;&lt;div&gt;- markierte Sätze&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="368" y="463" width="120" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=25;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="rjTUl5XIVZ2fF6Fhq3_S-2" target="rjTUl5XIVZ2fF6Fhq3_S-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="rjTUl5XIVZ2fF6Fhq3_S-3" target="rjTUl5XIVZ2fF6Fhq3_S-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-18" value="" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;position2=0.75;" vertex="1" parent="1">
+          <mxGeometry x="78" y="53" width="200" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-17" value="cn: com.crackyOS.wdx&lt;div&gt;$projdir: doc\wdx\%projekt%\&lt;/div&gt;&lt;div&gt;$sitedir: %projdir%\sites\&lt;/div&gt;&lt;div&gt;$imgdir: %projdir%\images\&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="81" y="53" width="187" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-19" value="Versionskontrolle&lt;div&gt;bei möglichen&lt;/div&gt;&lt;div&gt;Änderungen&lt;/div&gt;&lt;div&gt;der online Quelle&lt;/div&gt;" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="1">
+          <mxGeometry x="66" y="473" width="142" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-20" value="Durchsuchung möglich&lt;div&gt;Smarte Features wie zusammen-&lt;/div&gt;&lt;div&gt;Fassungen / Ähnlihckeiten&lt;/div&gt;&lt;div&gt;erkennen möglich&lt;/div&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="1">
+          <mxGeometry x="56" y="590.5" width="202" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rjTUl5XIVZ2fF6Fhq3_S-21" value="Automatisches Erstellen einer&lt;div&gt;Quellenangabe für Präsentation&lt;/div&gt;&lt;div&gt;Quelle, zul. Aufgerufen am d/m/y&lt;/div&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="1">
+          <mxGeometry x="268" y="590.5" width="212" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
