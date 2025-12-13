@@ -9,6 +9,7 @@ import webbrowser
 import pyperclip
 import json
 import os
+from constants import DEFAULT_COLOR  # Wichtig!
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -17,9 +18,12 @@ class ProjectWindow:
         self.app = app
         self.source_frames = {}
         self.selected_source_id = None
-        self.dragging = False
+        self.dragging_card = False
+        self.dragging_canvas = False
         self.drag_start_x = 0
         self.drag_start_y = 0
+        self.canvas_start_x = 0
+        self.canvas_start_y = 0
 
         self.last_file_mtime = 0
         self.update_last_mtime()
@@ -56,8 +60,10 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
-        # Klick auf Canvas (leerer Bereich) → immer deselektieren
-        self.canvas.bind("<ButtonPress-1>", self.on_canvas_click)
+        # Maus-Events für Canvas-Panning (Hand-Tool)
+        self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
+        self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
+        self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
 
         self.start_auto_refresh()
 
@@ -72,7 +78,7 @@ class ProjectWindow:
             if "id" not in source:
                 source["id"] = str(uuid.uuid4())
             if "color" not in source:
-                source["color"] = "#ffffff"
+                source["color"] = DEFAULT_COLOR
             if "pos_x" not in source:
                 source["pos_x"] = 300
                 source["pos_y"] = 300
@@ -80,7 +86,7 @@ class ProjectWindow:
         self.update_scrollregion()
 
     def create_source_card(self, source):
-        color = source.get("color", "#ffffff")
+        color = source.get("color", DEFAULT_COLOR)
 
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
         frame.source_data = source
@@ -88,7 +94,6 @@ class ProjectWindow:
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
-        # Header mit Titel + Auswahl-Button
         header = ttk.Frame(frame)
         header.pack(fill="x", pady=(0, 8))
 
@@ -115,23 +120,22 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
-        # Drag & Drop
-        frame.bind("<ButtonPress-1>", lambda e: self.on_frame_press(e, source["id"]))
-        frame.bind("<B1-Motion>", lambda e: self.on_frame_motion(e))
-        frame.bind("<ButtonRelease-1>", lambda e: self.on_frame_release(e))
+        # Drag & Drop für Karte
+        frame.bind("<ButtonPress-1>", lambda e, sid=source["id"]: self.on_card_press(e, sid))
+        frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
+        frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
 
         x, y = source.get("pos_x", 300), source.get("pos_y", 300)
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
-        # Rahmen aktualisieren, falls ausgewählt
-        if self.selected_source_id == source["id"]:
-            frame.config(borderwidth=5, bootstyle="primary")
+        # Rahmen zurücksetzen, falls nicht ausgewählt
+        if self.selected_source_id != source["id"]:
+            frame.config(borderwidth=2, bootstyle=None)
 
         self.update_scrollregion()
 
@@ -185,10 +189,9 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def select_card(self, source_id):
-        # Alten Rahmen zurücksetzen
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2, bootstyle="")
+            old_frame.config(borderwidth=2, bootstyle=None)
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
@@ -197,45 +200,67 @@ class ProjectWindow:
     def deselect_card(self):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            frame.config(borderwidth=2, bootstyle="")
+            frame.config(borderwidth=2, bootstyle=None)
         self.selected_source_id = None
 
-    def on_frame_press(self, event, source_id):
-        # Wenn man auf eine Karte klickt, aber nicht zieht → auswählen
+    # === Drag & Drop für Karten ===
+    def on_card_press(self, event, source_id):
         if source_id != self.selected_source_id:
             self.select_card(source_id)
 
         if source_id == self.selected_source_id:
-            self.dragging = True
+            self.dragging_card = True
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
             self.canvas.tag_raise(self.source_frames[source_id][1])
 
-    def on_frame_motion(self, event):
-        if self.dragging:
+    def on_card_motion(self, event):
+        if self.dragging_card:
             dx = event.x_root - self.drag_start_x
             dy = event.y_root - self.drag_start_y
             self.canvas.move(self.source_frames[self.selected_source_id][1], dx, dy)
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
 
-    def on_frame_release(self, event):
-        if self.dragging:
+    def on_card_release(self, event):
+        if self.dragging_card:
             coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
             source = next(s for s in self.project["data"]["sources"] if s["id"] == self.selected_source_id)
             source["pos_x"] = coords[0]
             source["pos_y"] = coords[1]
             self.save_project()
             self.update_last_mtime()
-            self.dragging = False
+            self.dragging_card = False
             self.update_scrollregion()
 
-    def on_canvas_click(self, event):
-        # Klick auf leeren Bereich → immer deselektieren
-        items = self.canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+    # === Hand-Tool: Canvas per Maus verschieben ===
+    def on_canvas_press(self, event):
+        # Prüfen, ob Klick auf eine Karte war
+        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
         card_items = [wid for _, wid in self.source_frames.values()]
-        if not any(item in card_items for item in items):
-            self.deselect_card()
+        if any(item in card_items for item in items):
+            return  # Klick auf Karte → wird von Karte-Event behandelt
+
+        # Klick auf leeren Bereich → Canvas pannen
+        self.dragging_canvas = True
+        self.canvas_start_x = event.x
+        self.canvas_start_y = event.y
+        self.canvas.xview_moveto(0)  # Dummy, um Cursor zu ändern (optional)
+        self.canvas.config(cursor="fleur")
+
+    def on_canvas_motion(self, event):
+        if self.dragging_canvas:
+            dx = event.x - self.canvas_start_x
+            dy = event.y - self.canvas_start_y
+            self.canvas.xview_scroll(-dx, "units")
+            self.canvas.yview_scroll(-dy, "units")
+            self.canvas_start_x = event.x
+            self.canvas_start_y = event.y
+
+    def on_canvas_release(self, event):
+        if self.dragging_canvas:
+            self.dragging_canvas = False
+            self.canvas.config(cursor="")
 
     def delete_source(self, source):
         if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
