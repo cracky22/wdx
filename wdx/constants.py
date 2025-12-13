@@ -1,8 +1,8 @@
 from pathlib import Path
 
 # ========= KONFIG =========
-VERSION = "1.0.4 devbeta"
-APP_TITLE = f"WDX {VERSION}"
+VERSION = "v1.0.5"
+APP_TITLE = f"wdx {VERSION}"
 
 WDX_DIR = Path.home() / "Documents" / "wdx"
 PROJECTS_FILE = WDX_DIR / "projects.json"

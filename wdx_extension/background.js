@@ -38,7 +38,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       chrome.notifications.create({
         type: "basic",
         iconUrl: "icon48.png",
-        title: "WDX",
+        title: "wdx",
         message: text ? "Ausgewählter Text erfolgreich gespeichert!" : "Quelle erfolgreich gespeichert!"
       });
     } else {
@@ -48,8 +48,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     chrome.notifications.create({
       type: "basic",
       iconUrl: "icon48.png",
-      title: "WDX Fehler",
-      message: "Verbindung zu WDX fehlgeschlagen – ist die App gestartet?"
+      title: "wdx Fehler",
+      message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?"
     });
   }
 });

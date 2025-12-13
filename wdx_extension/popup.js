@@ -40,7 +40,7 @@ async function updateConnection() {
     if (response.ok) {
       const data = await response.json();
       isConnected = true;
-      statusEl.textContent = "Verbunden mit WDX";
+      statusEl.textContent = "Verbunden mit wdx";
       statusEl.className = "status connected";
       connectBtn.textContent = "Verbunden ✓";
       connectBtn.classList.add("connected");
@@ -52,7 +52,7 @@ async function updateConnection() {
     }
   } catch (err) {
     isConnected = false;
-    statusEl.textContent = "Verbindung fehlgeschlagen – WDX läuft nicht?";
+    statusEl.textContent = "Verbindung fehlgeschlagen – wdx läuft nicht?";
     statusEl.className = "status disconnected";
     connectBtn.textContent = "Verbinden";
     connectBtn.classList.remove("connected");
@@ -66,7 +66,7 @@ connectBtn.addEventListener('click', updateConnection);
 
 saveBtn.addEventListener('click', async () => {
   if (!isConnected) {
-    showMessage("Keine Verbindung zu WDX", "error");
+    showMessage("Keine Verbindung zu wdx", "error");
     return;
   }
 
@@ -93,7 +93,7 @@ saveBtn.addEventListener('click', async () => {
       showMessage("Fehler beim Speichern", "error");
     }
   } catch (err) {
-    showMessage("Keine Verbindung zum WDX-Server", "error");
+    showMessage("Keine Verbindung zum wdx-Server", "error");
   }
 });
 
