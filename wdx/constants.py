@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========= KONFIG =========
-VERSION = "1.0.1 devbeta"
+VERSION = "1.0.2 devbeta"
 APP_TITLE = f"WDX {VERSION}"
 ICON_BASE64 = "BASE64BILD"  # Platzhalter
 
