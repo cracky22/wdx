@@ -81,17 +81,24 @@ class ProjectWindow:
     def create_source_card(self, source):
         color = source.get("color", "#ffffff")
 
-        # Karte mit Hintergrundfarbe, aber neutralem Rahmen
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
         frame.source_data = source
         frame.configure(style="Card.TFrame")
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
-        # Titel
+        # Header-Frame für Titel + Auswahl-Button
+        header = ttk.Frame(frame, bootstyle="card")
+        header.pack(fill="x", pady=(0, 8))
+
         title_text = source.get("title") or source["url"]
-        title_label = ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color)
-        title_label.pack(anchor="w")
+        title_label = ttk.Label(header, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=280, background=color)
+        title_label.pack(side="left")
+
+        # Auswahl-Button neben der Überschrift
+        select_btn = ttk.Button(header, text="🎯", width=4, bootstyle="outline-secondary",
+                                command=lambda sid=source["id"]: self.toggle_select_card(sid))
+        select_btn.pack(side="right")
 
         if source.get("title"):
             ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350, background=color).pack(anchor="w")
@@ -108,11 +115,6 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # NEU: Auswahl-Button mit Fadenkreuz-Icon oben rechts
-        select_btn = ttk.Button(frame, text="🎯", width=3, bootstyle="outline-secondary",
-                                command=lambda sid=source["id"]: self.toggle_select_card(sid))
-        select_btn.place(relx=1.0, rely=0, x=-10, y=10, anchor="ne")
-
         # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
@@ -127,7 +129,7 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
-        # Rahmen aktualisieren, falls diese Karte ausgewählt ist
+        # Rahmen aktualisieren, falls ausgewählt
         if self.selected_source_id == source["id"]:
             frame.config(borderwidth=5, bootstyle="primary")
 
@@ -183,10 +185,9 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def select_card(self, source_id):
-        # Alten Rahmen zurücksetzen
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2, bootstyle="")
+            old_frame.config(borderwidth=2)
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
@@ -195,7 +196,7 @@ class ProjectWindow:
     def deselect_card(self):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            frame.config(borderwidth=2, bootstyle="")
+            frame.config(borderwidth=2)
         self.selected_source_id = None
 
     def on_frame_press(self, event, source_id):
