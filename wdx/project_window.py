@@ -56,7 +56,8 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
-        self.canvas.bind("<ButtonPress-1>", self.on_press)
+        # Klick auf Canvas (leerer Bereich) → immer deselektieren
+        self.canvas.bind("<ButtonPress-1>", self.on_canvas_click)
 
         self.start_auto_refresh()
 
@@ -87,15 +88,14 @@ class ProjectWindow:
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
-        # Header-Frame für Titel + Auswahl-Button
-        header = ttk.Frame(frame, bootstyle="card")
+        # Header mit Titel + Auswahl-Button
+        header = ttk.Frame(frame)
         header.pack(fill="x", pady=(0, 8))
 
         title_text = source.get("title") or source["url"]
         title_label = ttk.Label(header, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=280, background=color)
         title_label.pack(side="left")
 
-        # Auswahl-Button neben der Überschrift
         select_btn = ttk.Button(header, text="🎯", width=4, bootstyle="outline-secondary",
                                 command=lambda sid=source["id"]: self.toggle_select_card(sid))
         select_btn.pack(side="right")
@@ -185,9 +185,10 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def select_card(self, source_id):
+        # Alten Rahmen zurücksetzen
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2)
+            old_frame.config(borderwidth=2, bootstyle="")
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
@@ -196,10 +197,14 @@ class ProjectWindow:
     def deselect_card(self):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            frame.config(borderwidth=2)
+            frame.config(borderwidth=2, bootstyle="")
         self.selected_source_id = None
 
     def on_frame_press(self, event, source_id):
+        # Wenn man auf eine Karte klickt, aber nicht zieht → auswählen
+        if source_id != self.selected_source_id:
+            self.select_card(source_id)
+
         if source_id == self.selected_source_id:
             self.dragging = True
             self.drag_start_x = event.x_root
@@ -225,9 +230,11 @@ class ProjectWindow:
             self.dragging = False
             self.update_scrollregion()
 
-    def on_press(self, event):
-        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
-        if not items or items[-1] not in [wid for _, wid in self.source_frames.values()]:
+    def on_canvas_click(self, event):
+        # Klick auf leeren Bereich → immer deselektieren
+        items = self.canvas.find_overlapping(event.x-10, event.y-10, event.x+10, event.y+10)
+        card_items = [wid for _, wid in self.source_frames.values()]
+        if not any(item in card_items for item in items):
             self.deselect_card()
 
     def delete_source(self, source):
@@ -238,7 +245,7 @@ class ProjectWindow:
             frame.destroy()
             del self.source_frames[source["id"]]
             if self.selected_source_id == source["id"]:
-                self.selected_source_id = None
+                self.deselect_card()
             self.save_project()
             self.update_last_mtime()
 
