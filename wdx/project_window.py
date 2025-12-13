@@ -21,8 +21,9 @@ class ProjectWindow:
         self.drag_start_x = 0
         self.drag_start_y = 0
 
-        # Für Auto-Refresh: Letzte bekannte Änderungszeit
-        self.last_modified_check = project.get("last_modified", "")
+        # Für Auto-Refresh: Letzte bekannte Datei-Änderungszeit (mtime)
+        self.last_file_mtime = 0
+        self.update_last_mtime()  # Initialwert setzen
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -58,8 +59,15 @@ class ProjectWindow:
 
         self.canvas.bind("<ButtonPress-1>", self.on_press)
 
-        # Live-Sync starten
+        # Live-Sync starten – leise und nur bei externen Änderungen
         self.start_auto_refresh()
+
+    def update_last_mtime(self):
+        """Setzt den aktuellen mtime der Datei"""
+        if os.path.exists(self.project["data_file"]):
+            self.last_file_mtime = os.path.getmtime(self.project["data_file"])
+        else:
+            self.last_file_mtime = 0
 
     def load_sources_on_canvas(self):
         for source in self.project["data"]["sources"]:
@@ -144,6 +152,7 @@ class ProjectWindow:
             self.project["data"]["sources"].append(new_source)
             self.create_source_card(new_source)
             self.save_project()
+            self.update_last_mtime()  # mtime aktualisieren, damit kein Reload triggert
 
     def edit_source(self, source):
         dialog = SourceDialog(self.root, self, source)
@@ -159,6 +168,7 @@ class ProjectWindow:
             del self.source_frames[source["id"]]
             self.create_source_card(source)
             self.save_project()
+            self.update_last_mtime()
 
     def select_card(self, source_id):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
@@ -197,6 +207,7 @@ class ProjectWindow:
             source["pos_x"] = coords[0]
             source["pos_y"] = coords[1]
             self.save_project()
+            self.update_last_mtime()  # Verhindert Reload bei Drag
             self.dragging = False
             self.update_scrollregion()
 
@@ -215,7 +226,7 @@ class ProjectWindow:
             if self.selected_source_id == source["id"]:
                 self.selected_source_id = None
             self.save_project()
-            self.update_scrollregion()
+            self.update_last_mtime()
 
     def create_citation(self, source):
         citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
@@ -232,49 +243,41 @@ class ProjectWindow:
         self.project["last_modified"] = datetime.datetime.now().isoformat()
         self.app.project_manager.save_projects()
 
-    # === NEU: Live-Sync mit Browser-Erweiterung ===
+    # === Live-Sync: Nur bei externen Änderungen aktualisieren ===
     def start_auto_refresh(self):
-        """Prüft alle 3 Sekunden, ob die project.json geändert wurde (z. B. durch Erweiterung)"""
         try:
-            # Aktuelle last_modified aus Datei lesen
             if os.path.exists(self.project["data_file"]):
-                with open(self.project["data_file"], "r", encoding="utf-8") as f:
-                    file_data = json.load(f)
-                current_last_modified = file_data.get("last_modified", self.project["last_modified"])
+                current_mtime = os.path.getmtime(self.project["data_file"])
             else:
-                current_last_modified = self.project["last_modified"]
+                current_mtime = 0
 
-            if current_last_modified != self.last_modified_check:
-                # Datei wurde geändert → neu laden
+            if current_mtime > self.last_file_mtime:
+                # Nur bei externer Änderung (z. B. Erweiterung) → neu laden
                 self.reload_sources()
-                self.last_modified_check = current_last_modified
+                self.last_file_mtime = current_mtime  # Aktualisieren
         except Exception as e:
             print("Auto-Refresh Fehler:", e)
 
-        # Alle 3 Sekunden wiederholen
         self.root.after(3000, self.start_auto_refresh)
 
     def reload_sources(self):
-        """Lädt die Quellen neu aus der project.json"""
         try:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
             # Alte Karten entfernen
-            for frame, item_id in self.source_frames.values():
+            for frame, item_id in list(self.source_frames.values()):
                 self.canvas.delete(item_id)
                 frame.destroy()
             self.source_frames.clear()
 
-            # Neue Daten übernehmen
+            # Neue Quellen übernehmen
             self.project["data"]["sources"] = updated_data.get("sources", [])
-            self.project["last_modified"] = updated_data.get("last_modified", datetime.datetime.now().isoformat())
 
-            # Neue Karten zeichnen
+            # Karten neu zeichnen
             self.load_sources_on_canvas()
-
         except Exception as e:
-            messagebox.showerror("Fehler", f"Fehler beim Aktualisieren: {e}")
+            print("Reload-Fehler:", e)
 
     def back_to_projects(self):
         self.save_project()
