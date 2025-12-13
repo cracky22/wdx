@@ -1,7 +1,7 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog, colorchooser
 from dialogs import SourceDialog
 import datetime
 import uuid
@@ -9,6 +9,7 @@ import webbrowser
 import pyperclip
 import json
 import os
+from constants import DEFAULT_COLOR
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -51,20 +52,28 @@ class ProjectWindow:
         h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
-        self.add_button = ttk.Button(self.main_frame, text="+ Quelle hinzufügen", command=self.add_source,
-                                     bootstyle="primary-outline-toolbutton", width=20)
+        # + Button mit Menü
+        self.add_menu = tk.Menu(self.root, tearoff=0)
+        self.add_menu.add_command(label="Quelle hinzufügen", command=self.add_source)
+        self.add_menu.add_command(label="Überschrift hinzufügen", command=self.add_heading)
+
+        self.add_button = ttk.Button(self.main_frame, text="+", width=4,
+                                     command=self.show_add_menu,
+                                     bootstyle="primary-outline-toolbutton")
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
 
-        self.load_sources_on_canvas()
+        self.load_items_on_canvas()
 
-        # Hand-Tool für Canvas-Panning
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
 
         self.start_auto_refresh()
+
+    def show_add_menu(self, event=None):
+        self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
 
     def update_last_mtime(self):
         if os.path.exists(self.project["data_file"]):
@@ -72,23 +81,25 @@ class ProjectWindow:
         else:
             self.last_file_mtime = 0
 
-    def load_sources_on_canvas(self):
-        for source in self.project["data"]["sources"]:
-            if "id" not in source:
-                source["id"] = str(uuid.uuid4())
-            if "color" not in source:
-                source["color"] = "#ffffff"
-            if "pos_x" not in source:
-                source["pos_x"] = 300
-                source["pos_y"] = 300
-            self.create_source_card(source)
+    def load_items_on_canvas(self):
+        items = self.project["data"].get("items", [])
+        # Migration von alten Projekten
+        if "sources" in self.project["data"] and "items" not in self.project["data"]:
+            items = [{"type": "source", **s} for s in self.project["data"]["sources"]]
+            self.project["data"]["items"] = items
+
+        for item in items:
+            if item.get("type") == "source":
+                self.create_source_card(item)
+            elif item.get("type") == "heading":
+                self.create_heading_card(item)
         self.update_scrollregion()
 
     def create_source_card(self, source):
-        color = source.get("color", "#ffffff")
+        color = source.get("color", DEFAULT_COLOR)
 
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
-        frame.source_data = source
+        frame.item_data = source
         frame.configure(style="Card.TFrame")
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
@@ -111,13 +122,11 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick-Menü
-        frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+        frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
         for child in frame.winfo_children():
-            child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+            child.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
 
-        # Linksklick auf Karte → auswählen + ggf. verschieben
-        frame.bind("<ButtonPress-1>", lambda e, sid=source["id"]: self.on_card_press(e, sid))
+        frame.bind("<ButtonPress-1>", lambda e, iid=source["id"]: self.on_card_press(e, iid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
         frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
 
@@ -125,7 +134,6 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
-        # Rahmen aktualisieren
         if self.selected_source_id == source["id"]:
             frame.config(borderwidth=5, bootstyle="primary")
         else:
@@ -133,34 +141,135 @@ class ProjectWindow:
 
         self.update_scrollregion()
 
-    def show_context_menu(self, event, source):
-        self.context_menu.delete(0, tk.END)
-        self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
-        self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
-        self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(source))
+    def create_heading_card(self, heading):
+        color = heading.get("color", "#e9ecef")
+        text_color = "#212529" if color == "#e9ecef" else "#ffffff"
 
-        if self.selected_source_id == source["id"]:
+        frame = ttk.Frame(self.canvas, padding="20", relief="flat", borderwidth=0)
+        frame.item_data = heading
+        frame.configure(style="Heading.TFrame")
+        self.root.style.configure("Heading.TFrame", background=color)
+        frame.configure(style="Heading.TFrame")
+
+        label = ttk.Label(frame, text=heading["text"], font=("Helvetica", 16, "bold"), foreground=text_color, background=color)
+        label.pack()
+
+        frame.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
+        for child in frame.winfo_children():
+            child.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
+
+        frame.bind("<ButtonPress-1>", lambda e, iid=heading["id"]: self.on_card_press(e, iid))
+        frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
+        frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
+
+        x, y = heading.get("pos_x", 300), heading.get("pos_y", 300)
+        window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
+        self.source_frames[heading["id"]] = (frame, window_id)
+
+        if self.selected_source_id == heading["id"]:
+            frame.config(borderwidth=5, bootstyle="primary")
+        else:
+            frame.config(borderwidth=0, bootstyle=None)
+
+        self.update_scrollregion()
+
+    def add_heading(self):
+        text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
+        if not text:
+            return
+
+        color = colorchooser.askcolor(title="Farbe wählen", initialcolor="#e9ecef")[1]
+        if not color:
+            color = "#e9ecef"
+
+        new_heading = {
+            "id": str(uuid.uuid4()),
+            "type": "heading",
+            "text": text,
+            "color": color,
+            "pos_x": 300,
+            "pos_y": 300
+        }
+
+        if "items" not in self.project["data"]:
+            self.project["data"]["items"] = []
+        self.project["data"]["items"].append(new_heading)
+        self.create_heading_card(new_heading)
+        self.save_project()
+        self.update_last_mtime()
+
+    def show_context_menu(self, event, item):
+        self.context_menu.delete(0, tk.END)
+        self.context_menu.add_command(label="Löschen", command=lambda: self.delete_item(item))
+        if item["type"] == "heading":
+            self.context_menu.add_command(label="Umbenennen", command=lambda: self.rename_heading(item))
+            self.context_menu.add_command(label="Farbe ändern", command=lambda: self.change_heading_color(item))
+        else:
+            self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(item))
+            self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(item))
+
+        if self.selected_source_id == item["id"]:
             self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
         else:
-            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
+            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(item["id"]))
 
         self.context_menu.post(event.x_root, event.y_root)
+
+    def rename_heading(self, heading):
+        new_text = simpledialog.askstring("Umbenennen", "Neuer Text:", initialvalue=heading["text"], parent=self.root)
+        if new_text is not None and new_text != heading["text"]:
+            heading["text"] = new_text
+            frame, item_id = self.source_frames[heading["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[heading["id"]]
+            self.create_heading_card(heading)
+            self.save_project()
+            self.update_last_mtime()
+
+    def change_heading_color(self, heading):
+        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=heading["color"])[1]
+        if color and color != heading["color"]:
+            heading["color"] = color
+            frame, item_id = self.source_frames[heading["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[heading["id"]]
+            self.create_heading_card(heading)
+            self.save_project()
+            self.update_last_mtime()
+
+    def delete_item(self, item):
+        if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
+            self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item["id"]]
+
+            frame, item_id = self.source_frames[item["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[item["id"]]
+            if self.selected_source_id == item["id"]:
+                self.deselect_card()
+            self.save_project()
+            self.update_last_mtime()
 
     def add_source(self):
         dialog = SourceDialog(self.root, self)
         if dialog.result:
             new_source = {
                 "id": str(uuid.uuid4()),
+                "type": "source",
                 "url": dialog.result["url"],
                 "title": dialog.result["title"],
                 "text": dialog.result["text"],
                 "keywords": dialog.result["keywords"],
                 "color": dialog.result["color"],
                 "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "pos_x": 300 + len(self.project["data"]["sources"]) * 80,
+                "pos_x": 300 + len(self.project["data"].get("items", [])) * 80,
                 "pos_y": 300
             }
-            self.project["data"]["sources"].append(new_source)
+            if "items" not in self.project["data"]:
+                self.project["data"]["items"] = []
+            self.project["data"]["items"].append(new_source)
             self.create_source_card(new_source)
             self.save_project()
             self.update_last_mtime()
@@ -184,7 +293,7 @@ class ProjectWindow:
     def select_card(self, source_id):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2, bootstyle=None)
+            old_frame.config(borderwidth=2 if old_frame.item_data["type"] == "source" else 0, bootstyle=None)
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
@@ -193,19 +302,18 @@ class ProjectWindow:
     def deselect_card(self):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            frame.config(borderwidth=2, bootstyle=None)
+            border = 2 if frame.item_data["type"] == "source" else 0
+            frame.config(borderwidth=border, bootstyle=None)
         self.selected_source_id = None
 
-    def on_card_press(self, event, source_id):
-        # Klick auf Karte → immer auswählen
-        if source_id != self.selected_source_id:
-            self.select_card(source_id)
+    def on_card_press(self, event, item_id):
+        if item_id != self.selected_source_id:
+            self.select_card(item_id)
 
-        # Dann ggf. Drag starten
         self.dragging_card = True
         self.drag_start_x = event.x_root
         self.drag_start_y = event.y_root
-        self.canvas.tag_raise(self.source_frames[source_id][1])
+        self.canvas.tag_raise(self.source_frames[item_id][1])
 
     def on_card_motion(self, event):
         if self.dragging_card:
@@ -218,9 +326,9 @@ class ProjectWindow:
     def on_card_release(self, event):
         if self.dragging_card:
             coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
-            source = next(s for s in self.project["data"]["sources"] if s["id"] == self.selected_source_id)
-            source["pos_x"] = coords[0]
-            source["pos_y"] = coords[1]
+            item = next(i for i in self.project["data"]["items"] if i["id"] == self.selected_source_id)
+            item["pos_x"] = coords[0]
+            item["pos_y"] = coords[1]
             self.save_project()
             self.update_last_mtime()
             self.dragging_card = False
@@ -230,7 +338,7 @@ class ProjectWindow:
         items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
         card_items = [wid for _, wid in self.source_frames.values()]
         if any(item in card_items for item in items):
-            return  # Klick auf Karte → wird von Karte-Event behandelt
+            return
 
         self.dragging_canvas = True
         self.canvas_start_x = event.x
@@ -250,18 +358,6 @@ class ProjectWindow:
         if self.dragging_canvas:
             self.dragging_canvas = False
             self.canvas.config(cursor="")
-
-    def delete_source(self, source):
-        if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
-            self.project["data"]["sources"].remove(source)
-            frame, item_id = self.source_frames[source["id"]]
-            self.canvas.delete(item_id)
-            frame.destroy()
-            del self.source_frames[source["id"]]
-            if self.selected_source_id == source["id"]:
-                self.deselect_card()
-            self.save_project()
-            self.update_last_mtime()
 
     def create_citation(self, source):
         citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
@@ -286,14 +382,14 @@ class ProjectWindow:
                 current_mtime = 0
 
             if current_mtime > self.last_file_mtime:
-                self.reload_sources()
+                self.reload_items()
                 self.last_file_mtime = current_mtime
         except Exception as e:
             print("Auto-Refresh Fehler:", e)
 
         self.root.after(3000, self.start_auto_refresh)
 
-    def reload_sources(self):
+    def reload_items(self):
         try:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
@@ -303,9 +399,13 @@ class ProjectWindow:
                 frame.destroy()
             self.source_frames.clear()
 
-            self.project["data"]["sources"] = updated_data.get("sources", [])
+            items = updated_data.get("items", updated_data.get("sources", []))
+            for item in items:
+                if "type" not in item:
+                    item["type"] = "source"
+            self.project["data"]["items"] = items
 
-            self.load_sources_on_canvas()
+            self.load_items_on_canvas()
         except Exception as e:
             print("Reload-Fehler:", e)
 
