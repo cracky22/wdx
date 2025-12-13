@@ -57,7 +57,7 @@ class WdxApp:
         self.root = root
         self.style = ttk.Style("flatly")
         self.root.title(APP_TITLE)
-        self.root.geometry("1200x800")  # Etwas größer für Mindmap-Nutzung
+        self.root.geometry("1200x800")
         try:
             self.root.iconbitmap(base64.b64decode(ICON_BASE64))
         except:
@@ -344,8 +344,8 @@ class WdxApp:
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
             "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "pos_x": 200 + len(project["data"]["sources"]) * 50,  # Verteilte Startposition
-            "pos_y": 200
+            "pos_x": 300,
+            "pos_y": 300
         }
         project["data"]["sources"].append(source)
         project["last_modified"] = datetime.datetime.now().isoformat()
@@ -360,13 +360,15 @@ class ProjectWindow:
         self.root = root
         self.app = app
         self.source_frames = {}
+        self.dragging_item = None
+        self.drag_start_x = 0
+        self.drag_start_y = 0
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
-        # Header nur mit Zurück und Titel
         header_frame = ttk.Frame(self.main_frame, padding="15 10", bootstyle="primary")
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         header_frame.columnconfigure(0, weight=1)
@@ -375,42 +377,38 @@ class ProjectWindow:
         ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
         ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=0, column=2, sticky=tk.E, padx=20)
 
-        # Großer Canvas für Mindmap
         self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0)
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.main_frame.rowconfigure(1, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
 
-        # Scrollbars
         h_scroll = ttk.Scrollbar(self.main_frame, orient="horizontal", command=self.canvas.xview, bootstyle="round")
         v_scroll = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
         self.canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
         h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
-        # Fester Button unten rechts: + Quelle hinzufügen
         self.add_button = ttk.Button(self.main_frame, text="+ Quelle hinzufügen", command=self.add_source,
                                      bootstyle=(PRIMARY, "outline-toolbutton"), width=20)
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
-        # Kontextmenü
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
         self.context_menu.add_command(label="Löschen", command=self.delete_source)
         self.context_menu.add_command(label="Quellenangabe erstellen", command=self.create_citation)
 
         self.load_sources_on_canvas()
 
-        # Drag & Drop
-        self.canvas.bind("<ButtonPress-1>", self.on_canvas_click)
+        # Globale Events für Drag
         self.canvas.bind("<B1-Motion>", self.on_drag_motion)
+        self.canvas.bind("<ButtonRelease-1>", self.on_drag_release)
 
     def load_sources_on_canvas(self):
         for source in self.project["data"]["sources"]:
             if "id" not in source:
                 source["id"] = str(uuid.uuid4())
             if "pos_x" not in source:
-                source["pos_x"] = 200
-                source["pos_y"] = 200
+                source["pos_x"] = 300
+                source["pos_y"] = 300
             self.create_source_card(source)
         self.update_scrollregion()
 
@@ -418,8 +416,18 @@ class ProjectWindow:
         frame = ttk.Frame(self.canvas, padding="15", bootstyle="secondary", relief="raised", borderwidth=2)
         frame.source_data = source
 
+        # Header mit Titel und Move-Button
+        header = ttk.Frame(frame)
+        header.pack(fill="x", pady=(0, 8))
+
         title_text = source.get("title") or source["url"]
-        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=350).pack(anchor="w")
+        ttk.Label(header, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320).pack(side="left")
+
+        # Move-Button mit Fadenkreuz-Symbol
+        move_btn = ttk.Button(header, text="↗", width=3, bootstyle="light-outline", command=lambda: None)
+        move_btn.pack(side="right")
+        move_btn.bind("<ButtonPress-1>", lambda e, item=self.canvas.create_window(source["pos_x"], source["pos_y"], window=frame, anchor="nw"): self.start_drag(e, item))
+        move_btn.bind("<ButtonRelease-1>", lambda e: self.on_drag_release(e))
 
         if source.get("title"):
             ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350).pack(anchor="w")
@@ -441,48 +449,47 @@ class ProjectWindow:
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
-        # Drag-Start
-        frame.bind("<ButtonPress-1>", lambda e, f=frame: self.start_drag(e, f))
-
-        x, y = source.get("pos_x", 200), source.get("pos_y", 200)
+        # Karte im Canvas platzieren
+        x, y = source.get("pos_x", 300), source.get("pos_y", 300)
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
         self.update_scrollregion()
 
+    def start_drag(self, event, item_id):
+        self.dragging_item = item_id
+        self.drag_start_x = event.x_root
+        self.drag_start_y = event.y_root
+        self.drag_offset_x = event.x
+        self.drag_offset_y = event.y
+
+    def on_drag_motion(self, event):
+        if self.dragging_item:
+            dx = event.x_root - self.drag_start_x
+            dy = event.y_root - self.drag_start_y
+            new_x = self.canvas.coords(self.dragging_item)[0] + dx
+            new_y = self.canvas.coords(self.dragging_item)[1] + dy
+            self.canvas.coords(self.dragging_item, new_x, new_y)
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+
+    def on_drag_release(self, event):
+        if self.dragging_item:
+            coords = self.canvas.coords(self.dragging_item)
+            # Finde die zugehörige Quelle
+            for source_id, (_, item_id) in self.source_frames.items():
+                if item_id == self.dragging_item:
+                    source = next(s for s in self.project["data"]["sources"] if s["id"] == source_id)
+                    source["pos_x"] = coords[0]
+                    source["pos_y"] = coords[1]
+                    self.save_project()
+                    break
+            self.dragging_item = None
+            self.update_scrollregion()
+
     def update_scrollregion(self):
         self.canvas.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def start_drag(self, event, frame):
-        self.drag_data = {
-            "frame": frame,
-            "start_x": event.x_root,
-            "start_y": event.y_root,
-            "item_x": self.canvas.canvasx(event.x),
-            "item_y": self.canvas.canvasy(event.y)
-        }
-
-    def on_drag_motion(self, event):
-        if hasattr(self, "drag_data"):
-            dx = event.x_root - self.drag_data["start_x"]
-            dy = event.y_root - self.drag_data["start_y"]
-            new_x = self.drag_data["item_x"] + dx
-            new_y = self.drag_data["item_y"] + dy
-            source_id = self.drag_data["frame"].source_data["id"]
-            self.canvas.coords(self.source_frames[source_id][1], new_x, new_y)
-
-    def on_canvas_click(self, event):
-        if hasattr(self, "drag_data"):
-            frame = self.drag_data["frame"]
-            source = frame.source_data
-            item_id = self.source_frames[source["id"]][1]
-            coords = self.canvas.coords(item_id)
-            source["pos_x"] = coords[0]
-            source["pos_y"] = coords[1]
-            self.save_project()
-            self.update_scrollregion()
-            del self.drag_data
 
     def show_context_menu(self, event, source):
         self.selected_source = source
@@ -519,7 +526,7 @@ class ProjectWindow:
             "text": "",
             "keywords": keywords or "",
             "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "pos_x": 300,
+            "pos_x": 300 + len(self.project["data"]["sources"]) * 60,
             "pos_y": 300
         }
         self.project["data"]["sources"].append(source)
