@@ -14,6 +14,7 @@ from zipfile import ZipFile
 import threading
 import http.server
 import socketserver
+import webbrowser  # Für das Öffnen von URLs
 
 # ========= KONFIG =========
 VERSION = "1.0.0 devbeta"
@@ -133,7 +134,7 @@ class WdxApp:
             text = "Keine Browser-Verbindung"
             style = "danger"
         self.status_label.config(text=text, bootstyle=style)
-        self.root.after(30000, self.update_connection_status)  # alle 30 Sekunden
+        self.root.after(30000, self.update_connection_status)
 
     def load_projects(self):
         self.projects = []
@@ -325,11 +326,9 @@ class WdxApp:
     def open_project(self, project):
         project["last_modified"] = datetime.datetime.now().isoformat()
         self.save_projects()
-        # Projektansicht im selben Fenster öffnen
         ProjectWindow(self.root, project, self)
 
     def handle_communication(self, data):
-        # Aktualisiere Verbindungsstatus
         self.last_connection = datetime.datetime.now()
         self.connection_count += 1
 
@@ -349,7 +348,9 @@ class WdxApp:
             "title": data.get("title", ""),
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
-            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "pos_x": 100,  # Standardposition für neue Quellen
+            "pos_y": 100
         }
         project["data"]["sources"].append(source)
         project["last_modified"] = datetime.datetime.now().isoformat()
@@ -357,7 +358,6 @@ class WdxApp:
             json.dump(project["data"], f, indent=4)
         self.save_projects()
         messagebox.showinfo("Erfolg", f"Quelle '{source['url']}' in Projekt '{project_name}' gespeichert.")
-        # Status wird automatisch durch Timer aktualisiert
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -365,92 +365,163 @@ class ProjectWindow:
         self.root = root
         self.app = app
 
-        # Alle Widgets im Hauptfenster löschen und neue Ansicht aufbauen
+        # Alte Widgets entfernen
         for widget in root.winfo_children():
             widget.destroy()
 
-        self.main_frame = ttk.Frame(self.root, padding="20", bootstyle="light")
+        self.main_frame = ttk.Frame(self.root, padding="10", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
         # Header mit Zurück-Button
         header_frame = ttk.Frame(self.main_frame, padding="10", bootstyle="primary")
-        header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         header_frame.columnconfigure(1, weight=1)
 
         ttk.Button(header_frame, text="← Zurück zu Projekten", command=self.back_to_projects, bootstyle=(SECONDARY, OUTLINE)).grid(row=0, column=0, sticky=tk.W, padx=5)
         ttk.Label(header_frame, text=f"Projekt: {project['name']}", font=("Helvetica", 16, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W)
         ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 10)).grid(row=0, column=2, sticky=tk.E)
 
-        # Suche
-        search_frame = ttk.Frame(self.main_frame, padding="10")
-        search_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
-        ttk.Label(search_frame, text="🔍 Suche:", font=("Helvetica", 10)).grid(row=0, column=0, sticky=tk.W)
-        self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=50, bootstyle="info")
-        self.search_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=10)
-        search_frame.columnconfigure(1, weight=1)
-        self.search_var.trace("w", self.update_source_list)
+        # Mindmap-Canvas
+        self.canvas = tk.Canvas(self.main_frame, bg="#f8f9fa", highlightthickness=0)
+        self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame.rowconfigure(1, weight=1)
 
-        # Quellenliste
-        self.canvas = tk.Canvas(self.main_frame, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
-        self.source_frame = ttk.Frame(self.canvas, padding="10")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        # Scrollbars
+        h_scroll = ttk.Scrollbar(self.main_frame, orient="horizontal", command=self.canvas.xview)
+        v_scroll = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
+        h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
+        v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
-        self.canvas.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.scrollbar.grid(row=2, column=1, sticky=(tk.N, tk.S))
-        self.main_frame.columnconfigure(0, weight=1)
-        self.main_frame.rowconfigure(2, weight=1)
-
-        self.source_window = self.canvas.create_window((0, 0), window=self.source_frame, anchor="nw")
-        self.source_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.source_window, width=e.width))
-
-        # Buttons
-        button_frame = ttk.Frame(self.main_frame, padding="10")
-        button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=20)
-        ttk.Button(button_frame, text="Quelle hinzufügen", command=self.add_source, bootstyle=(PRIMARY, OUTLINE), width=18).grid(row=0, column=0, padx=5)
+        # Button zum Hinzufügen
+        add_btn = ttk.Button(self.main_frame, text="+ Quelle hinzufügen", command=self.add_source, bootstyle=(PRIMARY, OUTLINE))
+        add_btn.grid(row=0, column=3, padx=10, pady=5)
 
         # Kontextmenü
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
         self.context_menu.add_command(label="Löschen", command=self.delete_source)
         self.context_menu.add_command(label="Quellenangabe erstellen", command=self.create_citation)
 
-        self.update_source_list()
+        self.source_frames = {}
+        self.selected_source_index = None
 
-    def back_to_projects(self):
-        # Zurück zur Hauptansicht
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        self.app.main_frame.grid()
-        self.app.update_project_tiles()
+        self.load_sources_on_canvas()
 
-    def update_source_list(self, *args):
-        for widget in self.source_frame.winfo_children():
-            widget.destroy()
-        search_term = self.search_var.get().lower()
-        for idx, source in enumerate(self.project["data"]["sources"]):
-            if search_term and not (search_term in source["url"].lower() or search_term in (source.get("keywords", "") or "").lower() or search_term in (source.get("title", "") or "").lower()):
-                continue
-            source_frame = ttk.Frame(self.source_frame, padding="10", bootstyle="secondary", relief="flat", borderwidth=1)
-            source_frame.grid(row=idx, column=0, sticky=(tk.W, tk.E), pady=5)
-            source_frame.columnconfigure(0, weight=1)
+        # Drag & Drop Bindings
+        self.canvas.bind("<ButtonPress-1>", self.on_canvas_click)
+        self.canvas.bind("<B1-Motion>", self.on_drag_motion)
 
-            display_text = f"🌐 {source['url']} (Hinzugefügt: {source['added']})"
-            if source["title"]:
-                display_text = f"🌐 {source['title']}\n{source['url']} (Hinzugefügt: {source['added']})"
-            if source["text"]:
-                preview = source['text'][:70] + ("..." if len(source['text']) > 70 else "")
-                display_text += f"\n📝 Text: {preview}"
-            ttk.Label(source_frame, text=display_text, wraplength=700, font=("Helvetica", 10), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
-            if source["keywords"]:
-                ttk.Label(source_frame, text=f"🏷 Schlagworte: {source['keywords']}", font=("Helvetica", 9), bootstyle="secondary").grid(row=1, column=0, sticky=tk.W, pady=(4,0))
+    def load_sources_on_canvas(self):
+        for source in self.project["data"]["sources"]:
+            if "pos_x" not in source:
+                source["pos_x"] = 100
+                source["pos_y"] = 100
+            self.create_source_card(source)
 
-            source_frame.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
-            for child in source_frame.winfo_children():
-                child.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
+    def create_source_card(self, source):
+        frame = ttk.Frame(self.canvas, padding="12", bootstyle="secondary", relief="raised", borderwidth=2)
+        frame.source_data = source
+
+        # Titel/URL
+        title_text = source.get("title") or source["url"]
+        title_label = ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 11, "bold"), foreground="#2c3e50", wraplength=300)
+        title_label.pack(anchor="w")
+
+        # URL klein darunter
+        if source.get("title"):
+            url_label = ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=300)
+            url_label.pack(anchor="w")
+
+        # Textvorschau
+        if source["text"]:
+            preview = source["text"][:150] + ("..." if len(source["text"]) > 150 else "")
+            text_label = ttk.Label(frame, text=f"📝 {preview}", font=("Helvetica", 9), foreground="#34495e", wraplength=300)
+            text_label.pack(anchor="w", pady=(4,0))
+
+        # Schlagworte
+        if source["keywords"]:
+            kw_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=("Helvetica", 9), bootstyle="info")
+            kw_label.pack(anchor="w", pady=(4,0))
+
+        # Hinzugefügt-Datum
+        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6")
+        added_label.pack(anchor="w", pady=(6,0))
+
+        # Öffnen-Button
+        open_btn = ttk.Button(frame, text="Öffnen", bootstyle="success-outline", width=10,
+                              command=lambda url=source["url"]: webbrowser.open(url))
+        open_btn.pack(pady=(8,0))
+
+        # Rechtsklick für Kontextmenü
+        frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+        for child in frame.winfo_children():
+            child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+
+        # Drag-Start auf Frame
+        frame.bind("<ButtonPress-1>", lambda e, f=frame: self.start_drag(e, f))
+
+        # In Canvas platzieren
+        x = source.get("pos_x", 100)
+        y = source.get("pos_y", 100)
+        window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
+        self.source_frames[source] = (frame, window_id)
+
+        # Canvas groß genug machen
+        self.canvas.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def start_drag(self, event, frame):
+        self.drag_data = {
+            "frame": frame,
+            "start_x": event.x_root,
+            "start_y": event.y_root,
+            "item_x": self.canvas.canvasx(event.x),
+            "item_y": self.canvas.canvasy(event.y)
+        }
+
+    def on_drag_motion(self, event):
+        if hasattr(self, "drag_data"):
+            dx = event.x_root - self.drag_data["start_x"]
+            dy = event.y_root - self.drag_data["start_y"]
+            new_x = self.drag_data["item_x"] + dx
+            new_y = self.drag_data["item_y"] + dy
+            self.canvas.coords(self.source_frames[self.drag_data["frame"].source_data][1], new_x, new_y)
+
+    def on_canvas_click(self, event):
+        # Beendet Drag, speichert neue Position
+        if hasattr(self, "drag_data"):
+            frame = self.drag_data["frame"]
+            source = frame.source_data
+            item_id = self.source_frames[source][1]
+            coords = self.canvas.coords(item_id)
+            source["pos_x"] = coords[0]
+            source["pos_y"] = coords[1]
+            self.save_project()
+            del self.drag_data
+
+    def show_context_menu(self, event, source):
+        self.selected_source = source
+        self.context_menu.post(event.x_root, event.y_root)
+
+    def delete_source(self):
+        if hasattr(self, "selected_source"):
+            source = self.selected_source
+            if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
+                self.project["data"]["sources"].remove(source)
+                frame, item_id = self.source_frames[source]
+                self.canvas.delete(item_id)
+                frame.destroy()
+                del self.source_frames[source]
+                self.save_project()
+
+    def create_citation(self):
+        if hasattr(self, "selected_source"):
+            source = self.selected_source
+            citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+            pyperclip.copy(citation)
+            messagebox.showinfo("Erfolg", "Quellenangabe in die Zwischenablage kopiert.")
 
     def add_source(self):
         url = simpledialog.askstring("Neue Quelle", "URL der Quelle eingeben:", parent=self.root)
@@ -462,37 +533,28 @@ class ProjectWindow:
             "title": "",
             "text": "",
             "keywords": keywords or "",
-            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "pos_x": 150,
+            "pos_y": 150
         }
         self.project["data"]["sources"].append(source)
-        self.project["last_modified"] = datetime.datetime.now().isoformat()
+        self.create_source_card(source)
         self.save_project()
-        self.update_source_list()
         messagebox.showinfo("Erfolg", f"Quelle '{url}' hinzugefügt.")
 
     def save_project(self):
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
             json.dump(self.project["data"], f, indent=4)
+        self.project["last_modified"] = datetime.datetime.now().isoformat()
 
-    def show_context_menu(self, event, index):
-        self.selected_source_index = index
-        self.context_menu.post(event.x_root, event.y_root)
-
-    def delete_source(self):
-        if hasattr(self, "selected_source_index"):
-            source = self.project["data"]["sources"][self.selected_source_index]
-            if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
-                self.project["data"]["sources"].pop(self.selected_source_index)
-                self.project["last_modified"] = datetime.datetime.now().isoformat()
-                self.save_project()
-                self.update_source_list()
-
-    def create_citation(self):
-        if hasattr(self, "selected_source_index"):
-            source = self.project["data"]["sources"][self.selected_source_index]
-            citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
-            pyperclip.copy(citation)
-            messagebox.showinfo("Erfolg", "Quellenangabe in die Zwischenablage kopiert.")
+    def back_to_projects(self):
+        # Speichern vor dem Verlassen
+        self.save_project()
+        # Alles entfernen und Hauptansicht wiederherstellen
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.app.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.app.update_project_tiles()
 
 if __name__ == "__main__":
     root = ttk.Window()
