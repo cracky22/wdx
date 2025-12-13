@@ -77,10 +77,7 @@ class ProjectManager:
         self.save_projects()
         return True, project
 
-    def import_project(self):
-        file_path = filedialog.askopenfilename(filetypes=[("wdx Files", "*.wdx")])
-        if not file_path:
-            return False, None
+    def import_project(self, file_path):
         with ZipFile(file_path, "r") as zip_ref:
             temp_dir = WDX_DIR / "temp_import"
             temp_dir.mkdir(exist_ok=True)
