@@ -37,9 +37,11 @@ class SourceDialog(tk.Toplevel):
 
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
-        text_frame.pack(fill="both", expand=True, pady=(0,10))
+        # FIX: Vertikale Expansion entfernt (expand=True und fill="both" zu fill="x" geändert)
+        text_frame.pack(fill="x", pady=(0,10)) 
         self.text_text = tk.Text(text_frame, height=10, wrap="word")
-        self.text_text.pack(fill="both", expand=True)
+        # FIX: Nur horizontale Füllung, nutzt die feste Höhe von 10 Zeilen
+        self.text_text.pack(fill="x") 
         self.text_text.insert("1.0", self.source.get("text", ""))
 
         ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -54,7 +56,10 @@ class SourceDialog(tk.Toplevel):
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
 
-        used_colors = list({s.get("color", "#ffffff") for s in project_window.project["data"]["sources"] if s.get("color") != "#ffffff"})
+        # KONSISTENZ-FIX: Farben aus der neuen 'items' Struktur holen
+        all_items = project_window.project["data"].get("items", [])
+        used_colors = list({s.get("color", "#ffffff") for s in all_items if s.get("type") == "source" and s.get("color") != "#ffffff"})
+        
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
             palette = ttk.Frame(main)
