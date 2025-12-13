@@ -24,7 +24,6 @@ function applyTheme() {
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
-// Schöne Meldung unter dem Button
 function showMessage(text, type = 'success') {
   saveMessageEl.textContent = text;
   saveMessageEl.className = type;
@@ -35,7 +34,6 @@ function showMessage(text, type = 'success') {
   }, 3000);
 }
 
-// Verbindung prüfen
 async function updateConnection() {
   connectBtn.disabled = true;
   connectBtn.textContent = "Prüfe Verbindung...";
@@ -53,11 +51,7 @@ async function updateConnection() {
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
 
-      if (data.current_project) {
-        projectNameEl.textContent = data.current_project;
-      } else {
-        projectNameEl.textContent = "Kein Projekt geöffnet";
-      }
+      projectNameEl.textContent = data.current_project || "Kein Projekt geöffnet";
       projectEl.style.display = "block";
     } else {
       throw new Error();
@@ -77,7 +71,6 @@ async function updateConnection() {
 
 connectBtn.addEventListener('click', updateConnection);
 
-// Speichern aus Popup (ganze Seite)
 saveBtn.addEventListener('click', async () => {
   if (!isConnected) {
     showMessage("Keine Verbindung zu WDX", "error");
@@ -93,11 +86,6 @@ saveBtn.addEventListener('click', async () => {
     keywords: ""
   };
 
-  await sendToWDX(payload, "Quelle erfolgreich gespeichert!");
-});
-
-// Funktion zum Senden an WDX (wiederverwendbar für Popup und Rechtsklick)
-async function sendToWDX(payload, successMessage) {
   try {
     const response = await fetch(API_ADD, {
       method: 'POST',
@@ -106,7 +94,7 @@ async function sendToWDX(payload, successMessage) {
     });
 
     if (response.ok) {
-      showMessage(successMessage);
+      showMessage("Quelle erfolgreich gespeichert!");
       updateConnection();
     } else {
       showMessage("Fehler beim Speichern", "error");
@@ -114,35 +102,6 @@ async function sendToWDX(payload, successMessage) {
   } catch (err) {
     showMessage("Keine Verbindung zum WDX-Server", "error");
   }
-}
-
-// Wichtig: Nachrichten vom background.js empfangen (Rechtsklick-Menü)
-chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  if (message.type === "save_text" || message.type === "save_page") {
-    if (!isConnected) {
-      // Auch wenn Popup nicht offen ist, versuchen wir zu speichern
-      // (aber nur wenn Verbindung besteht – sonst ignorieren)
-      const check = await fetch(API_STATUS).catch(() => null);
-      if (!check || !check.ok) {
-        // Keine Verbindung – nichts tun (kein nerviges Popup)
-        return;
-      }
-    }
-
-    const payload = {
-      url: message.url,
-      title: message.title,
-      text: message.text || "",
-      keywords: message.keywords || ""
-    };
-
-    const successMsg = message.text 
-      ? "Ausgewählter Text erfolgreich gespeichert!" 
-      : "Quelle erfolgreich gespeichert!";
-
-    await sendToWDX(payload, successMsg);
-  }
 });
 
-// Beim Öffnen prüfen
 updateConnection();
