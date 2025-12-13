@@ -2,24 +2,104 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>WDX Letzte Quellen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WDX</title>
   <style>
-    body { font-family: Arial, sans-serif; width: 350px; padding: 10px; }
-    h3 { margin: 0 0 10px; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 8px 0; word-break: break-all; }
-    a { color: #007bff; text-decoration: none; }
-    .status { font-weight: bold; margin-bottom: 15px; }
-    .online { color: green; }
-    .offline { color: red; }
+    body {
+      width: 360px;
+      padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.light {
+      background: #ffffff;
+      color: #000000;
+    }
+    body.dark {
+      background: #1e1e1e;
+      color: #ffffff;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      text-align: center;
+    }
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 15px 0;
+      text-align: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .project {
+      margin: 15px 0;
+      padding: 12px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 8px;
+      text-align: center;
+      font-size: 14px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #connectBtn {
+      background: #007bff;
+      color: white;
+    }
+    #connectBtn:hover {
+      background: #0056b3;
+    }
+    #connectBtn.connected {
+      background: #28a745;
+    }
+    #connectBtn.connected:hover {
+      background: #218838;
+    }
+    #saveBtn {
+      background: #28a745;
+      color: white;
+    }
+    #saveBtn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    #saveBtn:hover:not(:disabled) {
+      background: #218838;
+    }
   </style>
 </head>
-<body>
-  <h3>WDX Status</h3>
-  <div id="status" class="status offline">Prüfe Verbindung...</div>
+<body class="light">
+  <h1>WDX Quellen</h1>
 
-  <h3>Letzte 3 gesicherte Quellen</h3>
-  <ul id="history"></ul>
+  <div id="status" class="status disconnected">
+    Nicht verbunden
+  </div>
+
+  <button id="connectBtn">Verbinden</button>
+
+  <div id="currentProject" class="project" style="display: none;">
+    Aktuelles Projekt: <strong id="projectName">—</strong>
+  </div>
+
+  <button id="saveBtn" disabled>Speichern in WDX</button>
 
   <script src="popup.js"></script>
 </body>

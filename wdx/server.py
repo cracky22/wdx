@@ -11,7 +11,11 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/api/add_source":
-            content_length = int(self.headers["Content-Length"])
+            content_length = int(self.headers.get("Content-Length", 0))
+            if content_length == 0:
+                self.send_response(400)
+                self.end_headers()
+                return
             post_data = self.rfile.read(content_length).decode("utf-8")
             try:
                 data = json.loads(post_data)
@@ -28,6 +32,29 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_GET(self):
+        if self.path == "/api/status":
+            current_project = getattr(self.app, "current_project_name", None)  # Falls du das später setzt
+            response = {
+                "connected": True,
+                "current_project": current_project
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode("utf-8"))
+        else:
+            super().do_GET()
+
+    def do_HEAD(self):
+        # Wichtig: HEAD-Anfragen für /api/add_source abfangen, damit Verbindungstest klappt
+        if self.path == "/api/add_source" or self.path == "/api/status":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+        else:
+            super().do_HEAD()
 
 def start_server(app):
     handler = lambda *args, **kwargs: WdxHTTPRequestHandler(*args, app=app, **kwargs)
