@@ -9,10 +9,11 @@ const connectBtn = document.getElementById('connectBtn');
 const saveBtn = document.getElementById('saveBtn');
 const projectEl = document.getElementById('currentProject');
 const projectNameEl = document.getElementById('projectName');
+const saveMessageEl = document.getElementById('saveMessage');
 
 // Dark Mode
 function applyTheme() {
-  if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.classList.add('dark');
     document.body.classList.remove('light');
   } else {
@@ -23,6 +24,18 @@ function applyTheme() {
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
+// Schöne Meldung unter dem Button (verschwindet nach 3 Sekunden)
+function showMessage(text, type = 'success') {
+  saveMessageEl.textContent = text;
+  saveMessageEl.className = type;
+  saveMessageEl.style.opacity = 1;
+
+  setTimeout(() => {
+    saveMessageEl.style.opacity = 0;
+  }, 3000);
+}
+
+// Verbindung prüfen
 async function updateConnection() {
   connectBtn.disabled = true;
   connectBtn.textContent = "Prüfe Verbindung...";
@@ -64,9 +77,10 @@ async function updateConnection() {
 
 connectBtn.addEventListener('click', updateConnection);
 
+// Speichern aus Popup (ganze Seite)
 saveBtn.addEventListener('click', async () => {
   if (!isConnected) {
-    alert("Keine Verbindung zu WDX");
+    showMessage("Keine Verbindung zu WDX", "error");
     return;
   }
 
@@ -87,13 +101,47 @@ saveBtn.addEventListener('click', async () => {
     });
 
     if (response.ok) {
-      alert("Quelle erfolgreich in WDX gespeichert!");
+      showMessage("Quelle erfolgreich in WDX gespeichert!");
       updateConnection();
     } else {
-      alert("Fehler beim Speichern.");
+      showMessage("Fehler beim Speichern", "error");
     }
   } catch (err) {
-    alert("Keine Verbindung zum WDX-Server.");
+    showMessage("Keine Verbindung zum WDX-Server", "error");
+  }
+});
+
+// Nachrichten vom background.js empfangen (Rechtsklick-Menü)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "save_text" || message.type === "save_page") {
+    if (!isConnected) {
+      showMessage("Keine Verbindung zu WDX", "error");
+      return;
+    }
+
+    const payload = {
+      url: message.url,
+      title: message.title,
+      text: message.text || "",
+      keywords: message.keywords || ""
+    };
+
+    fetch(API_ADD, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(response => {
+      if (response.ok) {
+        showMessage(message.text ? "Auswahl erfolgreich gespeichert!" : "Quelle erfolgreich gespeichert!");
+        updateConnection();
+      } else {
+        showMessage("Fehler beim Speichern", "error");
+      }
+    })
+    .catch(() => {
+      showMessage("Keine Verbindung zum Server", "error");
+    });
   }
 });
 
