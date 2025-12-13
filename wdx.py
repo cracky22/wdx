@@ -9,14 +9,11 @@ from tkinter import ttk, simpledialog, messagebox, filedialog
 from pathlib import Path
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from ttkbootstrap.icons import Icon
 import pyperclip
 from zipfile import ZipFile
-import time
 import threading
 import http.server
 import socketserver
-import urllib.parse
 
 # ========= KONFIG =========
 VERSION = "1.0.0 devbeta"
@@ -57,7 +54,7 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 class WdxApp:
     def __init__(self, root):
         self.root = root
-        self.style = ttk.Style("flatly")  # Modernes Design mit ttkbootstrap
+        self.style = ttk.Style("flatly")
         self.root.title(APP_TITLE)
         self.root.geometry("1000x600")
         try:
@@ -69,13 +66,17 @@ class WdxApp:
         self.projects = []
         self.load_projects()
 
-        # Hauptfenster GUI
+        # Verbindungstatus
+        self.last_connection = None
+        self.connection_count = 0
+
+        # Hauptframe für Projektübersicht
         self.main_frame = ttk.Frame(self.root, padding="20", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
-        # Header mit Buttons
+        # Header
         header_frame = ttk.Frame(self.main_frame, padding="10", bootstyle="primary")
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
         header_frame.columnconfigure(1, weight=1)
@@ -84,7 +85,11 @@ class WdxApp:
         ttk.Button(header_frame, text="Projekt importieren", command=self.import_project, bootstyle=(SECONDARY, OUTLINE), width=15).grid(row=0, column=1, padx=5)
         ttk.Label(header_frame, text=APP_TITLE, font=("Helvetica", 16, "bold"), bootstyle="inverse-primary").grid(row=0, column=2, sticky=tk.E)
 
-        # Projektkacheln in Scrollable Frame
+        # Status-Label für Browser-Verbindung
+        self.status_label = ttk.Label(header_frame, text="Keine Browser-Verbindung", font=("Helvetica", 10), bootstyle="danger")
+        self.status_label.grid(row=1, column=2, sticky=tk.E, pady=5)
+
+        # Projektkacheln
         self.canvas = tk.Canvas(self.main_frame, highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
         self.project_frame = ttk.Frame(self.canvas, padding="10")
@@ -104,18 +109,33 @@ class WdxApp:
         # HTTP-Server starten
         self.start_http_server()
 
+        # Status periodisch aktualisieren
+        self.update_connection_status()
+
     def start_http_server(self):
-        """Startet den HTTP-Server für die Chrome-Erweiterung."""
         handler = lambda *args, **kwargs: WdxHTTPRequestHandler(*args, app=self, **kwargs)
         self.httpd = socketserver.TCPServer(("", PORT), handler)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def _resize_canvas(self, event):
-        """Passt die Breite des Canvas-Fensters an."""
         self.canvas.itemconfig(self.project_window, width=event.width)
 
+    def update_connection_status(self):
+        if self.last_connection:
+            minutes_ago = (datetime.datetime.now() - self.last_connection).total_seconds() / 60
+            if minutes_ago < 5:
+                text = f"Verbunden ({self.connection_count} Aktionen)"
+                style = "success"
+            else:
+                text = f"Letzte Verbindung vor {int(minutes_ago)} Min."
+                style = "warning"
+        else:
+            text = "Keine Browser-Verbindung"
+            style = "danger"
+        self.status_label.config(text=text, bootstyle=style)
+        self.root.after(30000, self.update_connection_status)  # alle 30 Sekunden
+
     def load_projects(self):
-        """Lädt Projekte aus projects.json."""
         self.projects = []
         if PROJECTS_FILE.exists():
             try:
@@ -136,7 +156,6 @@ class WdxApp:
                 self.save_projects()
 
     def save_projects(self):
-        """Speichert Projekte in projects.json."""
         projects_data = []
         for project in self.projects:
             project_data = {
@@ -153,7 +172,6 @@ class WdxApp:
             json.dump(projects_data, f, indent=4)
 
     def update_project_tiles(self):
-        """Aktualisiert die Projektkacheln."""
         for widget in self.project_frame.winfo_children():
             widget.destroy()
         for idx, project in enumerate(self.projects):
@@ -168,15 +186,15 @@ class WdxApp:
             now = datetime.datetime.now()
             minutes = (now - last_modified).total_seconds() / 60
             time_str = f"{int(minutes)} Minuten" if minutes < 60 else f"{int(minutes // 60)} Stunden"
-            ttk.Label(tile, text=f"🕒 Bearbeitet: {time_str}", font=("Helvetica", 10)).grid(row=3, column=0, sticky=tk.W, pady=2)
+            ttk.Label(tile, text=f"🕒 Bearbeitet: {time_str} her", font=("Helvetica", 10)).grid(row=3, column=0, sticky=tk.W, pady=2)
 
             menu_button = ttk.Menubutton(tile, text="⋮", bootstyle=(DARK, OUTLINE), width=3)
             menu_button.grid(row=0, column=1, sticky=tk.E)
             menu = tk.Menu(menu_button, tearoff=0, font=("Helvetica", 10))
-            menu.add_command(label="Umbenennen", command=lambda p=project: self.rename_project(p))
-            menu.add_command(label="Bearbeiten", command=lambda p=project: self.edit_project(p))
-            menu.add_command(label="Löschen", command=lambda p=project: self.delete_project(p))
-            menu.add_command(label="Exportieren", command=lambda p=project: self.export_project(p))
+            menu.add_command(label="✏️ Umbenennen", command=lambda p=project: self.rename_project(p))
+            menu.add_command(label="📝 Bearbeiten", command=lambda p=project: self.edit_project(p))
+            menu.add_command(label="💾 Exportieren", command=lambda p=project: self.export_project(p))
+            menu.add_command(label="🗑️ Löschen", command=lambda p=project: self.delete_project(p))
             menu_button["menu"] = menu
 
             tile.bind("<Double-1>", lambda e, p=project: self.open_project(p))
@@ -184,7 +202,6 @@ class WdxApp:
                 child.bind("<Double-1>", lambda e, p=project: self.open_project(p))
 
     def create_project(self):
-        """Erstellt ein neues Projekt."""
         name = simpledialog.askstring("Neues Projekt", "Projektname:", parent=self.root)
         if not name:
             return
@@ -223,7 +240,6 @@ class WdxApp:
         self.update_project_tiles()
 
     def import_project(self):
-        """Importiert ein Projekt aus einer .wdx-Datei."""
         file_path = filedialog.askopenfilename(filetypes=[("WDX Files", "*.wdx")])
         if file_path:
             with ZipFile(file_path, "r") as zip_ref:
@@ -261,7 +277,6 @@ class WdxApp:
                 self.update_project_tiles()
 
     def rename_project(self, project):
-        """Benennt ein Projekt um."""
         new_name = simpledialog.askstring("Umbenennen", "Neuer Projektname:", initialvalue=project["name"], parent=self.root)
         if new_name and new_name != project["name"]:
             if re.search(INVALID_CHARS, new_name):
@@ -282,9 +297,8 @@ class WdxApp:
             self.update_project_tiles()
 
     def edit_project(self, project):
-        """Bearbeitet die Projektbeschreibung."""
         new_desc = simpledialog.askstring("Bearbeiten", "Neue Projektbeschreibung:", initialvalue=project["description"], parent=self.root)
-        if new_desc:
+        if new_desc is not None:
             project["description"] = new_desc
             project["data"]["description"] = new_desc
             project["last_modified"] = datetime.datetime.now().isoformat()
@@ -294,7 +308,6 @@ class WdxApp:
             self.update_project_tiles()
 
     def delete_project(self, project):
-        """Löscht ein Projekt."""
         if messagebox.askyesno("Bestätigen", f"Projekt '{project['name']}' löschen?", parent=self.root):
             shutil.rmtree(project["path"])
             self.projects.remove(project)
@@ -302,32 +315,33 @@ class WdxApp:
             self.update_project_tiles()
 
     def export_project(self, project):
-        """Exportiert ein Projekt als .wdx-Datei."""
         file_path = filedialog.asksaveasfilename(defaultextension=".wdx", filetypes=[("WDX Files", "*.wdx")], initialfile=f"{project['name']}.wdx")
         if file_path:
             with ZipFile(file_path, "w") as zip_ref:
                 for file in project["path"].rglob("*"):
                     zip_ref.write(file, file.relative_to(project["path"]))
-            messagebox.showinfo("Erfolg", f"Projekt als '{file_path}' exportiert.")
+            messagebox.showinfo("Erfolg", f"Projekt als '{os.path.basename(file_path)}' exportiert.")
 
     def open_project(self, project):
-        """Öffnet ein Projektfenster."""
         project["last_modified"] = datetime.datetime.now().isoformat()
         self.save_projects()
-        ProjectWindow(self.root, project)
-        self.update_project_tiles()
+        # Projektansicht im selben Fenster öffnen
+        ProjectWindow(self.root, project, self)
 
     def handle_communication(self, data):
-        """Verarbeitet eingehende Quellen/Texte von der Chrome-Erweiterung."""
+        # Aktualisiere Verbindungsstatus
+        self.last_connection = datetime.datetime.now()
+        self.connection_count += 1
+
         self.root.deiconify()
         self.root.lift()
         project_names = [p["name"] for p in self.projects]
         if not project_names:
             messagebox.showerror("Fehler", "Keine Projekte vorhanden. Bitte erstellen Sie ein Projekt.")
             return
-        project_name = simpledialog.askstring("Projekt wählen", "In welches Projekt speichern?", parent=self.root)
+        project_name = simpledialog.askstring("Projekt wählen", "In welches Projekt speichern?\nVerfügbare Projekte:\n" + "\n".join(project_names), parent=self.root)
         if not project_name or project_name not in project_names:
-            messagebox.showerror("Fehler", "Ungültiger Projektname!")
+            messagebox.showerror("Fehler", "Ungültiger oder leerer Projektname!")
             return
         project = next(p for p in self.projects if p["name"] == project_name)
         source = {
@@ -343,28 +357,33 @@ class WdxApp:
             json.dump(project["data"], f, indent=4)
         self.save_projects()
         messagebox.showinfo("Erfolg", f"Quelle '{source['url']}' in Projekt '{project_name}' gespeichert.")
+        # Status wird automatisch durch Timer aktualisiert
 
 class ProjectWindow:
-    def __init__(self, parent, project):
+    def __init__(self, root, project, app):
         self.project = project
-        self.window = tk.Toplevel(parent)
-        self.style = ttk.Style("flatly")
-        self.window.title(f"Projekt: {project['name']}")
-        self.window.geometry("900x700")
-        self.window.transient(parent)
-        self.window.grab_set()
+        self.root = root
+        self.app = app
 
-        self.main_frame = ttk.Frame(self.window, padding="20", bootstyle="light")
+        # Alle Widgets im Hauptfenster löschen und neue Ansicht aufbauen
+        for widget in root.winfo_children():
+            widget.destroy()
+
+        self.main_frame = ttk.Frame(self.root, padding="20", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.window.columnconfigure(0, weight=1)
-        self.window.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
 
+        # Header mit Zurück-Button
         header_frame = ttk.Frame(self.main_frame, padding="10", bootstyle="primary")
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
         header_frame.columnconfigure(1, weight=1)
-        ttk.Label(header_frame, text=f"Projekt: {project['name']}", font=("Helvetica", 16, "bold"), bootstyle="inverse-primary").grid(row=0, column=0, sticky=tk.W)
-        ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 10)).grid(row=0, column=1, sticky=tk.E)
 
+        ttk.Button(header_frame, text="← Zurück zu Projekten", command=self.back_to_projects, bootstyle=(SECONDARY, OUTLINE)).grid(row=0, column=0, sticky=tk.W, padx=5)
+        ttk.Label(header_frame, text=f"Projekt: {project['name']}", font=("Helvetica", 16, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W)
+        ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 10)).grid(row=0, column=2, sticky=tk.E)
+
+        # Suche
         search_frame = ttk.Frame(self.main_frame, padding="10")
         search_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
         ttk.Label(search_frame, text="🔍 Suche:", font=("Helvetica", 10)).grid(row=0, column=0, sticky=tk.W)
@@ -374,7 +393,8 @@ class ProjectWindow:
         search_frame.columnconfigure(1, weight=1)
         self.search_var.trace("w", self.update_source_list)
 
-        self.canvas = tk.Canvas(self.main_frame, highlightthickness=0, bootstyle="light")
+        # Quellenliste
+        self.canvas = tk.Canvas(self.main_frame, highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
         self.source_frame = ttk.Frame(self.canvas, padding="10")
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
@@ -388,80 +408,86 @@ class ProjectWindow:
         self.source_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.source_window, width=e.width))
 
+        # Buttons
         button_frame = ttk.Frame(self.main_frame, padding="10")
         button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=20)
-        ttk.Button(button_frame, text="Quelle hinzufügen", command=self.add_source, bootstyle=(PRIMARY, OUTLINE), width=15).grid(row=0, column=0, padx=5)
-        ttk.Button(button_frame, text="Schließen", command=self.window.destroy, bootstyle=(SECONDARY, OUTLINE), width=15).grid(row=0, column=1, padx=5)
+        ttk.Button(button_frame, text="Quelle hinzufügen", command=self.add_source, bootstyle=(PRIMARY, OUTLINE), width=18).grid(row=0, column=0, padx=5)
 
-        self.context_menu = tk.Menu(self.window, tearoff=0, font=("Helvetica", 10))
+        # Kontextmenü
+        self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
         self.context_menu.add_command(label="Löschen", command=self.delete_source)
         self.context_menu.add_command(label="Quellenangabe erstellen", command=self.create_citation)
 
         self.update_source_list()
 
+    def back_to_projects(self):
+        # Zurück zur Hauptansicht
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.app.main_frame.grid()
+        self.app.update_project_tiles()
+
     def update_source_list(self, *args):
-        """Aktualisiert die Quellenliste basierend auf der Suche."""
         for widget in self.source_frame.winfo_children():
             widget.destroy()
         search_term = self.search_var.get().lower()
         for idx, source in enumerate(self.project["data"]["sources"]):
-            if not search_term or search_term in source["url"].lower() or search_term in source.get("keywords", "").lower():
-                source_frame = ttk.Frame(self.source_frame, padding="10", bootstyle="secondary", relief="flat", borderwidth=1)
-                source_frame.grid(row=idx, column=0, sticky=(tk.W, tk.E), pady=5)
-                source_frame.columnconfigure(0, weight=1)
+            if search_term and not (search_term in source["url"].lower() or search_term in (source.get("keywords", "") or "").lower() or search_term in (source.get("title", "") or "").lower()):
+                continue
+            source_frame = ttk.Frame(self.source_frame, padding="10", bootstyle="secondary", relief="flat", borderwidth=1)
+            source_frame.grid(row=idx, column=0, sticky=(tk.W, tk.E), pady=5)
+            source_frame.columnconfigure(0, weight=1)
 
-                display_text = f"🌐 {source['url']} (Hinzugefügt: {source['added']})"
-                if source["title"]:
-                    display_text = f"🌐 {source['title']}\n{source['url']} (Hinzugefügt: {source['added']})"
-                if source["text"]:
-                    display_text += f"\n📝 Text: {source['text'][:50]}..."
-                ttk.Label(source_frame, text=display_text, wraplength=600, font=("Helvetica", 10)).grid(row=0, column=0, sticky=tk.W)
-                ttk.Label(source_frame, text=f"🏷 Schlagworte: {source['keywords']}", font=("Helvetica", 9), bootstyle="secondary").grid(row=1, column=0, sticky=tk.W)
+            display_text = f"🌐 {source['url']} (Hinzugefügt: {source['added']})"
+            if source["title"]:
+                display_text = f"🌐 {source['title']}\n{source['url']} (Hinzugefügt: {source['added']})"
+            if source["text"]:
+                preview = source['text'][:70] + ("..." if len(source['text']) > 70 else "")
+                display_text += f"\n📝 Text: {preview}"
+            ttk.Label(source_frame, text=display_text, wraplength=700, font=("Helvetica", 10), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
+            if source["keywords"]:
+                ttk.Label(source_frame, text=f"🏷 Schlagworte: {source['keywords']}", font=("Helvetica", 9), bootstyle="secondary").grid(row=1, column=0, sticky=tk.W, pady=(4,0))
 
-                source_frame.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
-                for child in source_frame.winfo_children():
-                    child.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
+            source_frame.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
+            for child in source_frame.winfo_children():
+                child.bind("<Button-3>", lambda e, i=idx: self.show_context_menu(e, i))
 
     def add_source(self):
-        """Fügt eine neue Quelle hinzu."""
-        url = simpledialog.askstring("Neue Quelle", "URL der Quelle eingeben:", parent=self.window)
-        if url:
-            keywords = simpledialog.askstring("Schlagworte", "Schlagworte (durch Kommas getrennt):", parent=self.window)
-            source = {
-                "url": url,
-                "title": "",
-                "text": "",
-                "keywords": keywords or "",
-                "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            self.project["data"]["sources"].append(source)
-            self.project["last_modified"] = datetime.datetime.now().isoformat()
-            self.save_project()
-            self.update_source_list()
-            messagebox.showinfo("Erfolg", f"Quelle '{url}' hinzugefügt.")
+        url = simpledialog.askstring("Neue Quelle", "URL der Quelle eingeben:", parent=self.root)
+        if not url:
+            return
+        keywords = simpledialog.askstring("Schlagworte", "Schlagworte (durch Kommas getrennt):", parent=self.root)
+        source = {
+            "url": url,
+            "title": "",
+            "text": "",
+            "keywords": keywords or "",
+            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.project["data"]["sources"].append(source)
+        self.project["last_modified"] = datetime.datetime.now().isoformat()
+        self.save_project()
+        self.update_source_list()
+        messagebox.showinfo("Erfolg", f"Quelle '{url}' hinzugefügt.")
 
     def save_project(self):
-        """Speichert die Projektdaten."""
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
             json.dump(self.project["data"], f, indent=4)
 
     def show_context_menu(self, event, index):
-        """Zeigt das Kontextmenü für die Quellenliste."""
         self.selected_source_index = index
         self.context_menu.post(event.x_root, event.y_root)
 
     def delete_source(self):
-        """Löscht die ausgewählte Quelle."""
         if hasattr(self, "selected_source_index"):
             source = self.project["data"]["sources"][self.selected_source_index]
-            if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.window):
+            if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
                 self.project["data"]["sources"].pop(self.selected_source_index)
                 self.project["last_modified"] = datetime.datetime.now().isoformat()
                 self.save_project()
                 self.update_source_list()
 
     def create_citation(self):
-        """Kopiert die Quellenangabe in die Zwischenablage."""
         if hasattr(self, "selected_source_index"):
             source = self.project["data"]["sources"][self.selected_source_index]
             citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
