@@ -456,8 +456,6 @@ class ProjectWindow:
 
     def reload_current_page(self, source):
         """Startet den Reload-Prozess in einem Hintergrund-Thread."""
-        self.root.after(0, lambda: messagebox.showinfo("Info", "Seite wird im Hintergrund aktualisiert...", parent=self.root))
-        
         threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
 
     def _reload_worker(self, source):
@@ -530,8 +528,6 @@ class ProjectWindow:
             # Startet asynchrone I/O-Vorbereitung und anschließende GUI-Erstellung
             threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
 
-
-        messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!", parent=self.root)
 
     def _concurrent_reload_single_card(self, source):
         """Worker für das Neuladen einer einzelnen Karte."""
