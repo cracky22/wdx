@@ -360,7 +360,7 @@ class ProjectWindow:
         self.root = root
         self.app = app
         self.source_frames = {}
-        self.selected_source_id = None  # ID der ausgewählten Karte
+        self.selected_source_id = None
         self.dragging = False
         self.drag_start_x = 0
         self.drag_start_y = 0
@@ -397,6 +397,7 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
+        # Globale Maus-Events für Drag
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
@@ -433,8 +434,15 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick-Menü dynamisch bauen
+        # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+        for child in frame.winfo_children():
+            child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
+
+        # Drag-Events auf dem Frame (nur wenn ausgewählt)
+        frame.bind("<ButtonPress-1>", lambda e: self.on_frame_press(e, source["id"]))
+        frame.bind("<B1-Motion>", lambda e: self.on_frame_motion(e))
+        frame.bind("<ButtonRelease-1>", lambda e: self.on_frame_release(e))
 
         x, y = source.get("pos_x", 300), source.get("pos_y", 300)
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
@@ -443,12 +451,12 @@ class ProjectWindow:
         self.update_scrollregion()
 
     def show_context_menu(self, event, source):
-        self.context_menu.delete(0, tk.END)  # Menü leeren
+        self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
         self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
 
         if self.selected_source_id == source["id"]:
-            self.context_menu.add_command(label="Karte abwählen", command=lambda: self.deselect_card())
+            self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
         else:
             self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
 
@@ -471,27 +479,22 @@ class ProjectWindow:
             frame.config(borderwidth=2, bootstyle="secondary")
         self.selected_source_id = None
 
-    def on_press(self, event):
-        items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
-        if items:
-            item_id = items[-1]
-            for src_id, (_, wid) in self.source_frames.items():
-                if wid == item_id and src_id == self.selected_source_id:
-                    self.dragging = True
-                    self.drag_start_x = event.x
-                    self.drag_start_y = event.y
-                    self.canvas.tag_raise(item_id)
-                    break
+    def on_frame_press(self, event, source_id):
+        if source_id == self.selected_source_id:
+            self.dragging = True
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+            self.canvas.tag_raise(self.source_frames[source_id][1])
 
-    def on_motion(self, event):
+    def on_frame_motion(self, event):
         if self.dragging:
-            dx = event.x - self.drag_start_x
-            dy = event.y - self.drag_start_y
+            dx = event.x_root - self.drag_start_x
+            dy = event.y_root - self.drag_start_y
             self.canvas.move(self.source_frames[self.selected_source_id][1], dx, dy)
-            self.drag_start_x = event.x
-            self.drag_start_y = event.y
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
 
-    def on_release(self, event):
+    def on_frame_release(self, event):
         if self.dragging:
             coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
             source = next(s for s in self.project["data"]["sources"] if s["id"] == self.selected_source_id)
@@ -500,6 +503,18 @@ class ProjectWindow:
             self.save_project()
             self.dragging = False
             self.update_scrollregion()
+
+    def on_press(self, event):
+        # Für Klicks auf leeren Bereich – deselektiert
+        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
+        if not items or items[-1] not in [wid for _, wid in self.source_frames.values()]:
+            self.deselect_card()
+
+    def on_motion(self, event):
+        pass  # Nicht mehr nötig
+
+    def on_release(self, event):
+        pass  # Nicht mehr nötig
 
     def delete_source(self, source):
         if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
