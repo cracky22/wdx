@@ -78,7 +78,7 @@ class ProjectManager:
         return True, project
 
     def import_project(self):
-        file_path = filedialog.askopenfilename(filetypes=[("WDX Files", "*.wdx")])
+        file_path = filedialog.askopenfilename(filetypes=[("wdx Files", "*.wdx")])
         if not file_path:
             return False, None
         with ZipFile(file_path, "r") as zip_ref:
@@ -87,7 +87,7 @@ class ProjectManager:
             zip_ref.extractall(temp_dir)
             project_json = temp_dir / "project.json"
             if not project_json.exists():
-                messagebox.showerror("Fehler", "Ungültige WDX-Datei!")
+                messagebox.showerror("Fehler", "Ungültige wdx-Datei!")
                 shutil.rmtree(temp_dir)
                 return False, None
             with open(project_json, "r", encoding="utf-8") as f:
@@ -146,7 +146,7 @@ class ProjectManager:
         self.save_projects()
 
     def export_project(self, project):
-        file_path = filedialog.asksaveasfilename(defaultextension=".wdx", filetypes=[("WDX Files", "*.wdx")], initialfile=f"{project['name']}.wdx")
+        file_path = filedialog.asksaveasfilename(defaultextension=".wdx", filetypes=[("wdx Files", "*.wdx")], initialfile=f"{project['name']}.wdx")
         if file_path:
             with ZipFile(file_path, "w") as zip_ref:
                 for file in project["path"].rglob("*"):

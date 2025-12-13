@@ -1,7 +1,7 @@
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, filedialog
 import datetime
 from constants import APP_TITLE
 import re
@@ -65,7 +65,7 @@ class MainWindow:
             messagebox.showerror("Fehler", result)
 
     def import_project(self):
-        file_path = filedialog.askopenfilename(filetypes=[("WDX Files", "*.wdx")])
+        file_path = filedialog.askopenfilename(filetypes=[("wdx Files", "*.wdx")])
         if file_path:
             success, error = self.project_manager.import_project(file_path)
             if success:

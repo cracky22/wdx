@@ -31,7 +31,6 @@ class ProjectWindow:
         self.last_file_mtime = 0
         self.update_last_mtime()
 
-        # Datenstruktur bereinigen
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
                 self.project["data"]["items"] = [{"type": "source", **s} for s in self.project["data"]["sources"]]
@@ -154,7 +153,7 @@ class ProjectWindow:
 
         ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color).pack(anchor="w", pady=(8,0))
 
-        # Gespeicherte Seiten öffnen (Popup mit Liste)
+        
         if source.get("saved_pages", []):
             ttk.Button(frame, text="📄 Gespeicherte Seiten öffnen", bootstyle="info-outline", width=28,
                        command=lambda s=source: self.show_saved_pages_popup(s)).pack(pady=(4,0))
@@ -230,7 +229,7 @@ class ProjectWindow:
         listbox.pack(fill="both", expand=True, padx=20, pady=10)
 
         sites_dir = Path(self.project["path"]) / "sites"
-        self.current_source_for_popup = source  # Temporär speichern für Doppelklick
+        self.current_source_for_popup = source
         self.current_listbox = listbox
         self.current_sites_dir = sites_dir
 
@@ -239,7 +238,7 @@ class ProjectWindow:
             filename = saved["file"]
             listbox.insert(tk.END, f"{timestamp} – {filename}")
 
-        # Doppelklick-Event
+
         listbox.bind("<Double-Button-1>", lambda e: self.open_selected_version_from_popup())
 
         def open_selected():
@@ -274,7 +273,7 @@ class ProjectWindow:
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
 
-                # Favicon versuchen
+                
                 parsed = urlparse(source["url"])
                 favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
                 favicon_response = requests.get(favicon_url, timeout=5)
@@ -285,7 +284,7 @@ class ProjectWindow:
                         f.write(favicon_response.content)
                     source["favicon"] = favicon_filename
 
-                # In saved_pages eintragen
+
                 if "saved_pages" not in source:
                     source["saved_pages"] = []
                 source["saved_pages"].append({
@@ -293,7 +292,7 @@ class ProjectWindow:
                     "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
 
-                # Karte neu zeichnen
+                
                 frame, item_id = self.source_frames[source["id"]]
                 self.canvas.delete(item_id)
                 frame.destroy()

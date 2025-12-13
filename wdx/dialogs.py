@@ -11,7 +11,7 @@ class SourceDialog(tk.Toplevel):
         self.result = None
 
         self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
-        self.geometry("540x800")  # Etwas kleiner, da kein Scroll mehr nötig
+        self.geometry("540x800")
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
@@ -20,7 +20,6 @@ class SourceDialog(tk.Toplevel):
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)
 
-        # URL mit Paste-Button
         url_frame = ttk.Frame(main)
         url_frame.pack(fill="x", pady=(0,10))
         ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -32,12 +31,10 @@ class SourceDialog(tk.Toplevel):
         paste_btn = ttk.Button(url_entry_frame, text="📋", width=3, command=self.paste_clipboard)
         paste_btn.pack(side="right", padx=(5,0))
 
-        # Titel
         ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(10,0))
         self.title_var = tk.StringVar(value=self.source.get("title", ""))
         ttk.Entry(main, textvariable=self.title_var).pack(fill="x", pady=(0,10))
 
-        # Text
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
         text_frame.pack(fill="both", expand=True, pady=(0,10))
@@ -45,12 +42,10 @@ class SourceDialog(tk.Toplevel):
         self.text_text.pack(fill="both", expand=True)
         self.text_text.insert("1.0", self.source.get("text", ""))
 
-        # Schlagworte
         ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         self.keywords_var = tk.StringVar(value=self.source.get("keywords", ""))
         ttk.Entry(main, textvariable=self.keywords_var).pack(fill="x", pady=(0,10))
 
-        # Farbe
         ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0,15))
@@ -59,7 +54,6 @@ class SourceDialog(tk.Toplevel):
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
 
-        # Verwendete Farben
         used_colors = list({s.get("color", "#ffffff") for s in project_window.project["data"]["sources"] if s.get("color") != "#ffffff"})
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
@@ -69,7 +63,6 @@ class SourceDialog(tk.Toplevel):
                 btn = tk.Button(palette, bg=col, width=3, height=1, relief="solid", command=lambda c=col: self.color_var.set(c))
                 btn.pack(side="left", padx=2)
 
-        # Buttons – direkt unter der Farbe
         btn_frame = ttk.Frame(main)
         btn_frame.pack(fill="x", pady=(10, 0))
         ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)

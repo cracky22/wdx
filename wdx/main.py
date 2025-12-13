@@ -24,7 +24,7 @@ class WdxApp:
         self.connection_count = 0
         self.current_project_name = None
 
-        # Darkmode aus Einstellungen laden
+        
         self.dark_mode = self.load_dark_mode_setting()
         self.apply_theme()
 
@@ -56,7 +56,7 @@ class WdxApp:
         self.dark_mode = not self.dark_mode
         self.save_dark_mode_setting(self.dark_mode)
         self.apply_theme()
-        # MainWindow neu zeichnen
+        
         self.main_window.main_frame.destroy()
         self.main_window = MainWindow(self.root, self)
 
@@ -80,7 +80,6 @@ class WdxApp:
         self.current_project_name = project["name"]
         ProjectWindow(self.root, project, self)
 
-    # ... (der Anfang von main.py bleibt unverändert bis handle_communication)
 
     def handle_communication(self, data):
         self.last_connection = datetime.datetime.now()
@@ -126,15 +125,15 @@ class WdxApp:
         try:
             import requests
             from urllib.parse import urljoin, urlparse
-            from bs4 import BeautifulSoup  # Neue Abhängigkeit – pip install beautifulsoup4
+            from bs4 import BeautifulSoup
 
-            # Seite herunterladen
+            
             response = requests.get(data["url"], timeout=15)
             if response.status_code == 200:
                 html_content = response.text
                 soup = BeautifulSoup(html_content, 'html.parser')
 
-                # HTML speichern
+                
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 html_filename = f"page_{source['id']}_{timestamp}.html"
                 html_path = sites_dir / html_filename
@@ -146,25 +145,24 @@ class WdxApp:
                     "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
 
-                # Favicon finden (beste Methode)
+                
                 favicon_url = None
-                # 1. <link rel="icon"> oder <link rel="shortcut icon">
                 icon_link = soup.find("link", rel=lambda x: x and "icon" in x)
                 if icon_link and icon_link.get("href"):
                     favicon_url = urljoin(data["url"], icon_link["href"])
 
-                # 2. Fallback: /favicon.ico
+                
                 if not favicon_url:
                     parsed = urlparse(data["url"])
                     favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
 
-                # Favicon herunterladen
+                
                 if favicon_url:
                     try:
                         favicon_response = requests.get(favicon_url, timeout=10)
                         if favicon_response.status_code == 200 and favicon_response.content:
                             favicon_filename = f"favicon_{source['id']}.ico"
-                            # Falls es PNG ist, umbenennen
+                            
                             if "image/png" in favicon_response.headers.get("Content-Type", ""):
                                 favicon_filename = f"favicon_{source['id']}.png"
                             favicon_path = images_dir / favicon_filename
@@ -172,12 +170,12 @@ class WdxApp:
                                 f.write(favicon_response.content)
                             source["favicon"] = favicon_filename
                     except:
-                        pass  # Wenn Favicon nicht geht, einfach ignorieren
+                        pass
 
         except Exception as e:
             print("Fehler beim Speichern von HTML/Favicon:", e)
 
-        # Quelle in items speichern
+        
         if "items" not in project["data"]:
             project["data"]["items"] = []
         project["data"]["items"].append(source)
