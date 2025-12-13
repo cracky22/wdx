@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========= KONFIG =========
-VERSION = "1.0.3 devbeta"
+VERSION = "1.0.4 devbeta"
 APP_TITLE = f"WDX {VERSION}"
 
 WDX_DIR = Path.home() / "Documents" / "wdx"

@@ -9,7 +9,10 @@ import webbrowser
 import pyperclip
 import json
 import os
+from pathlib import Path
 from constants import DEFAULT_COLOR
+import requests
+from urllib.parse import urlparse
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -28,12 +31,10 @@ class ProjectWindow:
         self.last_file_mtime = 0
         self.update_last_mtime()
 
-        # Datenstruktur bereinigen: Nur "items" verwenden
+        # Datenstruktur bereinigen
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
                 self.project["data"]["items"] = [{"type": "source", **s} for s in self.project["data"]["sources"]]
-                # Optional: sources entfernen, um sauber zu bleiben
-                # del self.project["data"]["sources"]
             else:
                 self.project["data"]["items"] = []
 
@@ -124,8 +125,22 @@ class ProjectWindow:
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
+        # Favicon oder Globus
+        favicon_path = Path(self.project["path"]) / "images" / source.get("favicon", "")
+        if source.get("favicon") and favicon_path.exists():
+            try:
+                favicon_img = tk.PhotoImage(file=favicon_path)
+                favicon_img = favicon_img.subsample(2, 2)
+                favicon_label = ttk.Label(frame, image=favicon_img, background=color)
+                favicon_label.image = favicon_img
+                favicon_label.pack(anchor="w")
+            except:
+                ttk.Label(frame, text="🌐", font=("Helvetica", 20), background=color).pack(anchor="w")
+        else:
+            ttk.Label(frame, text="🌐", font=("Helvetica", 20), background=color).pack(anchor="w")
+
         title_text = source.get("title") or source["url"]
-        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color).pack(anchor="w")
+        ttk.Label(frame, text=title_text, font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color).pack(anchor="w")
 
         if source.get("title"):
             ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350, background=color).pack(anchor="w")
@@ -139,7 +154,12 @@ class ProjectWindow:
 
         ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color).pack(anchor="w", pady=(8,0))
 
-        ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
+        # Gespeicherte Seiten öffnen (Popup mit Liste)
+        if source.get("saved_pages", []):
+            ttk.Button(frame, text="📄 Gespeicherte Seiten öffnen", bootstyle="info-outline", width=28,
+                       command=lambda s=source: self.show_saved_pages_popup(s)).pack(pady=(4,0))
+
+        ttk.Button(frame, text="🔗 Original öffnen", bootstyle="success-outline", width=20,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
         frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
@@ -193,28 +213,99 @@ class ProjectWindow:
 
         self.update_scrollregion()
 
-    def add_heading(self):
-        text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
-        if not text:
+    def show_saved_pages_popup(self, source):
+        if not source.get("saved_pages"):
+            messagebox.showinfo("Keine Versionen", "Es gibt keine gespeicherten Versionen dieser Seite.")
             return
 
-        color = colorchooser.askcolor(title="Farbe wählen", initialcolor="#e9ecef")[1]
-        if not color:
-            color = "#e9ecef"
+        popup = tk.Toplevel(self.root)
+        popup.title("Gespeicherte Versionen")
+        popup.geometry("500x400")
+        popup.transient(self.root)
+        popup.grab_set()
 
-        new_heading = {
-            "id": str(uuid.uuid4()),
-            "type": "heading",
-            "text": text,
-            "color": color,
-            "pos_x": 300,
-            "pos_y": 300
-        }
+        ttk.Label(popup, text=f"Gespeicherte Versionen von:\n{source['url']}", font=("Helvetica", 12, "bold")).pack(pady=10)
 
-        self.project["data"]["items"].append(new_heading)
-        self.create_heading_card(new_heading)
-        self.save_project()
-        self.update_last_mtime()
+        listbox = tk.Listbox(popup, height=15)
+        listbox.pack(fill="both", expand=True, padx=20, pady=10)
+
+        sites_dir = Path(self.project["path"]) / "sites"
+        self.current_source_for_popup = source  # Temporär speichern für Doppelklick
+        self.current_listbox = listbox
+        self.current_sites_dir = sites_dir
+
+        for saved in source["saved_pages"]:
+            timestamp = saved["timestamp"]
+            filename = saved["file"]
+            listbox.insert(tk.END, f"{timestamp} – {filename}")
+
+        # Doppelklick-Event
+        listbox.bind("<Double-Button-1>", lambda e: self.open_selected_version_from_popup())
+
+        def open_selected():
+            self.open_selected_version_from_popup()
+            popup.destroy()
+
+        ttk.Button(popup, text="Ausgewählte öffnen", command=open_selected, bootstyle="primary").pack(pady=10)
+        ttk.Button(popup, text="Schließen", command=popup.destroy, bootstyle="secondary").pack(pady=5)
+
+    def open_selected_version_from_popup(self):
+        selection = self.current_listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        saved_file = self.current_source_for_popup["saved_pages"][index]["file"]
+        file_path = self.current_sites_dir / saved_file
+        if file_path.exists():
+            webbrowser.open(f"file://{file_path}")
+
+    def reload_current_page(self, source):
+        sites_dir = Path(self.project["path"]) / "sites"
+        images_dir = Path(self.project["path"]) / "images"
+        sites_dir.mkdir(exist_ok=True)
+        images_dir.mkdir(exist_ok=True)
+
+        try:
+            response = requests.get(source["url"], timeout=15)
+            if response.status_code == 200:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"page_{source['id']}_{timestamp}.html"
+                file_path = sites_dir / filename
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(response.text)
+
+                # Favicon versuchen
+                parsed = urlparse(source["url"])
+                favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+                favicon_response = requests.get(favicon_url, timeout=5)
+                if favicon_response.status_code == 200 and "image" in favicon_response.headers.get("Content-Type", ""):
+                    favicon_filename = f"favicon_{source['id']}_{timestamp}.ico"
+                    favicon_path = images_dir / favicon_filename
+                    with open(favicon_path, "wb") as f:
+                        f.write(favicon_response.content)
+                    source["favicon"] = favicon_filename
+
+                # In saved_pages eintragen
+                if "saved_pages" not in source:
+                    source["saved_pages"] = []
+                source["saved_pages"].append({
+                    "file": filename,
+                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+
+                # Karte neu zeichnen
+                frame, item_id = self.source_frames[source["id"]]
+                self.canvas.delete(item_id)
+                frame.destroy()
+                del self.source_frames[source["id"]]
+                self.create_source_card(source)
+
+                self.save_project()
+                messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!")
+            else:
+                messagebox.showerror("Fehler", f"HTTP {response.status_code}: Seite konnte nicht geladen werden.")
+        except Exception as e:
+            messagebox.showerror("Fehler", f"Fehler beim Laden: {str(e)}")
 
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
@@ -225,6 +316,7 @@ class ProjectWindow:
         else:
             self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(item))
             self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(item))
+            self.context_menu.add_command(label="Aktuelle Seite neu laden", command=lambda: self.reload_current_page(item))
 
         if self.selected_source_id == item["id"]:
             self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
@@ -270,6 +362,29 @@ class ProjectWindow:
             self.save_project()
             self.update_last_mtime()
 
+    def add_heading(self):
+        text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
+        if not text:
+            return
+
+        color = colorchooser.askcolor(title="Farbe wählen", initialcolor="#e9ecef")[1]
+        if not color:
+            color = "#e9ecef"
+
+        new_heading = {
+            "id": str(uuid.uuid4()),
+            "type": "heading",
+            "text": text,
+            "color": color,
+            "pos_x": 300,
+            "pos_y": 300
+        }
+
+        self.project["data"]["items"].append(new_heading)
+        self.create_heading_card(new_heading)
+        self.save_project()
+        self.update_last_mtime()
+
     def add_source(self):
         dialog = SourceDialog(self.root, self)
         if dialog.result:
@@ -283,7 +398,9 @@ class ProjectWindow:
                 "color": dialog.result["color"],
                 "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "pos_x": 300 + len(self.project["data"]["items"]) * 80,
-                "pos_y": 300
+                "pos_y": 300,
+                "favicon": "",
+                "saved_pages": []
             }
             self.project["data"]["items"].append(new_source)
             self.create_source_card(new_source)
@@ -411,17 +528,12 @@ class ProjectWindow:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
-            # Alles entfernen
             for frame, item_id in list(self.source_frames.values()):
                 self.canvas.delete(item_id)
                 frame.destroy()
             self.source_frames.clear()
 
-            # Items übernehmen (Migration falls nötig)
             items = updated_data.get("items", [])
-            if not items and "sources" in updated_data:
-                items = [{"type": "source", **s} for s in updated_data["sources"]]
-
             self.project["data"]["items"] = items
 
             self.load_items_on_canvas()
