@@ -12,6 +12,8 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab || !tab.url) return;
+
   let text = "";
   let keywords = "";
 
@@ -22,11 +24,36 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     keywords = prompt("Schlagworte (Kommas getrennt, optional):") || "";
   }
 
-  chrome.runtime.sendMessage({
-    type: info.menuItemId === "save_text" ? "save_text" : "save_page",
+  const payload = {
     url: tab.url,
-    title: tab.title,
+    title: tab.title || "Kein Titel",
     text: text,
     keywords: keywords
-  });
+  };
+
+  try {
+    const response = await fetch("http://127.0.0.1:8765/api/add_source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "icon48.png",
+        title: "WDX",
+        message: text ? "Ausgewählter Text gespeichert!" : "Quelle gespeichert!"
+      });
+    } else {
+      throw new Error("Server error");
+    }
+  } catch (err) {
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icon48.png",
+      title: "WDX Fehler",
+      message: "Verbindung zu WDX fehlgeschlagen – App läuft?"
+    });
+  }
 });
