@@ -28,10 +28,7 @@ function showMessage(text, type = 'success') {
   saveMessageEl.textContent = text;
   saveMessageEl.className = type;
   saveMessageEl.style.opacity = 1;
-
-  setTimeout(() => {
-    saveMessageEl.style.opacity = 0;
-  }, 3000);
+  setTimeout(() => saveMessageEl.style.opacity = 0, 3000);
 }
 
 async function updateConnection() {
@@ -40,17 +37,14 @@ async function updateConnection() {
 
   try {
     const response = await fetch(API_STATUS, { method: 'GET' });
-
     if (response.ok) {
       const data = await response.json();
-
       isConnected = true;
       statusEl.textContent = "Verbunden mit WDX";
       statusEl.className = "status connected";
       connectBtn.textContent = "Verbunden ✓";
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
-
       projectNameEl.textContent = data.current_project || "Kein Projekt geöffnet";
       projectEl.style.display = "block";
     } else {
@@ -65,7 +59,6 @@ async function updateConnection() {
     saveBtn.disabled = true;
     projectEl.style.display = "none";
   }
-
   connectBtn.disabled = false;
 }
 
@@ -88,8 +81,8 @@ saveBtn.addEventListener('click', async () => {
 
   try {
     const response = await fetch(API_ADD, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 

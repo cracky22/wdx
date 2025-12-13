@@ -28,6 +28,15 @@ class ProjectWindow:
         self.last_file_mtime = 0
         self.update_last_mtime()
 
+        # Datenstruktur bereinigen: Nur "items" verwenden
+        if "items" not in self.project["data"]:
+            if "sources" in self.project["data"]:
+                self.project["data"]["items"] = [{"type": "source", **s} for s in self.project["data"]["sources"]]
+                # Optional: sources entfernen, um sauber zu bleiben
+                # del self.project["data"]["sources"]
+            else:
+                self.project["data"]["items"] = []
+
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.root.columnconfigure(0, weight=1)
@@ -37,18 +46,14 @@ class ProjectWindow:
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         header_frame.columnconfigure(1, weight=1)
 
-        # Linke Seite: Zurück-Button
         ttk.Button(header_frame, text="← Zurück zu Projekten", command=self.back_to_projects, bootstyle="secondary-outline").grid(row=0, column=0, sticky=tk.W, padx=10)
 
-        # Rechte Seite: Manuelle Buttons
         btn_frame = ttk.Frame(header_frame)
         btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
-
         ttk.Button(btn_frame, text="💾", width=3, bootstyle="outline-secondary", command=self.manual_save).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="📥", width=3, bootstyle="outline-secondary", command=self.manual_export).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="🔄", width=3, bootstyle="outline-secondary", command=self.manual_reload).pack(side="left", padx=2)
 
-        # Mitte: Projektname und Beschreibung
         ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
         ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=1, column=1, sticky=tk.W, padx=20, columnspan=2)
 
@@ -63,7 +68,6 @@ class ProjectWindow:
         h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
-        # + Button mit Menü
         self.add_menu = tk.Menu(self.root, tearoff=0)
         self.add_menu.add_command(label="Quelle hinzufügen", command=self.add_source)
         self.add_menu.add_command(label="Überschrift hinzufügen", command=self.add_heading)
@@ -88,6 +92,7 @@ class ProjectWindow:
 
     def manual_save(self):
         self.save_project()
+        messagebox.showinfo("Gespeichert", "Projekt wurde manuell gespeichert.")
 
     def manual_export(self):
         success, file_path = self.app.project_manager.export_project(self.project)
@@ -96,6 +101,7 @@ class ProjectWindow:
 
     def manual_reload(self):
         self.reload_items()
+        messagebox.showinfo("Neu geladen", "Mindmap wurde aus Datei neu geladen.")
 
     def update_last_mtime(self):
         if os.path.exists(self.project["data_file"]):
@@ -104,13 +110,7 @@ class ProjectWindow:
             self.last_file_mtime = 0
 
     def load_items_on_canvas(self):
-        items = self.project["data"].get("items", [])
-        # Migration von alten Projekten
-        if "sources" in self.project["data"] and "items" not in self.project["data"]:
-            items = [{"type": "source", **s} for s in self.project["data"]["sources"]]
-            self.project["data"]["items"] = items
-
-        for item in items:
+        for item in self.project["data"]["items"]:
             if item.get("type") == "source":
                 self.create_source_card(item)
             elif item.get("type") == "heading":
@@ -213,8 +213,6 @@ class ProjectWindow:
             "pos_y": 300
         }
 
-        if "items" not in self.project["data"]:
-            self.project["data"]["items"] = []
         self.project["data"]["items"].append(new_heading)
         self.create_heading_card(new_heading)
         self.save_project()
@@ -286,11 +284,9 @@ class ProjectWindow:
                 "keywords": dialog.result["keywords"],
                 "color": dialog.result["color"],
                 "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "pos_x": 300 + len(self.project["data"].get("items", [])) * 80,
+                "pos_x": 300 + len(self.project["data"]["items"]) * 80,
                 "pos_y": 300
             }
-            if "items" not in self.project["data"]:
-                self.project["data"]["items"] = []
             self.project["data"]["items"].append(new_source)
             self.create_source_card(new_source)
             self.save_project()
@@ -417,15 +413,17 @@ class ProjectWindow:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
+            # Alles entfernen
             for frame, item_id in list(self.source_frames.values()):
                 self.canvas.delete(item_id)
                 frame.destroy()
             self.source_frames.clear()
 
-            items = updated_data.get("items", updated_data.get("sources", []))
-            for item in items:
-                if "type" not in item:
-                    item["type"] = "source"
+            # Items übernehmen (Migration falls nötig)
+            items = updated_data.get("items", [])
+            if not items and "sources" in updated_data:
+                items = [{"type": "source", **s} for s in updated_data["sources"]]
+
             self.project["data"]["items"] = items
 
             self.load_items_on_canvas()

@@ -15,7 +15,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab || !tab.url) return;
 
   let text = "";
-  let keywords = "";
 
   if (info.menuItemId === "save_text" && info.selectionText) {
     text = info.selectionText.trim();
@@ -25,7 +24,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     url: tab.url,
     title: tab.title || "Kein Titel",
     text: text,
-    keywords: keywords
+    keywords: ""  // Kein Schlagwort-Prompt mehr – optional leer
   };
 
   try {
