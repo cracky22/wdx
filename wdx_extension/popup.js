@@ -1,6 +1,6 @@
 const API_BASE = 'http://127.0.0.1:8765';
 const API_ADD = API_BASE + '/api/add_source';
-const API_STATUS = API_BASE + '/api/status';  // Neuer Endpoint für Status + Projekt
+const API_STATUS = API_BASE + '/api/status';
 
 let isConnected = false;
 
@@ -10,9 +10,9 @@ const saveBtn = document.getElementById('saveBtn');
 const projectEl = document.getElementById('currentProject');
 const projectNameEl = document.getElementById('projectName');
 
-// Dark Mode automatisch an System anpassen
+// Dark Mode
 function applyTheme() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.classList.add('dark');
     document.body.classList.remove('light');
   } else {
@@ -23,7 +23,6 @@ function applyTheme() {
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
-// Verbindung prüfen und Projekt laden
 async function updateConnection() {
   connectBtn.disabled = true;
   connectBtn.textContent = "Prüfe Verbindung...";
@@ -43,13 +42,12 @@ async function updateConnection() {
 
       if (data.current_project) {
         projectNameEl.textContent = data.current_project;
-        projectEl.style.display = "block";
       } else {
         projectNameEl.textContent = "Kein Projekt geöffnet";
-        projectEl.style.display = "block";
       }
+      projectEl.style.display = "block";
     } else {
-      throw new Error("Nicht 200");
+      throw new Error();
     }
   } catch (err) {
     isConnected = false;
@@ -66,7 +64,6 @@ async function updateConnection() {
 
 connectBtn.addEventListener('click', updateConnection);
 
-// Speichern in WDX
 saveBtn.addEventListener('click', async () => {
   if (!isConnected) {
     alert("Keine Verbindung zu WDX");
@@ -91,14 +88,14 @@ saveBtn.addEventListener('click', async () => {
 
     if (response.ok) {
       alert("Quelle erfolgreich in WDX gespeichert!");
-      updateConnection(); // Aktualisiert Projekt-Anzeige
+      updateConnection();
     } else {
-      alert("Fehler beim Speichern (Server-Antwort nicht OK).");
+      alert("Fehler beim Speichern.");
     }
   } catch (err) {
     alert("Keine Verbindung zum WDX-Server.");
   }
 });
 
-// Beim Öffnen des Popups prüfen
+// Beim Öffnen prüfen
 updateConnection();

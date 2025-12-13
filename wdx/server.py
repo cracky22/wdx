@@ -9,6 +9,17 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.app = app
         super().__init__(*args, **kwargs)
 
+    def end_headers(self):
+        # CORS für alle Antworten
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
+
     def do_POST(self):
         if self.path == "/api/add_source":
             content_length = int(self.headers.get("Content-Length", 0))
@@ -35,7 +46,7 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/status":
-            current_project = getattr(self.app, "current_project_name", None)  # Falls du das später setzt
+            current_project = getattr(self.app, "current_project_name", None)
             response = {
                 "connected": True,
                 "current_project": current_project
@@ -48,10 +59,8 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_HEAD(self):
-        # Wichtig: HEAD-Anfragen für /api/add_source abfangen, damit Verbindungstest klappt
-        if self.path == "/api/add_source" or self.path == "/api/status":
+        if self.path in ("/api/add_source", "/api/status"):
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
             self.end_headers()
         else:
             super().do_HEAD()
