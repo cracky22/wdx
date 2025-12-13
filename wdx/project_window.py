@@ -21,8 +21,8 @@ class ProjectWindow:
         self.project = project
         self.root = root
         self.app = app
-        self.source_frames = {} # Speichert (Frame, Canvas_ID)
-        self.card_widgets = {}  # Speichert Widget-Referenzen für dynamische Skalierung: {id: {label_ref: ..., original_font_size: ...}}
+        self.source_frames = {} 
+        self.card_widgets = {}  
         self.selected_source_id = None
         self.dragging_card = False
         self.dragging_canvas = False
@@ -38,16 +38,17 @@ class ProjectWindow:
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
 
         # Zoom-Einstellungen
-        self.zoom_level = 1.0
+        # Lädt Zoom-Level aus der Projektdatei, falls vorhanden, sonst 1.0
+        self.zoom_level = self.project["data"].get("canvas_zoom_level", 1.0) 
         self.max_zoom = 2.0
-        self.min_zoom = 0.5
+        self.min_zoom = 0.1 # Minimaler Zoom auf 0.1 reduziert
         self.zoom_factor = 1.2 
         # Basis-Fonts für Skalierung
         self.base_font_title = ("Helvetica", 12, "bold")
         self.base_font_heading = ("Helvetica", 16, "bold")
         self.base_font_default = ("Helvetica", 9)
-        self.base_icon_size = 20 # Font size for default globe icon
-        self.base_favicon_subsample = 2 # Original subsample factor for favicons
+        self.base_icon_size = 20 
+        self.base_favicon_subsample = 2 
 
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
@@ -117,13 +118,10 @@ class ProjectWindow:
             return {"item": item, "is_source": False, "favicon_path": None}
 
         favicon_path = None
-        original_favicon_img = None
         if item.get("favicon"):
             check_path = Path(self.project["path"]) / "images" / item["favicon"]
             if check_path.exists():
                 favicon_path = check_path 
-                # Das PhotoImage Objekt MUSS im Main-Thread erstellt werden. 
-                # Wir geben nur den Pfad zurück.
         
         return {"item": item, "is_source": True, "favicon_path": favicon_path}
 
@@ -143,7 +141,7 @@ class ProjectWindow:
                 self.root.after(0, self._create_all_cards_in_gui_thread, processed_results)
             
         except concurrent.futures.CancelledError:
-            # FIX: Fehler wird stumm geschaltet, da dies beim Executor-Shutdown erwartet wird
+            # FIX: Fehler wird stumm geschaltet, da dies dies beim Executor-Shutdown erwartet wird
             pass 
         except Exception as e:
             # Nur unerwartete Fehler anzeigen, wenn das Fenster noch existiert
@@ -160,7 +158,7 @@ class ProjectWindow:
             self.canvas.delete(item_id)
             frame.destroy()
         self.source_frames.clear()
-        self.card_widgets.clear() # Wichtig: Skalierungs-Cache leeren
+        self.card_widgets.clear() 
 
         for result in processed_results:
             item = result["item"]
@@ -234,27 +232,24 @@ class ProjectWindow:
             if 'keywords_label' in refs:
                 refs['keywords_label'].config(font=("Helvetica", default_size))
             if 'added_label' in refs:
-                refs['added_label'].config(font=("Helvetica", default_size))
+                # Kleinere Schriftgröße (8) muss ebenfalls skaliert werden
+                refs['added_label'].config(font=("Helvetica", max(int(8 * self.zoom_level), 5)))
 
             if 'heading_label' in refs:
                 refs['heading_label'].config(font=("Helvetica", heading_size, "bold"))
 
             # --- Icon skalieren ---
             if 'icon_label' in refs:
-                # Prüfen, ob es ein Favicon oder ein Globus ist
                 if 'original_icon_data' in refs and refs['original_icon_data']['is_favicon']:
-                    # Favicon: Muss neu gesampled werden
                     original_img = refs['original_icon_data']['original_img']
+                    # new_subsample muss mindestens 1 sein
                     new_subsample = max(1, int(self.base_favicon_subsample / self.zoom_level))
                     
-                    # WICHTIG: Tkinter speichert PhotoImage-Referenzen. 
-                    # Wir müssen die Referenz des Labels aktualisieren.
                     try:
                         new_img = original_img.subsample(new_subsample, new_subsample)
                         refs['icon_label'].config(image=new_img)
                         refs['icon_label'].image = new_img
                     except tk.TclError:
-                        # Kann bei extremen Zoom-Werten passieren
                         pass 
                 else:
                     # Globus-Icon (Text)
@@ -266,7 +261,6 @@ class ProjectWindow:
         color = source.get("color", DEFAULT_COLOR)
         item_id = source["id"]
         
-        # Initialisiert den Widget-Speicher für diese Karte
         self.card_widgets[item_id] = {}
 
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
@@ -278,23 +272,19 @@ class ProjectWindow:
         # --- Favicon/Globus ---
         if favicon_path:
             try:
-                # PhotoImage MUSS im Main-Thread erstellt werden
                 original_img = tk.PhotoImage(file=favicon_path)
                 
-                # Speichere das Originalbild und den initialen subsample-Faktor
                 self.card_widgets[item_id]['original_icon_data'] = {
                     'original_img': original_img,
                     'is_favicon': True
                 }
                 
-                # Erstellt das Label mit dem initial gesampelten Bild (entspricht zoom_level=1.0)
                 favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
                 favicon_label = ttk.Label(frame, image=favicon_img, background=color)
-                favicon_label.image = favicon_img # Wichtig: Referenz halten
+                favicon_label.image = favicon_img 
                 favicon_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = favicon_label
             except Exception:
-                # Falls das Bild defekt ist, auf Globus zurückfallen
                 globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), background=color)
                 globe_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = globe_label
@@ -327,9 +317,7 @@ class ProjectWindow:
 
         added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color)
         added_label.pack(anchor="w", pady=(8,0))
-        self.card_widgets[item_id]['added_label'] = added_label # Speichern, auch wenn nicht im base_font_default
-
-        # Buttons ... (werden nicht skaliert)
+        self.card_widgets[item_id]['added_label'] = added_label 
 
         ttk.Button(frame, text="🔗 Original öffnen", bootstyle="success-outline", width=20,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
@@ -355,7 +343,6 @@ class ProjectWindow:
         # Skaliert die neue Karte, falls bereits gezoomt wurde
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
-            # Wichtig: Inhalt manuell skalieren, da die Karte neu erstellt wurde
             self._update_card_content_scale()
 
 
@@ -421,7 +408,6 @@ class ProjectWindow:
             self.last_file_mtime = 0
 
     def show_saved_pages_popup(self, source):
-        # ... (Methoden-Code unverändert) ...
         if not source.get("saved_pages"):
             messagebox.showinfo("Keine Versionen", "Es gibt keine gespeicherten Versionen dieser Seite.")
             return
@@ -452,9 +438,10 @@ class ProjectWindow:
 
         def open_selected():
             self.open_selected_version_from_popup()
-            popup.destroy()
+            # Der Doppelklick öffnet, aber der Button kann das Fenster schließen
+            # popup.destroy() 
 
-        ttk.Button(popup, text="Ausgewählte öffnen", command=open_selected, bootstyle="primary").pack(pady=10)
+        ttk.Button(popup, text="Ausgewählte öffnen", command=self.open_selected_version_from_popup, bootstyle="primary").pack(pady=10)
         ttk.Button(popup, text="Schließen", command=popup.destroy, bootstyle="secondary").pack(pady=5)
 
     def open_selected_version_from_popup(self):
@@ -538,7 +525,7 @@ class ProjectWindow:
             self.canvas.delete(item_id)
             frame.destroy()
             del self.source_frames[source_id]
-            del self.card_widgets[source_id] # Widget-Cache löschen
+            del self.card_widgets[source_id] 
             
             # Startet asynchrone I/O-Vorbereitung und anschließende GUI-Erstellung
             threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
@@ -559,10 +546,16 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_item(item))
+        
         if item["type"] == "heading":
             self.context_menu.add_command(label="Umbenennen", command=lambda: self.rename_heading(item))
             self.context_menu.add_command(label="Farbe ändern", command=lambda: self.change_heading_color(item))
         else:
+            # NEU: Option für gespeicherte Versionen hinzufügen, wenn vorhanden
+            if item.get("saved_pages") and len(item["saved_pages"]) > 0:
+                self.context_menu.add_command(label="Gespeicherte Versionen anzeigen", command=lambda: self.show_saved_pages_popup(item)) 
+                self.context_menu.add_separator() 
+                
             self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(item))
             self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(item))
             self.context_menu.add_command(label="Aktuelle Seite neu laden", command=lambda: self.reload_current_page(item))
@@ -684,7 +677,6 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def select_card(self, source_id):
-        # ... (Methoden-Code unverändert) ...
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
             border = 2 if old_frame.item_data["type"] == "source" else 0
@@ -695,7 +687,6 @@ class ProjectWindow:
         frame.config(borderwidth=5, bootstyle="primary")
 
     def deselect_card(self):
-        # ... (Methoden-Code unverändert) ...
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
             border = 2 if frame.item_data["type"] == "source" else 0
@@ -703,7 +694,6 @@ class ProjectWindow:
         self.selected_source_id = None
 
     def on_card_press(self, event, item_id):
-        # ... (Methoden-Code unverändert) ...
         if item_id != self.selected_source_id:
             self.select_card(item_id)
 
@@ -713,7 +703,6 @@ class ProjectWindow:
         self.canvas.tag_raise(self.source_frames[item_id][1])
 
     def on_card_motion(self, event):
-        # ... (Methoden-Code unverändert) ...
         if self.dragging_card:
             dx = (event.x_root - self.drag_start_x) / self.zoom_level
             dy = (event.y_root - self.drag_start_y) / self.zoom_level
@@ -723,7 +712,6 @@ class ProjectWindow:
             self.drag_start_y = event.y_root
 
     def on_card_release(self, event):
-        # ... (Methoden-Code unverändert) ...
         if self.dragging_card:
             coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
             item = next(i for i in self.project["data"]["items"] if i["id"] == self.selected_source_id)
@@ -737,8 +725,7 @@ class ProjectWindow:
             self.update_scrollregion()
 
     def on_canvas_press(self, event):
-        # ... (Methoden-Code unverändert) ...
-        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
+        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.x+5)
         card_items = [wid for _, wid in self.source_frames.values()]
         if any(item in card_items for item in items):
             return
@@ -749,7 +736,6 @@ class ProjectWindow:
         self.canvas.config(cursor="fleur")
 
     def on_canvas_motion(self, event):
-        # ... (Methoden-Code unverändert) ...
         if self.dragging_canvas:
             dx = event.x - self.canvas_start_x
             dy = event.y - self.canvas_start_y
@@ -759,31 +745,29 @@ class ProjectWindow:
             self.canvas_start_y = event.y
 
     def on_canvas_release(self, event):
-        # ... (Methoden-Code unverändert) ...
         if self.dragging_canvas:
             self.dragging_canvas = False
             self.canvas.config(cursor="")
 
     def create_citation(self, source):
-        # ... (Methoden-Code unverändert) ...
         citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
         pyperclip.copy(citation)
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
 
     def update_scrollregion(self):
-        # ... (Methoden-Code unverändert) ...
         self.canvas.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def save_project(self):
-        # ... (Methoden-Code unverändert) ...
+        # Speichert den aktuellen Zoom-Level im Projekt-Datenobjekt
+        self.project["data"]["canvas_zoom_level"] = self.zoom_level 
+        
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
             json.dump(self.project["data"], f, indent=4)
         self.project["last_modified"] = datetime.datetime.now().isoformat()
         self.app.project_manager.save_projects()
 
     def start_auto_refresh(self):
-        # ... (Methoden-Code unverändert) ...
         try:
             if os.path.exists(self.project["data_file"]):
                 current_mtime = os.path.getmtime(self.project["data_file"])
@@ -799,23 +783,27 @@ class ProjectWindow:
         self.root.after(3000, self.start_auto_refresh)
 
     def reload_items(self):
-        # ... (Methode unverändert - nutzt load_items_on_canvas) ...
         try:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
+            # Setzt den Zoom-Level des Fensters auf den geladenen Wert (letzter gespeicherter Zoom)
+            self.zoom_level = updated_data.get("canvas_zoom_level", 1.0)
+            
             items = updated_data.get("items", [])
             self.project["data"]["items"] = items
+            
+            # Stellt sicher, dass der Zoom-Level in self.project["data"] aktualisiert ist
+            self.project["data"]["canvas_zoom_level"] = self.zoom_level
 
             self.load_items_on_canvas()
             
         except Exception as e:
             print("Reload-Fehler:", e)
-
+    
     def back_to_projects(self):
         self.save_project()
-        # Wichtig: Thread-Pool sauber beenden (shutdown ohne wait=False, 
-        # damit _concurrent_load_worker einen CancelledError wirft und stumm schaltet)
+        # Wichtig: Thread-Pool sauber beenden, damit keine Fehlermeldung beim Schließen kommt
         self.executor.shutdown(wait=False) 
         self.main_frame.destroy()
         self.app.close_project()
