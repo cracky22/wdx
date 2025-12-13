@@ -4,11 +4,14 @@ from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog
 import datetime
 from constants import APP_TITLE
+import re
+from constants import INVALID_CHARS
 
 class MainWindow:
     def __init__(self, root, app):
         self.root = root
         self.app = app
+        self.root.iconbitmap("icon128.ico")
         self.project_manager = app.project_manager
 
         self.main_frame = ttk.Frame(self.root, padding="20", bootstyle="light")
@@ -22,59 +25,31 @@ class MainWindow:
 
         ttk.Button(header_frame, text="Neues Projekt", command=self.create_project, bootstyle="primary-outline", width=15).grid(row=0, column=0, padx=5)
         ttk.Button(header_frame, text="Projekt importieren", command=self.import_project, bootstyle="secondary-outline", width=15).grid(row=0, column=1, padx=5)
-        ttk.Label(header_frame, text=APP_TITLE, font=("Helvetica", 16, "bold"), bootstyle="inverse-primary").grid(row=0, column=2, sticky=tk.E)
+        ttk.Button(header_frame, text="Einstellungen", command=self.show_settings, bootstyle="info-outline", width=15).grid(row=0, column=2, padx=5)
 
-        self.status_label = ttk.Label(header_frame, text="Keine Browser-Verbindung", font=("Helvetica", 10), bootstyle="danger")
-        self.status_label.grid(row=1, column=2, sticky=tk.E, pady=5)
+        self.status_label = ttk.Label(header_frame, text="Keine Browser-Verbindung", bootstyle="danger")
+        self.status_label.grid(row=0, column=3, padx=20)
 
-        self.canvas = tk.Canvas(self.main_frame, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
-        self.project_frame = ttk.Frame(self.canvas, padding="10")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
-        self.main_frame.columnconfigure(0, weight=1)
+        self.projects_frame = ttk.Frame(self.main_frame)
+        self.projects_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.main_frame.rowconfigure(1, weight=1)
-
-        self.project_window = self.canvas.create_window((0, 0), window=self.project_frame, anchor="nw")
-        self.project_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", self._resize_canvas)
 
         self.update_project_tiles()
 
-    def _resize_canvas(self, event):
-        self.canvas.itemconfig(self.project_window, width=event.width)
+    def show_settings(self):
+        settings_window = ttk.Toplevel(self.root)
+        settings_window.title("Einstellungen")
+        settings_window.geometry("400x200")
+        settings_window.transient(self.root)
+        settings_window.grab_set()
 
-    def update_project_tiles(self):
-        for widget in self.project_frame.winfo_children():
-            widget.destroy()
-        for idx, project in enumerate(self.project_manager.projects):
-            tile = ttk.Frame(self.project_frame, padding="15", bootstyle="info", relief="flat", borderwidth=2)
-            tile.grid(row=idx, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-            tile.columnconfigure(0, weight=1)
+        ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(pady=20)
 
-            ttk.Label(tile, text=f"📋 {project['name']}", font=("Helvetica", 14, "bold"), bootstyle="inverse-info").grid(row=0, column=0, sticky=tk.W, pady=2)
-            ttk.Label(tile, text=project["description"], wraplength=400, font=("Helvetica", 10)).grid(row=1, column=0, sticky=tk.W, pady=2)
-            ttk.Label(tile, text=f"📅 Erstellt: {project['created']}", font=("Helvetica", 10)).grid(row=2, column=0, sticky=tk.W, pady=2)
-            last_modified = datetime.datetime.fromisoformat(project["last_modified"])
-            now = datetime.datetime.now()
-            minutes = (now - last_modified).total_seconds() / 60
-            time_str = f"{int(minutes)} Minuten" if minutes < 60 else f"{int(minutes // 60)} Stunden"
-            ttk.Label(tile, text=f"🕒 Bearbeitet: {time_str} her", font=("Helvetica", 10)).grid(row=3, column=0, sticky=tk.W, pady=2)
+        var = tk.BooleanVar(value=self.app.dark_mode)
+        switch = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var, bootstyle="round-toggle", command=lambda: self.app.toggle_dark_mode())
+        switch.pack(pady=10)
 
-            menu_button = ttk.Menubutton(tile, text="⋮", bootstyle="dark-outline", width=3)
-            menu_button.grid(row=0, column=1, sticky=tk.E)
-            menu = tk.Menu(menu_button, tearoff=0, font=("Helvetica", 10))
-            menu.add_command(label="✏️ Umbenennen", command=lambda p=project: self.rename_project(p))
-            menu.add_command(label="📝 Bearbeiten", command=lambda p=project: self.edit_project(p))
-            menu.add_command(label="💾 Exportieren", command=lambda p=project: self.export_project(p))
-            menu.add_command(label="🗑️ Löschen", command=lambda p=project: self.delete_project(p))
-            menu_button["menu"] = menu
-
-            tile.bind("<Double-1>", lambda e, p=project: self.app.open_project(p))
-            for child in tile.winfo_children():
-                child.bind("<Double-1>", lambda e, p=project: self.app.open_project(p))
+        ttk.Button(settings_window, text="Schließen", command=settings_window.destroy, bootstyle="secondary").pack(pady=20)
 
     def create_project(self):
         name = simpledialog.askstring("Neues Projekt", "Projektname:", parent=self.root)
@@ -90,13 +65,38 @@ class MainWindow:
             messagebox.showerror("Fehler", result)
 
     def import_project(self):
-        success, project = self.project_manager.import_project()
-        if success:
-            self.update_project_tiles()
+        file_path = filedialog.askopenfilename(filetypes=[("WDX Files", "*.wdx")])
+        if file_path:
+            success, error = self.project_manager.import_project(file_path)
+            if success:
+                self.update_project_tiles()
+            else:
+                messagebox.showerror("Fehler", error)
+
+    def update_project_tiles(self):
+        for widget in self.projects_frame.winfo_children():
+            widget.destroy()
+
+        for project in sorted(self.project_manager.projects, key=lambda p: p["last_modified"], reverse=True):
+            tile = ttk.Frame(self.projects_frame, padding="20", relief="raised", borderwidth=2)
+            tile.pack(fill="x", pady=10, padx=20)
+
+            ttk.Label(tile, text=project["name"], font=("Helvetica", 16, "bold")).pack(anchor="w")
+            ttk.Label(tile, text=project["description"], font=("Helvetica", 10)).pack(anchor="w", pady=(5,0))
+            ttk.Label(tile, text=f"Zuletzt geändert: {project['last_modified'][:16].replace('T', ' ')}", font=("Helvetica", 8), foreground="gray").pack(anchor="w")
+
+            btn_frame = ttk.Frame(tile)
+            btn_frame.pack(anchor="e", pady=10)
+
+            ttk.Button(btn_frame, text="Öffnen", command=lambda p=project: self.app.open_project(p), bootstyle="primary").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Umbenennen", command=lambda p=project: self.rename_project(p), bootstyle="secondary-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Beschreibung ändern", command=lambda p=project: self.edit_project(p), bootstyle="secondary-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Exportieren", command=lambda p=project: self.export_project(p), bootstyle="info-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Löschen", command=lambda p=project: self.delete_project(p), bootstyle="danger-outline").pack(side="left", padx=5)
 
     def rename_project(self, project):
-        new_name = simpledialog.askstring("Umbenennen", "Neuer Projektname:", initialvalue=project["name"], parent=self.root)
-        if new_name and new_name != project["name"]:
+        new_name = simpledialog.askstring("Umbenennen", "Neuer Name:", initialvalue=project["name"], parent=self.root)
+        if new_name and new_name != project["name"] and re.search(INVALID_CHARS, new_name) is None:
             success, error = self.project_manager.rename_project(project, new_name)
             if success:
                 self.update_project_tiles()
