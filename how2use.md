@@ -48,6 +48,27 @@ Im heruntergeladenen Ordner findest du die Datei **wdx_extension.crx**.
 
 Nach dem Laden sollte die Erweiterung direkt in der Liste erscheinen.
 
+### Python-Abhängigkeiten installieren
+
+wdx benötigt einige externe Python-Pakete, die vor dem Start installiert werden müssen.
+
+Lege dafür im Projektverzeichnis eine Datei **requirements.txt** mit folgendem Inhalt an:
+
+```txt
+pyperclip
+ttkbootstrap
+requests
+beautifulsoup4
+```
+
+Installiere die Abhängigkeiten anschließend mit **pip**:
+
+```bash
+pip install -r requirements.txt
+```
+
+> Hinweis: `tkinter` gehört zur Python-Standardbibliothek und ist in der Regel bereits enthalten. Unter manchen Linux-Distributionen muss es ggf. separat über den Paketmanager installiert werden.
+
 ### Schritt 4: Python-Skript ausführen
 
 Im Projektordner befindet sich die Datei **main.py** bzw. **main.pyc**.
