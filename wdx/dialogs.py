@@ -11,10 +11,11 @@ class SourceDialog(tk.Toplevel):
         self.result = None
 
         self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
-        self.geometry("540x750")  # Etwas kleiner, da kein Scroll mehr nötig
+        self.geometry("540x800")  # Etwas kleiner, da kein Scroll mehr nötig
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
+        self.iconbitmap("icon128.ico")
 
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)

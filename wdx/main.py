@@ -9,6 +9,8 @@ from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
+import base64
+from constants import ICON_BASE64
 
 class WdxApp:
     def __init__(self, root):
@@ -21,6 +23,7 @@ class WdxApp:
         self.last_connection = None
         self.connection_count = 0
         self.current_project_name = None  # Wichtig für Erweiterung
+        self.root.iconbitmap("icon128.ico")
 
         self.update_connection_status()
 
