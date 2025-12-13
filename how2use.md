@@ -6,11 +6,10 @@ Um **wdx** zu nutzen, lade die neueste Version aus den [Releases](https://github
 
 1. Entpacke die Datei **wdx_extension.crx** mit einem Tool wie [7-Zip](https://7-zip.org/).
 2. Öffne deinen Browser und gehe zu **Erweiterungen**.
-3. Aktiviere den **Entwicklermodus**.
-4. Wähle **Entpackte Erweiterung laden** und wähle den entpackten Ordner aus.
-5. Starte anschließend **main.py(c)** mit einer installierten Version von [Python](https://www.python.org/downloads/).
+3. Aktiviere den **Entwicklermodus** und wähle **Entpackte Erweiterung laden** und verwende den entpackten Ordner aus.
+4. Starte anschließend **main.py** / **main.pyc** mit  [Python](https://www.python.org/downloads/).
 
----
+##
 
 ## Ausführliche Version
 
@@ -50,16 +49,9 @@ Nach dem Laden sollte die Erweiterung direkt in der Liste erscheinen.
 
 ### Python-Abhängigkeiten installieren
 
-wdx benötigt einige externe Python-Pakete, die vor dem Start installiert werden müssen.
+wdx benötigt einige externe Python-Pakete, die vor dem Start installiert werden müssen. Lade dir dazu aus dem 
+Repository die **requirements.txt** herunter.
 
-Lege dafür im Projektverzeichnis eine Datei **requirements.txt** mit folgendem Inhalt an:
-
-```txt
-pyperclip
-ttkbootstrap
-requests
-beautifulsoup4
-```
 
 Installiere die Abhängigkeiten anschließend mit **pip**:
 
@@ -78,13 +70,13 @@ Im Projektordner befindet sich die Datei **main.py** bzw. **main.pyc**.
 * Starte das Skript mit:
 
 ```bash
-python main.py
+python main.pyc
 ```
 
-oder, falls vorhanden:
+oder, falls vorhanden (source code):
 
 ```bash
-python main.pyc
+python main.py
 ```
 
 ### Fertig
@@ -92,3 +84,6 @@ python main.pyc
 Sobald die Erweiterung geladen ist und das Python-Skript läuft, ist wdx einsatzbereit.
 
 Falls etwas nicht funktioniert, überprüfe zuerst die Python-Version und ob die Erweiterung korrekt geladen wurde.
+
+
+_Info: diese Anleitung wurde mithilfe Künstlicher Intelligenz erstellt_
