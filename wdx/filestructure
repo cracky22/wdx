@@ -1,16 +1,8 @@
 wdx/
-├── main.py                  # Einstiegspunkt (startet die App)
-├── gui/
-│   ├── __init__.py
-│   ├── main_window.py       # Startansicht: Projektliste, Neues Projekt, Import usw.
-│   ├── project_window.py    # Mindmap-Ansicht: Canvas, Karten, Drag & Drop, Quelle hinzufügen/bearbeiten
-│   └── dialogs.py           # SourceDialog (Popup für Quelle hinzufügen/bearbeiten)
-├── core/
-│   ├── __init__.py
-│   ├── project_manager.py   # Laden/Speichern von projects.json, Projekte verwalten
-│   └── server.py            # HTTP-Server und Handler für Chrome-Extension
-├── utils/
-│   ├── __init__.py
-│   └── constants.py         # VERSION, APP_TITLE, WDX_DIR, PORT, ICON_BASE64 usw.
-└── styles/
-    └── custom_styles.py     # Falls du später eigene ttk-Styles brauchst
+├── main.py
+├── constants.py
+├── server.py
+├── project_manager.py
+├── dialogs.py
+├── main_window.py
+└── project_window.py
