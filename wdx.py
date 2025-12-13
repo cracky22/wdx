@@ -5,7 +5,7 @@ import base64
 import datetime
 import re
 import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox, filedialog
+from tkinter import ttk, simpledialog, messagebox, filedialog, colorchooser
 from pathlib import Path
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -343,6 +343,7 @@ class WdxApp:
             "title": data.get("title", ""),
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
+            "color": "#ffffff",  # Default weiß
             "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "pos_x": 300,
             "pos_y": 300
@@ -353,6 +354,109 @@ class WdxApp:
             json.dump(project["data"], f, indent=4)
         self.save_projects()
         messagebox.showinfo("Erfolg", f"Quelle in '{project_name}' gespeichert.")
+
+class SourceDialog(tk.Toplevel):
+    def __init__(self, parent, project_window, source=None):
+        super().__init__(parent)
+        self.project_window = project_window
+        self.source = source or {}
+        self.result = None
+
+        self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
+        self.geometry("500x600")
+        self.resizable(False, False)
+        self.grab_set()
+
+        main = ttk.Frame(self, padding="20")
+        main.pack(fill="both", expand=True)
+
+        # URL
+        url_frame = ttk.Frame(main)
+        url_frame.pack(fill="x", pady=(0,10))
+        ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        url_entry_frame = ttk.Frame(url_frame)
+        url_entry_frame.pack(fill="x")
+        self.url_var = tk.StringVar(value=self.source.get("url", ""))
+        self.url_entry = ttk.Entry(url_entry_frame, textvariable=self.url_var, width=40)
+        self.url_entry.pack(side="left", fill="x", expand=True)
+        paste_btn = ttk.Button(url_entry_frame, text="📋", width=3, command=self.paste_clipboard)
+        paste_btn.pack(side="right", padx=(5,0))
+
+        # Titel
+        ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(10,0))
+        self.title_var = tk.StringVar(value=self.source.get("title", ""))
+        ttk.Entry(main, textvariable=self.title_var).pack(fill="x", pady=(0,10))
+
+        # Text
+        ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        text_frame = ttk.Frame(main)
+        text_frame.pack(fill="both", expand=True, pady=(0,10))
+        self.text_text = tk.Text(text_frame, height=8, wrap="word")
+        self.text_text.pack(fill="both", expand=True)
+        self.text_text.insert("1.0", self.source.get("text", ""))
+
+        # Schlagworte
+        ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        self.keywords_var = tk.StringVar(value=self.source.get("keywords", ""))
+        ttk.Entry(main, textvariable=self.keywords_var).pack(fill="x", pady=(0,10))
+
+        # Farbe
+        ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        color_frame = ttk.Frame(main)
+        color_frame.pack(fill="x", pady=(0,10))
+
+        self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
+        ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
+        ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
+
+        # Verwendete Farben
+        used_colors = list(set(s.get("color", "#ffffff") for s in project_window.project["data"]["sources"]))
+        if used_colors and "#ffffff" in used_colors:
+            used_colors.remove("#ffffff")
+        if used_colors:
+            ttk.Label(main, text="Verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
+            palette = ttk.Frame(main)
+            palette.pack(fill="x", pady=(0,10))
+            for col in used_colors:
+                btn = tk.Button(palette, bg=col, width=3, height=1, relief="solid", command=lambda c=col: self.color_var.set(c))
+                btn.pack(side="left", padx=2)
+
+        # Buttons
+        btn_frame = ttk.Frame(main)
+        btn_frame.pack(fill="x", pady=20)
+        ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle=(SECONDARY, OUTLINE)).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle=PRIMARY).pack(side="right")
+
+        # Autofocus auf URL
+        self.url_entry.focus_set()
+
+        self.wait_window()
+
+    def paste_clipboard(self):
+        try:
+            clip = pyperclip.paste()
+            if clip:
+                self.url_var.set(clip.strip())
+        except:
+            pass
+
+    def choose_color(self):
+        color = colorchooser.askcolor(initialcolor=self.color_var.get())[1]
+        if color:
+            self.color_var.set(color)
+
+    def save(self):
+        self.result = {
+            "url": self.url_var.get().strip(),
+            "title": self.title_var.get().strip(),
+            "text": self.text_text.get("1.0", "end").strip(),
+            "keywords": self.keywords_var.get().strip(),
+            "color": self.color_var.get().strip() or "#ffffff"
+        }
+        if not self.result["url"]:
+            messagebox.showerror("Fehler", "URL ist erforderlich!")
+            return
+        self.destroy()
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -397,7 +501,6 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
-        # Globale Maus-Events für Drag
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
@@ -406,6 +509,8 @@ class ProjectWindow:
         for source in self.project["data"]["sources"]:
             if "id" not in source:
                 source["id"] = str(uuid.uuid4())
+            if "color" not in source:
+                source["color"] = "#ffffff"
             if "pos_x" not in source:
                 source["pos_x"] = 300
                 source["pos_y"] = 300
@@ -413,33 +518,38 @@ class ProjectWindow:
         self.update_scrollregion()
 
     def create_source_card(self, source):
-        frame = ttk.Frame(self.canvas, padding="15", bootstyle="secondary", relief="raised", borderwidth=2)
+        color = source.get("color", "#ffffff")
+
+        # Custom Style für Farbe
+        style_name = f"color_{source['id']}.TFrame"
+        self.root.style = ttk.Style()
+        self.root.style.configure(style_name, background=color)
+
+        frame = ttk.Frame(self.canvas, padding="15", style=style_name, relief="raised", borderwidth=2)
         frame.source_data = source
 
         title_text = source.get("title") or source["url"]
-        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320).pack(anchor="w")
+        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color).pack(anchor="w")
 
         if source.get("title"):
-            ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350).pack(anchor="w")
+            ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350, background=color).pack(anchor="w")
 
         if source["text"]:
             preview = source["text"][:180] + ("..." if len(source["text"]) > 180 else "")
-            ttk.Label(frame, text=f"📝 {preview}", font=("Helvetica", 9), foreground="#34495e", wraplength=350).pack(anchor="w", pady=(6,0))
+            ttk.Label(frame, text=f"📝 {preview}", font=("Helvetica", 9), foreground="#34495e", wraplength=350, background=color).pack(anchor="w", pady=(6,0))
 
         if source["keywords"]:
-            ttk.Label(frame, text=f"🏷 {source['keywords']}", font=("Helvetica", 9), bootstyle="info").pack(anchor="w", pady=(4,0))
+            ttk.Label(frame, text=f"🏷 {source['keywords']}", font=("Helvetica", 9), bootstyle="info", background=color).pack(anchor="w", pady=(4,0))
 
-        ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6").pack(anchor="w", pady=(8,0))
+        ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color).pack(anchor="w", pady=(8,0))
 
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
-        # Drag-Events auf dem Frame (nur wenn ausgewählt)
         frame.bind("<ButtonPress-1>", lambda e: self.on_frame_press(e, source["id"]))
         frame.bind("<B1-Motion>", lambda e: self.on_frame_motion(e))
         frame.bind("<ButtonRelease-1>", lambda e: self.on_frame_release(e))
@@ -454,6 +564,7 @@ class ProjectWindow:
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
         self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
+        self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(source))
 
         if self.selected_source_id == source["id"]:
             self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
@@ -461,6 +572,41 @@ class ProjectWindow:
             self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
 
         self.context_menu.post(event.x_root, event.y_root)
+
+    def add_source(self):
+        dialog = SourceDialog(self.root, self)
+        if dialog.result:
+            new_source = {
+                "id": str(uuid.uuid4()),
+                "url": dialog.result["url"],
+                "title": dialog.result["title"],
+                "text": dialog.result["text"],
+                "keywords": dialog.result["keywords"],
+                "color": dialog.result["color"],
+                "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "pos_x": 300 + len(self.project["data"]["sources"]) * 80,
+                "pos_y": 300
+            }
+            self.project["data"]["sources"].append(new_source)
+            self.create_source_card(new_source)
+            self.save_project()
+            messagebox.showinfo("Erfolg", "Quelle zur Mindmap hinzugefügt.")
+
+    def edit_source(self, source):
+        dialog = SourceDialog(self.root, self, source)
+        if dialog.result:
+            source["url"] = dialog.result["url"]
+            source["title"] = dialog.result["title"]
+            source["text"] = dialog.result["text"]
+            source["keywords"] = dialog.result["keywords"]
+            source["color"] = dialog.result["color"]
+            # Karte neu zeichnen
+            frame, item_id = self.source_frames[source["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[source["id"]]
+            self.create_source_card(source)
+            self.save_project()
 
     def select_card(self, source_id):
         # Alte Auswahl entfernen
@@ -556,6 +702,83 @@ class ProjectWindow:
         self.create_source_card(source)
         self.save_project()
         messagebox.showinfo("Erfolg", "Quelle zur Mindmap hinzugefügt.")
+
+    def save_project(self):
+        with open(self.project["data_file"], "w", encoding="utf-8") as f:
+            json.dump(self.project["data"], f, indent=4)
+        self.project["last_modified"] = datetime.datetime.now().isoformat()
+
+    def back_to_projects(self):
+        self.save_project()
+        self.main_frame.destroy()
+        self.app.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.app.update_project_tiles()
+
+    def select_card(self, source_id):
+        if self.selected_source_id and self.selected_source_id in self.source_frames:
+            old_frame = self.source_frames[self.selected_source_id][0]
+            old_frame.config(borderwidth=2)
+
+        self.selected_source_id = source_id
+        frame = self.source_frames[source_id][0]
+        frame.config(borderwidth=5, bootstyle="primary", relief="solid")
+
+    def deselect_card(self):
+        if self.selected_source_id and self.selected_source_id in self.source_frames:
+            frame = self.source_frames[self.selected_source_id][0]
+            frame.config(borderwidth=2)
+        self.selected_source_id = None
+
+    def on_frame_press(self, event, source_id):
+        if source_id == self.selected_source_id:
+            self.dragging = True
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+            self.canvas.tag_raise(self.source_frames[source_id][1])
+
+    def on_frame_motion(self, event):
+        if self.dragging:
+            dx = event.x_root - self.drag_start_x
+            dy = event.y_root - self.drag_start_y
+            self.canvas.move(self.source_frames[self.selected_source_id][1], dx, dy)
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
+
+    def on_frame_release(self, event):
+        if self.dragging:
+            coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
+            source = next(s for s in self.project["data"]["sources"] if s["id"] == self.selected_source_id)
+            source["pos_x"] = coords[0]
+            source["pos_y"] = coords[1]
+            self.save_project()
+            self.dragging = False
+            self.update_scrollregion()
+
+    def on_press(self, event):
+        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
+        if not items or items[-1] not in [wid for _, wid in self.source_frames.values()]:
+            self.deselect_card()
+
+    def delete_source(self, source):
+        if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
+            self.project["data"]["sources"].remove(source)
+            frame, item_id = self.source_frames[source["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[source["id"]]
+            if self.selected_source_id == source["id"]:
+                self.selected_source_id = None
+            self.save_project()
+            self.update_scrollregion()
+
+    def create_citation(self, source):
+        citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+        pyperclip.copy(citation)
+        messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
+
+    def update_scrollregion(self):
+        self.canvas.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def save_project(self):
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
