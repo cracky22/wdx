@@ -13,6 +13,7 @@ from pathlib import Path
 from constants import DEFAULT_COLOR
 import requests
 from urllib.parse import urlparse
+import threading # NEU: Für asynchrone Operationen
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -65,6 +66,7 @@ class ProjectWindow:
         h_scroll = ttk.Scrollbar(self.main_frame, orient="horizontal", command=self.canvas.xview, bootstyle="round")
         v_scroll = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
         self.canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
+        self.canvas.config(xscrollincrement=1, yscrollincrement=1) # NEU: Für flüssigeres Scrolling
         h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
@@ -128,6 +130,8 @@ class ProjectWindow:
         favicon_path = Path(self.project["path"]) / "images" / source.get("favicon", "")
         if source.get("favicon") and favicon_path.exists():
             try:
+                # Da PhotoImage oft Probleme mit ICO hat, wird hier ein Versuch unternommen.
+                # Bei Fehlern wird der Standard-Globus verwendet.
                 favicon_img = tk.PhotoImage(file=favicon_path)
                 favicon_img = favicon_img.subsample(2, 2)
                 favicon_label = ttk.Label(frame, image=favicon_img, background=color)
@@ -259,52 +263,88 @@ class ProjectWindow:
             webbrowser.open(f"file://{file_path}")
 
     def reload_current_page(self, source):
+        """Startet den Reload-Prozess in einem Hintergrund-Thread."""
+        # Feedback für User, da es im Hintergrund läuft
+        self.root.after(0, lambda: messagebox.showinfo("Info", "Seite wird im Hintergrund aktualisiert...", parent=self.root))
+        
+        # Startet den Download im Hintergrund-Thread
+        threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
+
+    def _reload_worker(self, source):
+        """Führt den Ladevorgang im Hintergrund-Thread (Netzwerk-I/O) aus."""
         sites_dir = Path(self.project["path"]) / "sites"
         images_dir = Path(self.project["path"]) / "images"
         sites_dir.mkdir(exist_ok=True)
         images_dir.mkdir(exist_ok=True)
+        
+        new_favicon_name = None
 
         try:
+            # HTML Download
             response = requests.get(source["url"], timeout=15)
-            if response.status_code == 200:
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"page_{source['id']}_{timestamp}.html"
-                file_path = sites_dir / filename
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(response.text)
+            response.raise_for_status() # Löst Ausnahme bei 4xx/5xx aus
+            
+            # HTML Speichern
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"page_{source['id']}_{timestamp}.html"
+            
+            with open(sites_dir / filename, "w", encoding="utf-8") as f:
+                f.write(response.text)
 
-                
-                parsed = urlparse(source["url"])
-                favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
-                favicon_response = requests.get(favicon_url, timeout=5)
-                if favicon_response.status_code == 200 and "image" in favicon_response.headers.get("Content-Type", ""):
-                    favicon_filename = f"favicon_{source['id']}_{timestamp}.ico"
-                    favicon_path = images_dir / favicon_filename
-                    with open(favicon_path, "wb") as f:
-                        f.write(favicon_response.content)
-                    source["favicon"] = favicon_filename
+            # Favicon Logik (auch im Hintergrund-Thread)
+            parsed = urlparse(source["url"])
+            favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+            favicon_response = requests.get(favicon_url, timeout=5)
+            if favicon_response.status_code == 200 and "image" in favicon_response.headers.get("Content-Type", ""):
+                favicon_filename = f"favicon_{source['id']}_{timestamp}.ico"
+                favicon_path = images_dir / favicon_filename
+                with open(favicon_path, "wb") as f:
+                    f.write(favicon_response.content)
+                new_favicon_name = favicon_filename # Wird an den Main-Thread übergeben
 
+            # Zurück in den Main-Thread für UI-Update und JSON-Save
+            self.root.after(0, self._finalize_reload, source["id"], filename, timestamp, new_favicon_name)
 
-                if "saved_pages" not in source:
-                    source["saved_pages"] = []
-                source["saved_pages"].append({
-                    "file": filename,
-                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                })
-
-                
-                frame, item_id = self.source_frames[source["id"]]
-                self.canvas.delete(item_id)
-                frame.destroy()
-                del self.source_frames[source["id"]]
-                self.create_source_card(source)
-
-                self.save_project()
-                messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!")
-            else:
-                messagebox.showerror("Fehler", f"HTTP {response.status_code}: Seite konnte nicht geladen werden.")
+        except requests.exceptions.Timeout:
+            self.root.after(0, lambda: messagebox.showerror("Fehler", "Download-Timeout: Die Seite hat zu lange gebraucht.", parent=self.root))
+        except requests.exceptions.RequestException as e:
+            self.root.after(0, lambda: messagebox.showerror("Fehler", f"Download-Fehler: {e}", parent=self.root))
         except Exception as e:
-            messagebox.showerror("Fehler", f"Fehler beim Laden: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("Fehler", f"Ein unerwarteter Fehler ist aufgetreten: {e}", parent=self.root))
+
+    def _finalize_reload(self, source_id, filename, timestamp, new_favicon_name):
+        """Führt UI-Updates und Speicherung im Main-Thread aus."""
+        source = next((item for item in self.project["data"].get("items", []) if item.get("id") == source_id and item.get("type") == "source"), None)
+        
+        if not source:
+            messagebox.showerror("Fehler", "Quelle zum Aktualisieren nicht im Projekt gefunden.", parent=self.root)
+            return
+
+        if "saved_pages" not in source:
+            source["saved_pages"] = []
+            
+        source["saved_pages"].append({
+            "file": filename,
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+        # Favicon im Main-Thread aktualisieren
+        if new_favicon_name:
+            source["favicon"] = new_favicon_name
+
+        # Speichern des gesamten Projekts (nutzt das Lock im ProjectManager)
+        self.save_project()
+        
+        # Visuelles Update der Karte
+        if source_id in self.source_frames:
+            # Karte neu erstellen, um die Historie zu aktualisieren
+            frame, item_id = self.source_frames[source_id]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[source_id]
+            self.create_source_card(source)
+
+        messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!", parent=self.root)
 
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)

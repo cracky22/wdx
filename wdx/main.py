@@ -4,13 +4,15 @@ from tkinter import simpledialog, messagebox
 import datetime
 import json
 import uuid
+import threading # NEU
+import requests # NEU (hier importiert für den Thread)
+from urllib.parse import urljoin, urlparse # NEU
 from constants import APP_TITLE
 from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
 from pathlib import Path
-from bs4 import BeautifulSoup
 
 class WdxApp:
     def __init__(self, root):
@@ -23,12 +25,25 @@ class WdxApp:
         self.last_connection = None
         self.connection_count = 0
         self.current_project_name = None
-
         
         self.dark_mode = self.load_dark_mode_setting()
         self.apply_theme()
 
         self.update_connection_status()
+        
+    def open_project(self, project):
+        """Öffnet das ProjectWindow für das gewählte Projekt."""
+        self.main_window.hide()
+        self.project_window = ProjectWindow(self.root, project, self)
+        self.current_project_name = project["name"]
+
+    def close_project(self):
+        """Schließt das ProjectWindow und kehrt zum Hauptfenster zurück."""
+        if hasattr(self, 'project_window'):
+            self.project_window.main_frame.destroy()
+            del self.project_window
+        self.current_project_name = None
+        self.main_window.show()
 
     def load_dark_mode_setting(self):
         settings_file = Path.home() / "Documents" / "wdx" / "settings.json"
@@ -42,70 +57,78 @@ class WdxApp:
         return False
 
     def save_dark_mode_setting(self, enabled):
-        settings_file = Path.home() / "Documents" / "wdx" / "settings.json"
-        settings = {"dark_mode": enabled}
-        settings_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(settings_file, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=4)
+        settings_dir = Path.home() / "Documents" / "wdx"
+        settings_dir.mkdir(parents=True, exist_ok=True)
+        settings_file = settings_dir / "settings.json"
+        try:
+            with open(settings_file, "w", encoding="utf-8") as f:
+                json.dump({"dark_mode": enabled}, f)
+        except:
+            pass
+
+    def toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self.apply_theme()
+        self.save_dark_mode_setting(self.dark_mode)
 
     def apply_theme(self):
-        theme = "darkly" if self.dark_mode else "flatly"
-        self.root.style.theme_use(theme)
-
-    def toggle_dark_mode(self):
-        self.dark_mode = not self.dark_mode
-        self.save_dark_mode_setting(self.dark_mode)
-        self.apply_theme()
-        
-        self.main_window.main_frame.destroy()
-        self.main_window = MainWindow(self.root, self)
+        style = ttk.Style()
+        if self.dark_mode:
+            style.theme_use("darkly")
+        else:
+            style.theme_use("litera")
 
     def update_connection_status(self):
+        # Status update logic kann hier bleiben
         if self.last_connection:
-            minutes_ago = (datetime.datetime.now() - self.last_connection).total_seconds() / 60
-            if minutes_ago < 5:
-                text = f"Verbunden ({self.connection_count} Aktionen)"
-                style = "success"
-            else:
-                text = f"Letzte Verbindung vor {int(minutes_ago)} Min."
-                style = "warning"
-        else:
-            text = "Keine Browser-Verbindung"
-            style = "danger"
-        self.main_window.status_label.config(text=text, bootstyle=style)
-        self.root.after(30000, self.update_connection_status)
+            delta = datetime.datetime.now() - self.last_connection
+            if delta.total_seconds() < 5:
+                # Verbunden status
+                pass
+        self.root.after(2000, self.update_connection_status)
 
-    def open_project(self, project):
-        self.main_window.hide()
-        self.current_project_name = project["name"]
-        ProjectWindow(self.root, project, self)
+    def set_current_project(self, project_name):
+        self.current_project_name = project_name
 
-
+    # --- MULTITHREADING START ---
     def handle_communication(self, data):
         self.last_connection = datetime.datetime.now()
         self.connection_count += 1
-
+        
+        # UI: Fenster in Vordergrund (muss im Main Thread passieren)
         self.root.deiconify()
         self.root.lift()
 
+        # Projektbestimmung (blockiert kurz für Dialog, aber das ist OK)
         if self.current_project_name:
-            project = next(p for p in self.project_manager.projects if p["name"] == self.current_project_name)
+            try:
+                project = next(p for p in self.project_manager.projects if p["name"] == self.current_project_name)
+            except StopIteration:
+                self.current_project_name = None
+                return
         else:
             project_names = [p["name"] for p in self.project_manager.projects]
             if not project_names:
-                messagebox.showerror("Fehler", "Keine Projekte vorhanden.")
+                messagebox.showerror("Fehler", "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.")
                 return
-            project_name = simpledialog.askstring("Projekt wählen", "In welches Projekt speichern?\n\n" + "\n".join(project_names), parent=self.root)
+            
+            project_name = simpledialog.askstring("Projekt wählen", "In welches Projekt speichern?\n" + ", ".join(project_names), parent=self.root)
             if not project_name or project_name not in project_names:
-                messagebox.showerror("Fehler", "Ungültiger Projektname!")
                 return
             project = next(p for p in self.project_manager.projects if p["name"] == project_name)
 
-        source = {
-            "id": str(uuid.uuid4()),
+        # Startet Download im Hintergrund
+        threading.Thread(target=self._download_worker, args=(data, project), daemon=True).start()
+
+    def _download_worker(self, data, project):
+        """Hintergrund-Thread für Downloads"""
+        source_id = str(uuid.uuid4())
+        
+        new_source = {
+            "id": source_id,
             "type": "source",
             "url": data["url"],
-            "title": data.get("title", ""),
+            "title": data.get("title", data["url"]),
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
             "color": "#ffffff",
@@ -122,67 +145,66 @@ class WdxApp:
         images_dir.mkdir(exist_ok=True)
         sites_dir.mkdir(exist_ok=True)
 
+        # 1. HTML Download
         try:
-            import requests
-            from urllib.parse import urljoin, urlparse
-            from bs4 import BeautifulSoup
-
-            
             response = requests.get(data["url"], timeout=15)
             if response.status_code == 200:
                 html_content = response.text
-                soup = BeautifulSoup(html_content, 'html.parser')
-
-                
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                html_filename = f"page_{source['id']}_{timestamp}.html"
-                html_path = sites_dir / html_filename
-                with open(html_path, "w", encoding="utf-8") as f:
+                html_filename = f"page_{source_id}_{timestamp}.html"
+                
+                with open(sites_dir / html_filename, "w", encoding="utf-8") as f:
                     f.write(html_content)
 
-                source["saved_pages"].append({
+                new_source["saved_pages"].append({
                     "file": html_filename,
                     "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
-
                 
-                favicon_url = None
-                icon_link = soup.find("link", rel=lambda x: x and "icon" in x)
-                if icon_link and icon_link.get("href"):
-                    favicon_url = urljoin(data["url"], icon_link["href"])
-
-                
-                if not favicon_url:
-                    parsed = urlparse(data["url"])
-                    favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
-
-                
-                if favicon_url:
-                    try:
-                        favicon_response = requests.get(favicon_url, timeout=10)
-                        if favicon_response.status_code == 200 and favicon_response.content:
-                            favicon_filename = f"favicon_{source['id']}.ico"
-                            
-                            if "image/png" in favicon_response.headers.get("Content-Type", ""):
-                                favicon_filename = f"favicon_{source['id']}.png"
-                            favicon_path = images_dir / favicon_filename
-                            with open(favicon_path, "wb") as f:
-                                f.write(favicon_response.content)
-                            source["favicon"] = favicon_filename
-                    except:
-                        pass
+                # 2. Favicon Logik
+                try:
+                    parsed_uri = urlparse(data["url"])
+                    base_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
+                    favicon_url = urljoin(base_url, '/favicon.ico')
+                    
+                    fav_resp = requests.get(favicon_url, timeout=5)
+                    if fav_resp.status_code == 200 and fav_resp.content:
+                        # Einfacher Check ob es wirklich ein Bild ist (Header oder Content)
+                        if len(fav_resp.content) > 0:
+                            fav_name = f"favicon_{source_id}.ico"
+                            # Falls PNG Header
+                            if b'PNG' in fav_resp.content[:8]:
+                                fav_name = f"favicon_{source_id}.png"
+                                
+                            with open(images_dir / fav_name, "wb") as f:
+                                f.write(fav_resp.content)
+                            new_source["favicon"] = fav_name
+                except Exception as e:
+                    print(f"Favicon Fehler: {e}")
 
         except Exception as e:
-            print("Fehler beim Speichern von HTML/Favicon:", e)
+            print(f"Download Fehler: {e}")
 
-        
+        # Zurück an UI Thread übergeben zum Speichern
+        self.root.after(0, self._finalize_source_add, project, new_source)
+
+    def _finalize_source_add(self, project, source):
+        """UI Thread: JSON speichern und GUI aktualisieren"""
         if "items" not in project["data"]:
             project["data"]["items"] = []
+        
         project["data"]["items"].append(source)
         project["last_modified"] = datetime.datetime.now().isoformat()
+        
+        # Thread-safe save
         with open(project["data_file"], "w", encoding="utf-8") as f:
             json.dump(project["data"], f, indent=4)
+        
         self.project_manager.save_projects()
+        
+        # Feedback (optional, oder Statusbar)
+        # print("Quelle hinzugefügt.")
+    # --- MULTITHREADING END ---
 
 if __name__ == "__main__":
     root = ttk.Window()
@@ -192,4 +214,3 @@ if __name__ == "__main__":
     finally:
         if hasattr(app, "httpd"):
             app.httpd.shutdown()
-            app.httpd.server_close()

@@ -67,12 +67,12 @@ class MainWindow:
     def import_project(self):
         file_path = filedialog.askopenfilename(filetypes=[("wdx Files", "*.wdx")])
         if file_path:
-            success, error = self.project_manager.import_project(file_path)
+            success = self.project_manager.import_project(file_path)
             if success:
                 self.update_project_tiles()
             else:
-                messagebox.showerror("Fehler", error)
-
+                messagebox.showerror("Fehler", "Import fehlgeschlagen.")
+                
     def update_project_tiles(self):
         for widget in self.projects_frame.winfo_children():
             widget.destroy()

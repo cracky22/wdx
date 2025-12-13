@@ -5,10 +5,12 @@ from tkinter import messagebox, filedialog
 from zipfile import ZipFile
 import datetime
 import re
+import threading  # NEU
 from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS
 
 class ProjectManager:
     def __init__(self):
+        self.lock = threading.Lock()  # NEU: Thread-Lock
         self.projects = []
         self.load_projects()
 
@@ -31,91 +33,127 @@ class ProjectManager:
                 messagebox.showwarning("Warnung", "projects.json ist beschädigt. Initialisiere neue Datei.")
 
     def save_projects(self):
-        projects_data = []
-        for project in self.projects:
-            projects_data.append({
-                "name": project["name"],
-                "description": project["description"],
-                "created": project["created"],
-                "last_modified": project["last_modified"],
-                "path": str(project["path"]),
-                "data_file": str(project["data_file"]),
-                "data": project["data"]
-            })
-        WDX_DIR.mkdir(parents=True, exist_ok=True)
-        with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(projects_data, f, indent=4, ensure_ascii=False)
+        with self.lock:  # NEU: Thread-safe Block
+            projects_data = []
+            for project in self.projects:
+                projects_data.append({
+                    "name": project["name"],
+                    "description": project["description"],
+                    "created": project["created"],
+                    "last_modified": project["last_modified"],
+                    "path": str(project["path"]),
+                    "data_file": str(project["data_file"])
+                })
+            try:
+                with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(projects_data, f, indent=4)
+            except Exception as e:
+                print(f"Fehler beim Speichern der Projektliste: {e}")
 
     def create_project(self, name, description):
-        if re.search(INVALID_CHARS, name):
-            return False, "Ungültige Zeichen im Projektnamen!"
-        project_path = WDX_DIR / name
-        if project_path.exists():
-            return False, "Projekt existiert bereits!"
-        project_path.mkdir(parents=True)
-        (project_path / "images").mkdir(exist_ok=True)
-        (project_path / "sites").mkdir(exist_ok=True)
-        project_data = {
-            "name": name,
-            "description": description or "",
-            "sources": [],
-            "created": datetime.datetime.now().isoformat()
-        }
-        data_file = project_path / "project.json"
-        with open(data_file, "w", encoding="utf-8") as f:
-            json.dump(project_data, f, indent=4)
-        project = {
-            "name": name,
-            "description": description or "",
-            "created": project_data["created"],
-            "last_modified": project_data["created"],
-            "path": project_path,
-            "data_file": data_file,
-            "data": project_data
-        }
-        self.projects.append(project)
-        self.save_projects()
-        return True, project
+        project_dir = WDX_DIR / name
+        if project_dir.exists():
+            return False, "Ein Projekt mit diesem Namen existiert bereits!"
+        
+        try:
+            project_dir.mkdir(parents=True)
+            data_file = project_dir / "project.json"
+            
+            initial_data = {
+                "name": name,
+                "description": description,
+                "created": datetime.datetime.now().isoformat(),
+                "last_modified": datetime.datetime.now().isoformat(),
+                "items": []
+            }
+
+            with open(data_file, "w", encoding="utf-8") as f:
+                json.dump(initial_data, f, indent=4)
+
+            new_project = {
+                "name": name,
+                "description": description,
+                "created": initial_data["created"],
+                "last_modified": initial_data["last_modified"],
+                "path": project_dir,
+                "data_file": data_file,
+                "data": initial_data
+            }
+            
+            self.projects.append(new_project)
+            self.save_projects()
+            return True, new_project
+
+        except Exception as e:
+            return False, str(e)
 
     def import_project(self, file_path):
-        with ZipFile(file_path, "r") as zip_ref:
-            temp_dir = WDX_DIR / "temp_import"
-            temp_dir.mkdir(exist_ok=True)
-            zip_ref.extractall(temp_dir)
-            project_json = temp_dir / "project.json"
-            if not project_json.exists():
-                messagebox.showerror("Fehler", "Ungültige wdx-Datei!")
-                shutil.rmtree(temp_dir)
-                return False, None
-            with open(project_json, "r", encoding="utf-8") as f:
-                project_data = json.load(f)
-            project_name = project_data["name"]
-            if re.search(INVALID_CHARS, project_name):
-                messagebox.showerror("Fehler", "Ungültige Zeichen im importierten Projektnamen!")
-                shutil.rmtree(temp_dir)
-                return False, None
-            project_path = WDX_DIR / project_name
-            if project_path.exists():
-                messagebox.showerror("Fehler", "Projekt existiert bereits!")
-                shutil.rmtree(temp_dir)
-                return False, None
-            shutil.move(temp_dir, project_path)
-            project = {
-                "name": project_name,
-                "description": project_data.get("description", ""),
-                "created": project_data.get("created", datetime.datetime.now().isoformat()),
-                "last_modified": datetime.datetime.now().isoformat(),
-                "path": project_path,
-                "data_file": project_path / "project.json",
-                "data": project_data
-            }
-            self.projects.append(project)
-            self.save_projects()
-            return True, project
+        #file_path = filedialog.askopenfilename(filetypes=[("Zip Files", "*.zip"), ("wdx Files", "*.wdx")])
+        #if not file_path:
+        #    return False
+            
+        try:
+            with ZipFile(file_path, 'r') as zip_ref:
+                # Prüfen ob project.json enthalten ist
+                if "project.json" not in zip_ref.namelist():
+                    return False
+                
+                # Temporär entpacken um Namen zu lesen
+                with zip_ref.open("project.json") as f:
+                    data = json.load(f)
+                    name = data.get("name", "Imported Project")
+                
+                # Namenskollision vermeiden
+                original_name = name
+                counter = 1
+                while (WDX_DIR / name).exists():
+                    name = f"{original_name}_{counter}"
+                    counter += 1
+                
+                target_dir = WDX_DIR / name
+                target_dir.mkdir(parents=True)
+                zip_ref.extractall(target_dir)
+                
+                # Pfade im geladenen JSON anpassen falls nötig (hier laden wir neu)
+                self.load_projects() # Reload um sicher zu gehen oder manuell hinzufügen
+                
+                # Manuell hinzufügen, da load_projects nur die projects.json liest, 
+                # und der Import dort noch nicht drin steht.
+                
+                # Fix: Wir müssen das importierte Projekt sauber registrieren
+                data_file = target_dir / "project.json"
+                
+                # Ggf. Name in der project.json anpassen falls Ordner umbenannt wurde
+                if name != original_name:
+                    with open(data_file, "r", encoding="utf-8") as f:
+                        pj_data = json.load(f)
+                    pj_data["name"] = name
+                    with open(data_file, "w", encoding="utf-8") as f:
+                        json.dump(pj_data, f, indent=4)
+
+                # Projekt zur Liste hinzufügen
+                new_proj = {
+                    "name": name,
+                    "description": data.get("description", ""),
+                    "created": data.get("created", datetime.datetime.now().isoformat()),
+                    "last_modified": datetime.datetime.now().isoformat(),
+                    "path": target_dir,
+                    "data_file": data_file,
+                    "data": data 
+                }
+                # Data neu laden, da wir es oben ggf geändert haben
+                with open(data_file, "r", encoding="utf-8") as f:
+                     new_proj["data"] = json.load(f)
+
+                self.projects.append(new_proj)
+                self.save_projects()
+                
+                return True
+        except Exception as e:
+            messagebox.showerror("Import Fehler", str(e))
+            return False
 
     def rename_project(self, project, new_name):
-        if re.search(INVALID_CHARS, new_name):
-            return False, "Ungültige Zeichen im Projektnamen!"
         new_path = WDX_DIR / new_name
         if new_path.exists():
             return False, "Projektname existiert bereits!"
@@ -145,8 +183,7 @@ class ProjectManager:
     def export_project(self, project):
         file_path = filedialog.asksaveasfilename(defaultextension=".wdx", filetypes=[("wdx Files", "*.wdx")], initialfile=f"{project['name']}.wdx")
         if file_path:
-            with ZipFile(file_path, "w") as zip_ref:
-                for file in project["path"].rglob("*"):
-                    zip_ref.write(file, file.relative_to(project["path"]))
+            shutil.make_archive(file_path.replace(".wdx", ""), 'zip', project["path"])
+            shutil.move(file_path.replace(".wdx", ".zip"), file_path)
             return True, file_path
         return False, None
