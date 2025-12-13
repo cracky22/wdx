@@ -9,7 +9,6 @@ import webbrowser
 import pyperclip
 import json
 import os
-from constants import DEFAULT_COLOR  # Wichtig!
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -60,7 +59,7 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
-        # Maus-Events für Canvas-Panning (Hand-Tool)
+        # Hand-Tool für Canvas-Panning
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
@@ -78,7 +77,7 @@ class ProjectWindow:
             if "id" not in source:
                 source["id"] = str(uuid.uuid4())
             if "color" not in source:
-                source["color"] = DEFAULT_COLOR
+                source["color"] = "#ffffff"
             if "pos_x" not in source:
                 source["pos_x"] = 300
                 source["pos_y"] = 300
@@ -86,7 +85,7 @@ class ProjectWindow:
         self.update_scrollregion()
 
     def create_source_card(self, source):
-        color = source.get("color", DEFAULT_COLOR)
+        color = source.get("color", "#ffffff")
 
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
         frame.source_data = source
@@ -94,16 +93,8 @@ class ProjectWindow:
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
-        header = ttk.Frame(frame)
-        header.pack(fill="x", pady=(0, 8))
-
         title_text = source.get("title") or source["url"]
-        title_label = ttk.Label(header, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=280, background=color)
-        title_label.pack(side="left")
-
-        select_btn = ttk.Button(header, text="🎯", width=4, bootstyle="outline-secondary",
-                                command=lambda sid=source["id"]: self.toggle_select_card(sid))
-        select_btn.pack(side="right")
+        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color).pack(anchor="w")
 
         if source.get("title"):
             ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350, background=color).pack(anchor="w")
@@ -120,11 +111,12 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
+        # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
-        # Drag & Drop für Karte
+        # Linksklick auf Karte → auswählen + ggf. verschieben
         frame.bind("<ButtonPress-1>", lambda e, sid=source["id"]: self.on_card_press(e, sid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
         frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
@@ -133,23 +125,24 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
-        # Rahmen zurücksetzen, falls nicht ausgewählt
-        if self.selected_source_id != source["id"]:
+        # Rahmen aktualisieren
+        if self.selected_source_id == source["id"]:
+            frame.config(borderwidth=5, bootstyle="primary")
+        else:
             frame.config(borderwidth=2, bootstyle=None)
 
         self.update_scrollregion()
-
-    def toggle_select_card(self, source_id):
-        if self.selected_source_id == source_id:
-            self.deselect_card()
-        else:
-            self.select_card(source_id)
 
     def show_context_menu(self, event, source):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
         self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
         self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(source))
+
+        if self.selected_source_id == source["id"]:
+            self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
+        else:
+            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
 
         self.context_menu.post(event.x_root, event.y_root)
 
@@ -203,16 +196,16 @@ class ProjectWindow:
             frame.config(borderwidth=2, bootstyle=None)
         self.selected_source_id = None
 
-    # === Drag & Drop für Karten ===
     def on_card_press(self, event, source_id):
+        # Klick auf Karte → immer auswählen
         if source_id != self.selected_source_id:
             self.select_card(source_id)
 
-        if source_id == self.selected_source_id:
-            self.dragging_card = True
-            self.drag_start_x = event.x_root
-            self.drag_start_y = event.y_root
-            self.canvas.tag_raise(self.source_frames[source_id][1])
+        # Dann ggf. Drag starten
+        self.dragging_card = True
+        self.drag_start_x = event.x_root
+        self.drag_start_y = event.y_root
+        self.canvas.tag_raise(self.source_frames[source_id][1])
 
     def on_card_motion(self, event):
         if self.dragging_card:
@@ -233,19 +226,15 @@ class ProjectWindow:
             self.dragging_card = False
             self.update_scrollregion()
 
-    # === Hand-Tool: Canvas per Maus verschieben ===
     def on_canvas_press(self, event):
-        # Prüfen, ob Klick auf eine Karte war
         items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
         card_items = [wid for _, wid in self.source_frames.values()]
         if any(item in card_items for item in items):
             return  # Klick auf Karte → wird von Karte-Event behandelt
 
-        # Klick auf leeren Bereich → Canvas pannen
         self.dragging_canvas = True
         self.canvas_start_x = event.x
         self.canvas_start_y = event.y
-        self.canvas.xview_moveto(0)  # Dummy, um Cursor zu ändern (optional)
         self.canvas.config(cursor="fleur")
 
     def on_canvas_motion(self, event):
