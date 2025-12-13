@@ -360,11 +360,10 @@ class ProjectWindow:
         self.root = root
         self.app = app
         self.source_frames = {}
-        self.selected_source_id = None
-        self.dragging_item = None
-        self.drag_offset_x = 0
-        self.drag_offset_y = 0
-        self.space_pressed = False
+        self.selected_source_id = None  # ID der ausgewählten Karte
+        self.dragging = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -395,71 +394,12 @@ class ProjectWindow:
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
-        self.context_menu.add_command(label="Löschen", command=self.delete_source)
-        self.context_menu.add_command(label="Quellenangabe erstellen", command=self.create_citation)
 
         self.load_sources_on_canvas()
 
-        # Events
-        self.root.bind("<KeyPress-space>", lambda e: self.set_space(True))
-        self.root.bind("<KeyRelease-space>", lambda e: self.set_space(False))
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
-
-    def set_space(self, pressed):
-        self.space_pressed = pressed
-        self.canvas.config(cursor="hand2" if pressed else "arrow")
-
-    def on_press(self, event):
-        # Finde das oberste Item unter der Maus
-        items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
-        if items:
-            item_id = items[-1]  # oberstes
-            if item_id in [wid for _, wid in self.source_frames.values()]:
-                if self.space_pressed:
-                    self.dragging_item = item_id
-                    self.drag_offset_x = event.x
-                    self.drag_offset_y = event.y
-                    self.canvas.tag_raise(item_id)  # Vordergrund
-                else:
-                    # Auswahl für Border
-                    for src_id, (_, wid) in self.source_frames.items():
-                        if wid == item_id:
-                            self.select_card(src_id)
-                            break
-
-    def on_motion(self, event):
-        if self.dragging_item and self.space_pressed:
-            dx = event.x - self.drag_offset_x
-            dy = event.y - self.drag_offset_y
-            self.canvas.move(self.dragging_item, dx, dy)
-            self.drag_offset_x = event.x
-            self.drag_offset_y = event.y
-
-    def on_release(self, event):
-        if self.dragging_item and self.space_pressed:
-            coords = self.canvas.coords(self.dragging_item)
-            for src_id, (_, wid) in self.source_frames.items():
-                if wid == self.dragging_item:
-                    source = next(s for s in self.project["data"]["sources"] if s["id"] == src_id)
-                    source["pos_x"] = coords[0]
-                    source["pos_y"] = coords[1]
-                    self.save_project()
-                    break
-            self.dragging_item = None
-            self.update_scrollregion()
-
-    def select_card(self, source_id):
-        # Alten Border entfernen
-        if self.selected_source_id:
-            old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2, bootstyle="secondary")
-
-        # Neuen Border
-        self.selected_source_id = source_id
-        frame = self.source_frames[source_id][0]
-        frame.config(borderwidth=5, bootstyle="primary")
 
     def load_sources_on_canvas(self):
         for source in self.project["data"]["sources"]:
@@ -493,10 +433,8 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick
+        # Rechtsklick-Menü dynamisch bauen
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
-        for child in frame.winfo_children():
-            child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
         x, y = source.get("pos_x", 300), source.get("pos_y", 300)
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
@@ -504,34 +442,85 @@ class ProjectWindow:
 
         self.update_scrollregion()
 
+    def show_context_menu(self, event, source):
+        self.context_menu.delete(0, tk.END)  # Menü leeren
+        self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
+        self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
+
+        if self.selected_source_id == source["id"]:
+            self.context_menu.add_command(label="Karte abwählen", command=lambda: self.deselect_card())
+        else:
+            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
+
+        self.context_menu.post(event.x_root, event.y_root)
+
+    def select_card(self, source_id):
+        # Alte Auswahl entfernen
+        if self.selected_source_id and self.selected_source_id in self.source_frames:
+            old_frame = self.source_frames[self.selected_source_id][0]
+            old_frame.config(borderwidth=2, bootstyle="secondary")
+
+        # Neue Auswahl
+        self.selected_source_id = source_id
+        frame = self.source_frames[source_id][0]
+        frame.config(borderwidth=5, bootstyle="primary", relief="solid")
+
+    def deselect_card(self):
+        if self.selected_source_id and self.selected_source_id in self.source_frames:
+            frame = self.source_frames[self.selected_source_id][0]
+            frame.config(borderwidth=2, bootstyle="secondary")
+        self.selected_source_id = None
+
+    def on_press(self, event):
+        items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
+        if items:
+            item_id = items[-1]
+            for src_id, (_, wid) in self.source_frames.items():
+                if wid == item_id and src_id == self.selected_source_id:
+                    self.dragging = True
+                    self.drag_start_x = event.x
+                    self.drag_start_y = event.y
+                    self.canvas.tag_raise(item_id)
+                    break
+
+    def on_motion(self, event):
+        if self.dragging:
+            dx = event.x - self.drag_start_x
+            dy = event.y - self.drag_start_y
+            self.canvas.move(self.source_frames[self.selected_source_id][1], dx, dy)
+            self.drag_start_x = event.x
+            self.drag_start_y = event.y
+
+    def on_release(self, event):
+        if self.dragging:
+            coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
+            source = next(s for s in self.project["data"]["sources"] if s["id"] == self.selected_source_id)
+            source["pos_x"] = coords[0]
+            source["pos_y"] = coords[1]
+            self.save_project()
+            self.dragging = False
+            self.update_scrollregion()
+
+    def delete_source(self, source):
+        if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
+            self.project["data"]["sources"].remove(source)
+            frame, item_id = self.source_frames[source["id"]]
+            self.canvas.delete(item_id)
+            frame.destroy()
+            del self.source_frames[source["id"]]
+            if self.selected_source_id == source["id"]:
+                self.selected_source_id = None
+            self.save_project()
+            self.update_scrollregion()
+
+    def create_citation(self, source):
+        citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+        pyperclip.copy(citation)
+        messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
+
     def update_scrollregion(self):
         self.canvas.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def show_context_menu(self, event, source):
-        self.selected_source = source
-        self.context_menu.post(event.x_root, event.y_root)
-
-    def delete_source(self):
-        if hasattr(self, "selected_source"):
-            source = self.selected_source
-            if messagebox.askyesno("Bestätigen", f"Quelle '{source['url']}' löschen?", parent=self.root):
-                self.project["data"]["sources"].remove(source)
-                frame, item_id = self.source_frames[source["id"]]
-                self.canvas.delete(item_id)
-                frame.destroy()
-                del self.source_frames[source["id"]]
-                if self.selected_source_id == source["id"]:
-                    self.selected_source_id = None
-                self.save_project()
-                self.update_scrollregion()
-
-    def create_citation(self):
-        if hasattr(self, "selected_source"):
-            source = self.selected_source
-            citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
-            pyperclip.copy(citation)
-            messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
 
     def add_source(self):
         url = simpledialog.askstring("Neue Quelle", "URL eingeben:", parent=self.root)
