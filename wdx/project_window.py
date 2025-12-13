@@ -92,7 +92,6 @@ class ProjectWindow:
 
     def manual_save(self):
         self.save_project()
-        messagebox.showinfo("Gespeichert", "Projekt wurde manuell gespeichert.")
 
     def manual_export(self):
         success, file_path = self.app.project_manager.export_project(self.project)
@@ -101,7 +100,6 @@ class ProjectWindow:
 
     def manual_reload(self):
         self.reload_items()
-        messagebox.showinfo("Neu geladen", "Mindmap wurde aus Datei neu geladen.")
 
     def update_last_mtime(self):
         if os.path.exists(self.project["data_file"]):
