@@ -14,7 +14,7 @@ from constants import DEFAULT_COLOR
 import requests
 from urllib.parse import urlparse
 import threading 
-import concurrent.futures # NEU: Für Multicore/Thread-Pool
+import concurrent.futures 
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -33,14 +33,14 @@ class ProjectWindow:
         self.last_file_mtime = 0
         self.update_last_mtime()
 
-        # NEU: Thread-Pool für das Laden von Favicons/Disk-I/O
+        # Thread-Pool für Multicore/I/O
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
 
-        # NEU: Zoom-Einstellungen
+        # Zoom-Einstellungen
         self.zoom_level = 1.0
         self.max_zoom = 2.0
         self.min_zoom = 0.5
-        self.zoom_factor = 1.2 # Der Faktor, um den gezoomt wird
+        self.zoom_factor = 1.2 
 
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
@@ -91,86 +91,83 @@ class ProjectWindow:
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
 
-        # NEU: Asynchrones Laden
+        # Startet den I/O-Ladevorgang asynchron
         self.load_items_on_canvas()
 
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
         
-        # NEU: Zoom-Events binden
         self._bind_zoom_events()
 
         self.start_auto_refresh()
 
-    # NEUE METHODEN FÜR ZOOM UND MULTICORE START
+    # --- NEUE MULTICORE LOGIK ---
 
-    def _bind_zoom_events(self):
-        """Bindet plattformspezifische Mausrad-Events für das Zoomen."""
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel) # Windows/macOS
-        self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True)) # Linux Scroll Up
-        self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False)) # Linux Scroll Down
-
-    def _on_mousewheel(self, event, up=None):
-        """Behandelt das Mausrad-Ereignis für das Zoomen."""
-        if self.dragging_canvas or self.dragging_card:
-            return
-
-        if up is None:
-            # Windows / macOS: event.delta > 0 = hoch/reinzoomen
-            direction = 1 if event.delta > 0 else -1
-        else:
-            # Linux: Button-4 (hoch) / Button-5 (runter)
-            direction = 1 if up else -1
-
-        # Die Koordinaten des Mauszeigers relativ zum Canvas (wichtig für den Zoom-Fokus)
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+    def _process_item_data(self, item):
+        """Worker-Funktion, die in einem Hintergrund-Thread läuft. 
+           Führt alle I/O-intensiven Prüfungen durch und gibt das Ergebnis zurück."""
         
-        if direction > 0:
-            self.zoom(self.zoom_factor, x, y)
-        else:
-            self.zoom(1 / self.zoom_factor, x, y)
+        # Headings brauchen keine I/O-Prüfung
+        if item.get("type") == "heading":
+            return {"item": item, "is_source": False, "favicon_path": None}
 
-    def zoom(self, factor, x, y):
-        """Skaliert den Canvas-Inhalt und aktualisiert den Zoom-Level."""
-        new_zoom = self.zoom_level * factor
-        
-        if new_zoom < self.min_zoom or new_zoom > self.max_zoom:
-            return # Zoom-Limit erreicht
-
-        # Skaliert alle Elemente auf dem Canvas um den Faktor
-        self.canvas.scale("all", x, y, factor, factor)
-        self.zoom_level = new_zoom
-        
-        self.update_scrollregion()
-
-
-    def load_items_on_canvas(self):
-        """Lädt Projekt-Items. I/O-intensive Teile (Favicons) laufen asynchron."""
-        for item in self.project["data"]["items"]:
-            if item.get("type") == "source":
-                # Startet die zeitaufwendige Favicon-Verarbeitung im Thread-Pool
-                self.executor.submit(self._process_source_item, item)
-            elif item.get("type") == "heading":
-                # Überschriften sind einfach, direkt im Main-Thread erstellen
-                self.create_heading_card(item)
-        
-        self.update_scrollregion()
-        
-    def _process_source_item(self, source):
-        """Worker-Funktion, die in einem Hintergrund-Thread läuft (Multicore)."""
+        # Source-Items: I/O-Prüfung für Favicon
         favicon_path = None
-        if source.get("favicon"):
-            check_path = Path(self.project["path"]) / "images" / source["favicon"]
-            # File-I/O: Prüfen, ob die Datei existiert (kann bei vielen Karten I/O blockieren)
+        if item.get("favicon"):
+            check_path = Path(self.project["path"]) / "images" / item["favicon"]
             if check_path.exists():
                 favicon_path = check_path 
         
-        # Ruft _finalize_source_card_creation im Main-Thread auf, um GUI zu erstellen
-        self.root.after(0, self._finalize_source_card_creation, source, favicon_path)
+        return {"item": item, "is_source": True, "favicon_path": favicon_path}
 
-    def _finalize_source_card_creation(self, source, favicon_path):
-        """Erstellt die Quell-Karte im Main-Thread (Thread-sicher)."""
+
+    def load_items_on_canvas(self):
+        """Startet den synchronisierten Ladevorgang."""
+        items_to_process = self.project["data"]["items"]
+        
+        # Startet den Ladevorgang in einem separaten Thread, um die GUI nicht zu blockieren, 
+        # während der Executor blockiert auf alle Ergebnisse wartet.
+        threading.Thread(target=self._concurrent_load_worker, args=(items_to_process,), daemon=True).start()
+        
+    def _concurrent_load_worker(self, items_to_process):
+        """Blockiert im Hintergrund, um alle I/O-Aufgaben gleichzeitig zu erledigen."""
+        try:
+            # Map ist blockierend: Wartet, bis alle _process_item_data-Aufrufe fertig sind
+            # Dies ist der entscheidende Schritt, der alle I/O parallelisiert.
+            processed_results = list(self.executor.map(self._process_item_data, items_to_process))
+            
+            # Nachdem alle Ergebnisse gesammelt sind, zurück in den Main-Thread
+            self.root.after(0, self._create_all_cards_in_gui_thread, processed_results)
+            
+        except Exception as e:
+            print(f"Fehler im Concurrent Load Worker: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Fehler", "Fehler beim parallelen Laden der Kartendaten."))
+
+
+    def _create_all_cards_in_gui_thread(self, processed_results):
+        """Erstellt die Widgets aller Karten schnell und sequenziell im Main-Thread.
+           Wird nur einmal aufgerufen."""
+        
+        # Löscht alte Karten zuerst, um Platz zu schaffen (aus reload_items hierher verschoben)
+        for frame, item_id in list(self.source_frames.values()):
+            self.canvas.delete(item_id)
+            frame.destroy()
+        self.source_frames.clear()
+
+        for result in processed_results:
+            item = result["item"]
+            if result["is_source"]:
+                self._create_source_card_gui(item, result["favicon_path"])
+            else:
+                self._create_heading_card_gui(item)
+                
+        # Wichtig: Scrollregion nur einmal am Ende aktualisieren
+        self.update_scrollregion()
+
+
+    def _create_source_card_gui(self, source, favicon_path):
+        """Erstellt die GUI-Elemente für eine Quelle (muss im Main-Thread sein)."""
         color = source.get("color", DEFAULT_COLOR)
 
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
@@ -182,7 +179,6 @@ class ProjectWindow:
         # Favicon oder Globus
         if favicon_path:
             try:
-                # PhotoImage MUSS im Main-Thread erstellt werden!
                 favicon_img = tk.PhotoImage(file=favicon_path)
                 favicon_img = favicon_img.subsample(2, 2)
                 favicon_label = ttk.Label(frame, image=favicon_img, background=color)
@@ -207,7 +203,6 @@ class ProjectWindow:
             ttk.Label(frame, text=f"🏷 {source['keywords']}", font=("Helvetica", 9), bootstyle="info", background=color).pack(anchor="w", pady=(4,0))
 
         ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color).pack(anchor="w", pady=(8,0))
-
         
         if source.get("saved_pages", []):
             ttk.Button(frame, text="📄 Gespeicherte Seiten öffnen", bootstyle="info-outline", width=28,
@@ -233,40 +228,11 @@ class ProjectWindow:
         else:
             frame.config(borderwidth=2, bootstyle=None)
             
-        # Skaliert die neue Karte, falls bereits gezoomt wurde
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
 
-        self.update_scrollregion()
-    
-    # NEUE METHODEN FÜR ZOOM UND MULTICORE ENDE
-
-    def show_add_menu(self, event=None):
-        self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
-
-    def manual_save(self):
-        self.save_project()
-
-    def manual_export(self):
-        success, file_path = self.app.project_manager.export_project(self.project)
-        if success:
-            messagebox.showinfo("Exportiert", f"Projekt als '{file_path}' exportiert.")
-
-    def manual_reload(self):
-        self.reload_items()
-
-    def update_last_mtime(self):
-        if os.path.exists(self.project["data_file"]):
-            self.last_file_mtime = os.path.getmtime(self.project["data_file"])
-        else:
-            self.last_file_mtime = 0
-
-    # `load_items_on_canvas` wurde durch die Multicore-Logik oben ersetzt.
-
-    # `create_source_card` Logik wurde in `_finalize_source_card_creation` integriert und ersetzt
-    # die alte, blockierende Funktion.
-
-    def create_heading_card(self, heading):
+    def _create_heading_card_gui(self, heading):
+        """Erstellt die GUI-Elemente für eine Überschrift (muss im Main-Thread sein)."""
         color = heading.get("color", "#e9ecef")
         text_color = "#212529" if color == "#e9ecef" else "#ffffff"
 
@@ -296,11 +262,68 @@ class ProjectWindow:
         else:
             frame.config(borderwidth=0, bootstyle=None)
 
-        # Skaliert die neue Karte, falls bereits gezoomt wurde
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
 
+    # --- ENDE NEUE MULTICORE LOGIK ---
+
+
+    def _bind_zoom_events(self):
+        """Bindet plattformspezifische Mausrad-Events für das Zoomen."""
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel) 
+        self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True)) 
+        self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False)) 
+
+    def _on_mousewheel(self, event, up=None):
+        """Behandelt das Mausrad-Ereignis für das Zoomen."""
+        if self.dragging_canvas or self.dragging_card:
+            return
+
+        if up is None:
+            direction = 1 if event.delta > 0 else -1
+        else:
+            direction = 1 if up else -1
+
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        
+        if direction > 0:
+            self.zoom(self.zoom_factor, x, y)
+        else:
+            self.zoom(1 / self.zoom_factor, x, y)
+
+    def zoom(self, factor, x, y):
+        """Skaliert den Canvas-Inhalt und aktualisiert den Zoom-Level."""
+        new_zoom = self.zoom_level * factor
+        
+        if new_zoom < self.min_zoom or new_zoom > self.max_zoom:
+            return 
+
+        self.canvas.scale("all", x, y, factor, factor)
+        self.zoom_level = new_zoom
+        
         self.update_scrollregion()
+
+    # `create_source_card` und `create_heading_card` wurden durch die GUI-Helfer ersetzt.
+    
+    def show_add_menu(self, event=None):
+        self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
+
+    def manual_save(self):
+        self.save_project()
+
+    def manual_export(self):
+        success, file_path = self.app.project_manager.export_project(self.project)
+        if success:
+            messagebox.showinfo("Exportiert", f"Projekt als '{file_path}' exportiert.")
+
+    def manual_reload(self):
+        self.reload_items()
+
+    def update_last_mtime(self):
+        if os.path.exists(self.project["data_file"]):
+            self.last_file_mtime = os.path.getmtime(self.project["data_file"])
+        else:
+            self.last_file_mtime = 0
 
     def show_saved_pages_popup(self, source):
         if not source.get("saved_pages"):
@@ -352,7 +375,6 @@ class ProjectWindow:
         """Startet den Reload-Prozess in einem Hintergrund-Thread."""
         self.root.after(0, lambda: messagebox.showinfo("Info", "Seite wird im Hintergrund aktualisiert...", parent=self.root))
         
-        # Startet den Download im Hintergrund-Thread
         threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
 
     def _reload_worker(self, source):
@@ -365,18 +387,15 @@ class ProjectWindow:
         new_favicon_name = None
 
         try:
-            # HTML Download
             response = requests.get(source["url"], timeout=15)
             response.raise_for_status() 
             
-            # HTML Speichern
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"page_{source['id']}_{timestamp}.html"
             
             with open(sites_dir / filename, "w", encoding="utf-8") as f:
                 f.write(response.text)
 
-            # Favicon Logik (auch im Hintergrund-Thread)
             parsed = urlparse(source["url"])
             favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
             favicon_response = requests.get(favicon_url, timeout=5)
@@ -387,7 +406,6 @@ class ProjectWindow:
                     f.write(favicon_response.content)
                 new_favicon_name = favicon_filename 
 
-            # Zurück in den Main-Thread für UI-Update und JSON-Save
             self.root.after(0, self._finalize_reload, source["id"], filename, timestamp, new_favicon_name)
 
         except requests.exceptions.Timeout:
@@ -424,10 +442,22 @@ class ProjectWindow:
             self.canvas.delete(item_id)
             frame.destroy()
             del self.source_frames[source_id]
-            # Ruft die asynchrone Lademethode auf
-            self.executor.submit(self._process_source_item, source)
+            
+            # NEU: Nur die eine Karte neu laden (asynchrone Vorbereitung)
+            threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
+
 
         messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!", parent=self.root)
+
+    def _concurrent_reload_single_card(self, source):
+        """Worker für das Neuladen einer einzelnen Karte."""
+        try:
+            # Führt die I/O-Prüfung aus
+            result = self._process_item_data(source)
+            # Führt die GUI-Erstellung im Main-Thread aus
+            self.root.after(0, self._create_source_card_gui, source, result["favicon_path"])
+        except Exception as e:
+            print(f"Fehler beim Neuladen der Einzelkarte: {e}")
 
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
@@ -455,7 +485,7 @@ class ProjectWindow:
             self.canvas.delete(item_id)
             frame.destroy()
             del self.source_frames[heading["id"]]
-            self.create_heading_card(heading)
+            self._create_heading_card_gui(heading) # GUI-Helfer
             self.save_project()
             self.update_last_mtime()
 
@@ -467,7 +497,7 @@ class ProjectWindow:
             self.canvas.delete(item_id)
             frame.destroy()
             del self.source_frames[heading["id"]]
-            self.create_heading_card(heading)
+            self._create_heading_card_gui(heading) # GUI-Helfer
             self.save_project()
             self.update_last_mtime()
 
@@ -503,7 +533,7 @@ class ProjectWindow:
         }
 
         self.project["data"]["items"].append(new_heading)
-        self.create_heading_card(new_heading)
+        self._create_heading_card_gui(new_heading) # GUI-Helfer
         self.save_project()
         self.update_last_mtime()
 
@@ -525,7 +555,10 @@ class ProjectWindow:
                 "saved_pages": []
             }
             self.project["data"]["items"].append(new_source)
-            self.executor.submit(self._process_source_item, new_source) # NEU: Asynchron aufrufen
+            
+            # Startet asynchrone I/O-Vorbereitung und anschließende GUI-Erstellung
+            threading.Thread(target=self._concurrent_reload_single_card, args=(new_source,), daemon=True).start()
+            
             self.save_project()
             self.update_last_mtime()
 
@@ -538,12 +571,13 @@ class ProjectWindow:
             source["keywords"] = dialog.result["keywords"]
             source["color"] = dialog.result["color"]
             
-            # Neu erstellen über asynchronen Pfad
             frame, item_id = self.source_frames[source["id"]]
             self.canvas.delete(item_id)
             frame.destroy()
             del self.source_frames[source["id"]]
-            self.executor.submit(self._process_source_item, source)
+            
+            # Startet asynchrone I/O-Vorbereitung und anschließende GUI-Erstellung
+            threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
             
             self.save_project()
             self.update_last_mtime()
@@ -570,14 +604,12 @@ class ProjectWindow:
             self.select_card(item_id)
 
         self.dragging_card = True
-        # Korrigiert die Startposition für den gezoomten Canvas
         self.drag_start_x = event.x_root
         self.drag_start_y = event.y_root
         self.canvas.tag_raise(self.source_frames[item_id][1])
 
     def on_card_motion(self, event):
         if self.dragging_card:
-            # Bewegt die Karte basierend auf der Mausbewegung und dem Zoom-Level
             dx = (event.x_root - self.drag_start_x) / self.zoom_level
             dy = (event.y_root - self.drag_start_y) / self.zoom_level
             
@@ -590,7 +622,6 @@ class ProjectWindow:
             coords = self.canvas.coords(self.source_frames[self.selected_source_id][1])
             item = next(i for i in self.project["data"]["items"] if i["id"] == self.selected_source_id)
             
-            # Speichert die korrekten, unskalierten Koordinaten
             item["pos_x"] = coords[0]
             item["pos_y"] = coords[1]
             
@@ -659,15 +690,10 @@ class ProjectWindow:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
-            for frame, item_id in list(self.source_frames.values()):
-                self.canvas.delete(item_id)
-                frame.destroy()
-            self.source_frames.clear()
-
             items = updated_data.get("items", [])
             self.project["data"]["items"] = items
 
-            # NEU: Nutzt die asynchrone Lademethode
+            # NEU: Startet den synchronisierten Ladevorgang (Multicore I/O + sequenzielle GUI)
             self.load_items_on_canvas()
             
         except Exception as e:
@@ -675,7 +701,6 @@ class ProjectWindow:
 
     def back_to_projects(self):
         self.save_project()
-        # Wichtig: Thread-Pool sauber beenden
         self.executor.shutdown(wait=False) 
         self.main_frame.destroy()
-        self.app.close_project() # Ruft die neue Methode in WdxApp auf
+        self.app.close_project()
