@@ -8,6 +8,7 @@ import uuid
 import webbrowser
 import pyperclip
 import json
+import os
 
 class ProjectWindow:
     def __init__(self, root, project, app):
@@ -19,6 +20,9 @@ class ProjectWindow:
         self.dragging = False
         self.drag_start_x = 0
         self.drag_start_y = 0
+
+        # Für Auto-Refresh: Letzte bekannte Änderungszeit
+        self.last_modified_check = project.get("last_modified", "")
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -54,6 +58,9 @@ class ProjectWindow:
 
         self.canvas.bind("<ButtonPress-1>", self.on_press)
 
+        # Live-Sync starten
+        self.start_auto_refresh()
+
     def load_sources_on_canvas(self):
         for source in self.project["data"]["sources"]:
             if "id" not in source:
@@ -73,7 +80,6 @@ class ProjectWindow:
         frame.source_data = source
         frame.configure(style="Card.TFrame")
         self.root.style.configure("Card.TFrame", background=color)
-
         frame.configure(style="Card.TFrame")
 
         title_text = source.get("title") or source["url"]
@@ -138,7 +144,6 @@ class ProjectWindow:
             self.project["data"]["sources"].append(new_source)
             self.create_source_card(new_source)
             self.save_project()
-            messagebox.showinfo("Erfolg", "Quelle zur Mindmap hinzugefügt.")
 
     def edit_source(self, source):
         dialog = SourceDialog(self.root, self, source)
@@ -226,6 +231,50 @@ class ProjectWindow:
             json.dump(self.project["data"], f, indent=4)
         self.project["last_modified"] = datetime.datetime.now().isoformat()
         self.app.project_manager.save_projects()
+
+    # === NEU: Live-Sync mit Browser-Erweiterung ===
+    def start_auto_refresh(self):
+        """Prüft alle 3 Sekunden, ob die project.json geändert wurde (z. B. durch Erweiterung)"""
+        try:
+            # Aktuelle last_modified aus Datei lesen
+            if os.path.exists(self.project["data_file"]):
+                with open(self.project["data_file"], "r", encoding="utf-8") as f:
+                    file_data = json.load(f)
+                current_last_modified = file_data.get("last_modified", self.project["last_modified"])
+            else:
+                current_last_modified = self.project["last_modified"]
+
+            if current_last_modified != self.last_modified_check:
+                # Datei wurde geändert → neu laden
+                self.reload_sources()
+                self.last_modified_check = current_last_modified
+        except Exception as e:
+            print("Auto-Refresh Fehler:", e)
+
+        # Alle 3 Sekunden wiederholen
+        self.root.after(3000, self.start_auto_refresh)
+
+    def reload_sources(self):
+        """Lädt die Quellen neu aus der project.json"""
+        try:
+            with open(self.project["data_file"], "r", encoding="utf-8") as f:
+                updated_data = json.load(f)
+
+            # Alte Karten entfernen
+            for frame, item_id in self.source_frames.values():
+                self.canvas.delete(item_id)
+                frame.destroy()
+            self.source_frames.clear()
+
+            # Neue Daten übernehmen
+            self.project["data"]["sources"] = updated_data.get("sources", [])
+            self.project["last_modified"] = updated_data.get("last_modified", datetime.datetime.now().isoformat())
+
+            # Neue Karten zeichnen
+            self.load_sources_on_canvas()
+
+        except Exception as e:
+            messagebox.showerror("Fehler", f"Fehler beim Aktualisieren: {e}")
 
     def back_to_projects(self):
         self.save_project()
