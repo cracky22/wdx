@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>WDX Letzte Quellen</title>
+  <style>
+    body { font-family: Arial, sans-serif; width: 350px; padding: 10px; }
+    h3 { margin: 0 0 10px; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 8px 0; word-break: break-all; }
+    a { color: #007bff; text-decoration: none; }
+    .status { font-weight: bold; margin-bottom: 15px; }
+    .online { color: green; }
+    .offline { color: red; }
+  </style>
+</head>
+<body>
+  <h3>WDX Status</h3>
+  <div id="status" class="status offline">Prüfe Verbindung...</div>
+
+  <h3>Letzte 3 gesicherte Quellen</h3>
+  <ul id="history"></ul>
+
+  <script src="popup.js"></script>
+</body>
+</html>
