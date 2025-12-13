@@ -35,11 +35,22 @@ class ProjectWindow:
 
         header_frame = ttk.Frame(self.main_frame, padding="15 10", bootstyle="primary")
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        header_frame.columnconfigure(0, weight=1)
+        header_frame.columnconfigure(1, weight=1)
 
+        # Linke Seite: Zurück-Button
         ttk.Button(header_frame, text="← Zurück zu Projekten", command=self.back_to_projects, bootstyle="secondary-outline").grid(row=0, column=0, sticky=tk.W, padx=10)
+
+        # Rechte Seite: Manuelle Buttons
+        btn_frame = ttk.Frame(header_frame)
+        btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
+
+        ttk.Button(btn_frame, text="💾", width=3, bootstyle="outline-secondary", command=self.manual_save).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text="📥", width=3, bootstyle="outline-secondary", command=self.manual_export).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text="🔄", width=3, bootstyle="outline-secondary", command=self.manual_reload).pack(side="left", padx=2)
+
+        # Mitte: Projektname und Beschreibung
         ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
-        ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=0, column=2, sticky=tk.E, padx=20)
+        ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=1, column=1, sticky=tk.W, padx=20, columnspan=2)
 
         self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0)
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -74,6 +85,17 @@ class ProjectWindow:
 
     def show_add_menu(self, event=None):
         self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
+
+    def manual_save(self):
+        self.save_project()
+
+    def manual_export(self):
+        success, file_path = self.app.project_manager.export_project(self.project)
+        if success:
+            messagebox.showinfo("Exportiert", f"Projekt als '{file_path}' exportiert.")
+
+    def manual_reload(self):
+        self.reload_items()
 
     def update_last_mtime(self):
         if os.path.exists(self.project["data_file"]):
@@ -293,7 +315,8 @@ class ProjectWindow:
     def select_card(self, source_id):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2 if old_frame.item_data["type"] == "source" else 0, bootstyle=None)
+            border = 2 if old_frame.item_data["type"] == "source" else 0
+            old_frame.config(borderwidth=border, bootstyle=None)
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
