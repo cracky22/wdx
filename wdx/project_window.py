@@ -17,6 +17,15 @@ import threading
 import concurrent.futures 
 
 class ProjectWindow:
+    
+    # Neue Konstanten für das Farbsystem und die Auswahl
+    DEFAULT_SELECT_BORDER_WIDTH = 5
+    DEFAULT_SELECT_BORDER_COLOR = "primary" # Dies steuert die Borderfarbe (blau/dunkelblau)
+    
+    # Theme-abhängige Farben für unkolorierte Karten (Light Mode Defaults)
+    DEFAULT_SOURCE_BG = "#ffffff"   
+    DEFAULT_HEADING_BG = "#e9ecef"
+    
     def __init__(self, root, project, app):
         self.project = project
         self.root = root
@@ -24,6 +33,8 @@ class ProjectWindow:
         self.source_frames = {} 
         self.card_widgets = {}  
         self.selected_source_id = None
+        # Wird die effektive Farbe der Karte speichern, BEVOR der Auswahl-Bootstyle angewendet wird
+        self.selected_card_original_color = None 
         self.dragging_card = False
         self.dragging_canvas = False
         self.drag_start_x = 0
@@ -38,10 +49,9 @@ class ProjectWindow:
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
 
         # Zoom-Einstellungen
-        # Lädt Zoom-Level aus der Projektdatei, falls vorhanden, sonst 1.0
         self.zoom_level = self.project["data"].get("canvas_zoom_level", 1.0) 
         self.max_zoom = 2.0
-        self.min_zoom = 0.1 # Minimaler Zoom auf 0.1 reduziert
+        self.min_zoom = 0.1
         self.zoom_factor = 1.2 
         # Basis-Fonts für Skalierung
         self.base_font_title = ("Helvetica", 12, "bold")
@@ -136,15 +146,12 @@ class ProjectWindow:
         try:
             processed_results = list(self.executor.map(self._process_item_data, items_to_process))
             
-            # Nachdem alle Ergebnisse gesammelt sind, zurück in den Main-Thread
             if hasattr(self, 'main_frame') and self.main_frame.winfo_exists():
                 self.root.after(0, self._create_all_cards_in_gui_thread, processed_results)
             
         except concurrent.futures.CancelledError:
-            # FIX: Fehler wird stumm geschaltet, da dies dies beim Executor-Shutdown erwartet wird
             pass 
         except Exception as e:
-            # Nur unerwartete Fehler anzeigen, wenn das Fenster noch existiert
             print(f"Fehler im Concurrent Load Worker: {e}")
             if hasattr(self, 'main_frame') and self.main_frame.winfo_exists():
                 self.root.after(0, lambda: messagebox.showerror("Fehler", "Fehler beim parallelen Laden der Kartendaten."))
@@ -167,9 +174,25 @@ class ProjectWindow:
             else:
                 self._create_heading_card_gui(item)
                 
-        # Scrollregion nur einmal am Ende aktualisieren
         self.update_scrollregion()
 
+    # --- COLOR HELPERS ---
+
+    def _get_effective_bg_color(self, item):
+        """Ermittelt die effektive Hintergrundfarbe: gewählte Farbe oder Theme-Standard."""
+        custom_color = item.get("color", "").strip()
+        if custom_color:
+            return custom_color
+        
+        if item["type"] == "source":
+            return self.DEFAULT_SOURCE_BG
+        else: # heading
+            return self.DEFAULT_HEADING_BG
+    
+    def _get_default_border_width(self, item):
+        """Gibt die Standard-Randbreite basierend auf dem Item-Typ zurück."""
+        return 2 if item["type"] == "source" else 0
+        
     # --- ZOOM & SCALING ---
 
     def _bind_zoom_events(self):
@@ -202,11 +225,9 @@ class ProjectWindow:
         if new_zoom < self.min_zoom or new_zoom > self.max_zoom:
             return 
 
-        # Skaliert Positionen und Bounding Boxes der Canvas-Elemente
         self.canvas.scale("all", x, y, factor, factor)
         self.zoom_level = new_zoom
         
-        # Manuell die Inhalte (Fonts/Bilder) der Karten skalieren
         self._update_card_content_scale()
         
         self.update_scrollregion()
@@ -214,7 +235,6 @@ class ProjectWindow:
     def _update_card_content_scale(self):
         """Skaliert die Fonts und Bilder in allen Karten basierend auf dem Zoom-Level."""
         
-        # Berechnet die neuen Font-Größen (mit Minimum 5, um Lesbarkeit zu gewährleisten)
         title_size = max(int(self.base_font_title[1] * self.zoom_level), 5)
         heading_size = max(int(self.base_font_heading[1] * self.zoom_level), 8)
         default_size = max(int(self.base_font_default[1] * self.zoom_level), 5)
@@ -232,7 +252,6 @@ class ProjectWindow:
             if 'keywords_label' in refs:
                 refs['keywords_label'].config(font=("Helvetica", default_size))
             if 'added_label' in refs:
-                # Kleinere Schriftgröße (8) muss ebenfalls skaliert werden
                 refs['added_label'].config(font=("Helvetica", max(int(8 * self.zoom_level), 5)))
 
             if 'heading_label' in refs:
@@ -242,7 +261,6 @@ class ProjectWindow:
             if 'icon_label' in refs:
                 if 'original_icon_data' in refs and refs['original_icon_data']['is_favicon']:
                     original_img = refs['original_icon_data']['original_img']
-                    # new_subsample muss mindestens 1 sein
                     new_subsample = max(1, int(self.base_favicon_subsample / self.zoom_level))
                     
                     try:
@@ -252,70 +270,80 @@ class ProjectWindow:
                     except tk.TclError:
                         pass 
                 else:
-                    # Globus-Icon (Text)
                     refs['icon_label'].config(font=("Helvetica", icon_size))
 
 
     def _create_source_card_gui(self, source, favicon_path):
         """Erstellt die GUI-Elemente für eine Quelle (muss im Main-Thread sein)."""
-        color = source.get("color", DEFAULT_COLOR)
+        
+        color = self._get_effective_bg_color(source)
+        source["effective_color"] = color 
         item_id = source["id"]
         
+        # FIX 1: Einzigartiger Style-Name, um die Hintergrundfarbe nur für diese Karte zu ändern
+        style_name = f"Source.{item_id}.TFrame"
         self.card_widgets[item_id] = {}
 
-        frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
+        # 1. Style konfigurieren
+        try:
+             self.root.style.configure(style_name, background=color)
+        except tk.TclError:
+             self.root.style.configure(style_name, relief="raised", borderwidth=self._get_default_border_width(source))
+
+
+        # 2. Frame erstellen und Style zuweisen
+        frame = ttk.Frame(self.canvas, padding="15")
         frame.item_data = source
-        frame.configure(style="Card.TFrame")
-        self.root.style.configure("Card.TFrame", background=color)
-        frame.configure(style="Card.TFrame")
+        frame.unique_style_name = style_name 
+        
+        frame.configure(style=style_name)
+        frame.config(relief="raised", borderwidth=self._get_default_border_width(source))
+
 
         # --- Favicon/Globus ---
+        # FIX 2: background=color von ttk.Labels entfernt, um TclError zu vermeiden. Wird manuell unten gesetzt.
         if favicon_path:
             try:
                 original_img = tk.PhotoImage(file=favicon_path)
-                
-                self.card_widgets[item_id]['original_icon_data'] = {
-                    'original_img': original_img,
-                    'is_favicon': True
-                }
-                
+                self.card_widgets[item_id]['original_icon_data'] = {'original_img': original_img, 'is_favicon': True}
                 favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                favicon_label = ttk.Label(frame, image=favicon_img, background=color)
+                favicon_label = ttk.Label(frame, image=favicon_img) 
                 favicon_label.image = favicon_img 
                 favicon_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = favicon_label
             except Exception:
-                globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), background=color)
+                globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size))
                 globe_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = globe_label
         else:
-            globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), background=color)
+            globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size))
             globe_label.pack(anchor="w")
             self.card_widgets[item_id]['icon_label'] = globe_label
 
         # --- Labels ---
+        # FIX 2: background=color von allen Labels entfernt
         title_text = source.get("title") or source["url"]
-        title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground="#2c3e50", wraplength=320, background=color)
+        title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground="#2c3e50", wraplength=320)
         title_label.pack(anchor="w")
         self.card_widgets[item_id]['title_label'] = title_label
 
         if source.get("title"):
-            url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground="#7f8c8d", wraplength=350, background=color)
+            url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground="#7f8c8d", wraplength=350)
             url_label.pack(anchor="w")
             self.card_widgets[item_id]['url_label'] = url_label
 
         if source["text"]:
             preview = source["text"][:180] + ("..." if len(source["text"]) > 180 else "")
-            text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground="#34495e", wraplength=350, background=color)
+            text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground="#34495e", wraplength=350)
             text_label.pack(anchor="w", pady=(6,0))
             self.card_widgets[item_id]['text_label'] = text_label
 
         if source["keywords"]:
-            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info", background=color)
+            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info")
             keywords_label.pack(anchor="w", pady=(4,0))
             self.card_widgets[item_id]['keywords_label'] = keywords_label
 
-        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6", background=color)
+        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6")
         added_label.pack(anchor="w", pady=(8,0))
         self.card_widgets[item_id]['added_label'] = added_label 
 
@@ -326,6 +354,13 @@ class ProjectWindow:
         frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
+            # HACK: Manuelle Konfiguration der Label-Hintergründe, da ttk.Label sie sonst nicht korrekt vom Style erbt
+            try:
+                if isinstance(child, (ttk.Label, tk.Label)):
+                    child.config(background=color)
+            except Exception:
+                pass
+
 
         frame.bind("<ButtonPress-1>", lambda e, iid=item_id: self.on_card_press(e, iid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
@@ -335,12 +370,10 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[item_id] = (frame, window_id)
 
+        # 4. Selektionsstatus prüfen und anwenden (Initial-Load)
         if self.selected_source_id == item_id:
-            frame.config(borderwidth=5, bootstyle="primary")
-        else:
-            frame.config(borderwidth=2, bootstyle=None)
+            self.select_card(item_id, initial_load=True) 
             
-        # Skaliert die neue Karte, falls bereits gezoomt wurde
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
             self._update_card_content_scale()
@@ -348,25 +381,45 @@ class ProjectWindow:
 
     def _create_heading_card_gui(self, heading):
         """Erstellt die GUI-Elemente für eine Überschrift (muss im Main-Thread sein)."""
-        color = heading.get("color", "#e9ecef")
-        text_color = "#212529" if color == "#e9ecef" else "#ffffff"
+        
+        color = self._get_effective_bg_color(heading)
+        heading["effective_color"] = color 
+        
+        text_color = "#212529" if color in [self.DEFAULT_HEADING_BG, "#e9ecef", "#ffffff"] else "#ffffff"
         item_id = heading["id"]
+        
+        # FIX 1: Einzigartiger Style-Name
+        style_name = f"Heading.{item_id}.TFrame"
         
         self.card_widgets[item_id] = {}
 
-        frame = ttk.Frame(self.canvas, padding="20", relief="flat", borderwidth=0)
-        frame.item_data = heading
-        frame.configure(style="Heading.TFrame")
-        self.root.style.configure("Heading.TFrame", background=color)
-        frame.configure(style="Heading.TFrame")
+        # 1. Style konfigurieren
+        try:
+             self.root.style.configure(style_name, background=color)
+        except tk.TclError:
+             self.root.style.configure(style_name, relief="flat", borderwidth=self._get_default_border_width(heading))
 
-        label = ttk.Label(frame, text=heading["text"], font=self.base_font_heading, foreground=text_color, background=color)
+        # 2. Frame erstellen und Style zuweisen
+        frame = ttk.Frame(self.canvas, padding="20")
+        frame.item_data = heading
+        frame.unique_style_name = style_name 
+        frame.configure(style=style_name)
+        frame.config(relief="flat", borderwidth=self._get_default_border_width(heading))
+
+        # FIX 2: background=color von Labels entfernt
+        label = ttk.Label(frame, text=heading["text"], font=self.base_font_heading, foreground=text_color)
         label.pack()
         self.card_widgets[item_id]['heading_label'] = label
 
         frame.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
+            try:
+                if isinstance(child, (ttk.Label, tk.Label)):
+                    child.config(background=color)
+            except Exception:
+                pass
+
 
         frame.bind("<ButtonPress-1>", lambda e, iid=item_id: self.on_card_press(e, iid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
@@ -377,9 +430,7 @@ class ProjectWindow:
         self.source_frames[item_id] = (frame, window_id)
 
         if self.selected_source_id == item_id:
-            frame.config(borderwidth=5, bootstyle="primary")
-        else:
-            frame.config(borderwidth=0, bootstyle=None)
+            self.select_card(item_id, initial_load=True) 
 
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
@@ -438,8 +489,6 @@ class ProjectWindow:
 
         def open_selected():
             self.open_selected_version_from_popup()
-            # Der Doppelklick öffnet, aber der Button kann das Fenster schließen
-            # popup.destroy() 
 
         ttk.Button(popup, text="Ausgewählte öffnen", command=self.open_selected_version_from_popup, bootstyle="primary").pack(pady=10)
         ttk.Button(popup, text="Schließen", command=popup.destroy, bootstyle="secondary").pack(pady=5)
@@ -456,6 +505,8 @@ class ProjectWindow:
 
     def reload_current_page(self, source):
         """Startet den Reload-Prozess in einem Hintergrund-Thread."""
+        self.root.after(0, lambda: messagebox.showinfo("Info", "Seite wird im Hintergrund aktualisiert...", parent=self.root))
+        
         threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
 
     def _reload_worker(self, source):
@@ -525,16 +576,15 @@ class ProjectWindow:
             del self.source_frames[source_id]
             del self.card_widgets[source_id] 
             
-            # Startet asynchrone I/O-Vorbereitung und anschließende GUI-Erstellung
             threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
 
+
+        messagebox.showinfo("Erfolg", "Aktuelle Seite wurde neu gespeichert!", parent=self.root)
 
     def _concurrent_reload_single_card(self, source):
         """Worker für das Neuladen einer einzelnen Karte."""
         try:
-            # Führt die I/O-Prüfung aus
             result = self._process_item_data(source)
-            # Führt die GUI-Erstellung im Main-Thread aus
             self.root.after(0, self._create_source_card_gui, source, result["favicon_path"])
         except Exception as e:
             print(f"Fehler beim Neuladen der Einzelkarte: {e}")
@@ -547,7 +597,6 @@ class ProjectWindow:
             self.context_menu.add_command(label="Umbenennen", command=lambda: self.rename_heading(item))
             self.context_menu.add_command(label="Farbe ändern", command=lambda: self.change_heading_color(item))
         else:
-            # NEU: Option für gespeicherte Versionen hinzufügen, wenn vorhanden
             if item.get("saved_pages") and len(item["saved_pages"]) > 0:
                 self.context_menu.add_command(label="Gespeicherte Versionen anzeigen", command=lambda: self.show_saved_pages_popup(item)) 
                 self.context_menu.add_separator() 
@@ -557,9 +606,9 @@ class ProjectWindow:
             self.context_menu.add_command(label="Aktuelle Seite neu laden", command=lambda: self.reload_current_page(item))
 
         if self.selected_source_id == item["id"]:
-            self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
+            self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card) 
         else:
-            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(item["id"]))
+            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(item["id"])) 
 
         self.context_menu.post(event.x_root, event.y_root)
 
@@ -577,9 +626,11 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def change_heading_color(self, heading):
-        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=heading["color"])[1]
-        if color and color != heading["color"]:
-            heading["color"] = color
+        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=heading["color"] or self.DEFAULT_HEADING_BG)[1]
+        
+        if color and color != heading.get("color", ""):
+            heading["color"] = "" if color == self.DEFAULT_HEADING_BG else color
+            
             frame, item_id = self.source_frames[heading["id"]]
             self.canvas.delete(item_id)
             frame.destroy()
@@ -609,15 +660,15 @@ class ProjectWindow:
         if not text:
             return
 
-        color = colorchooser.askcolor(title="Farbe wählen", initialcolor="#e9ecef")[1]
-        if not color:
-            color = "#e9ecef"
+        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=self.DEFAULT_HEADING_BG)[1]
+        
+        color_to_save = "" if not color or color == self.DEFAULT_HEADING_BG else color
 
         new_heading = {
             "id": str(uuid.uuid4()),
             "type": "heading",
             "text": text,
-            "color": color,
+            "color": color_to_save,
             "pos_x": 300,
             "pos_y": 300
         }
@@ -672,26 +723,79 @@ class ProjectWindow:
             self.save_project()
             self.update_last_mtime()
 
-    def select_card(self, source_id):
-        if self.selected_source_id and self.selected_source_id in self.source_frames:
-            old_frame = self.source_frames[self.selected_source_id][0]
-            border = 2 if old_frame.item_data["type"] == "source" else 0
-            old_frame.config(borderwidth=border, bootstyle=None)
+    # --- SELECTION LOGIC ---
+    
+    def select_card(self, source_id, initial_load=False):
+        """Wählt eine Karte aus und wendet den Auswahl-Border an."""
+        
+        # Deselektiere die vorherige Karte, um den Border zu entfernen
+        if self.selected_source_id and self.selected_source_id != source_id:
+            self.deselect_card()
+
+        frame = self.source_frames[source_id][0]
+        item = frame.item_data
+        
+        # Speichere die ursprüngliche Farbe, falls noch nicht geschehen
+        if not self.selected_card_original_color:
+            self.selected_card_original_color = item.get('effective_color')
 
         self.selected_source_id = source_id
-        frame = self.source_frames[source_id][0]
-        frame.config(borderwidth=5, bootstyle="primary")
+
+        # Wende den 'primary' Bootstyle für den Rand an und setze den dicken Rand
+        frame.config(
+            borderwidth=self.DEFAULT_SELECT_BORDER_WIDTH, 
+            bootstyle=self.DEFAULT_SELECT_BORDER_COLOR, # Primary Bootstyle für Randfarbe
+            relief="raised" 
+        )
+        
+        # Der Bootstyle überschreibt den Frame-Hintergrund. Wir setzen die Label-Hintergründe 
+        # explizit auf die Originalfarbe, um die Lesbarkeit zu gewährleisten.
+        for child in frame.winfo_children():
+            try:
+                if isinstance(child, (ttk.Label, tk.Label)):
+                    child.config(background=item.get('effective_color'))
+            except Exception:
+                pass
+
 
     def deselect_card(self):
+        """Deselektiert die aktuelle Karte, entfernt den Border und stellt die Originalfarbe wieder her."""
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            border = 2 if frame.item_data["type"] == "source" else 0
-            frame.config(borderwidth=border, bootstyle=None)
+            item = frame.item_data
+            
+            # 1. Ursprünglichen Rand wiederherstellen
+            border = self._get_default_border_width(item)
+            
+            # 2. Ursprüngliche Hintergrundfarbe wiederherstellen (verwenden des einzigartigen Style-Namens)
+            original_style_name = frame.unique_style_name
+            original_color = item.get('effective_color')
+            
+            # Konfiguriert den ursprünglichen Style mit der Originalfarbe
+            self.root.style.configure(original_style_name, background=original_color) 
+            
+            # Setzt den Frame auf den ursprünglichen Style zurück und entfernt den Bootstyle/Rand
+            frame.configure(
+                style=original_style_name, 
+                bootstyle=None, # Wichtig, um den Primary-Bootstyle zu entfernen
+                borderwidth=border,
+                relief="raised" if item["type"] == "source" else "flat"
+            )
+            
+            # Setze die Label-Hintergründe auf die Originalfarbe zurück
+            for child in frame.winfo_children():
+                try:
+                    if isinstance(child, (ttk.Label, tk.Label)):
+                        child.config(background=original_color)
+                except Exception:
+                    pass
+            
         self.selected_source_id = None
+        self.selected_card_original_color = None
 
     def on_card_press(self, event, item_id):
         if item_id != self.selected_source_id:
-            self.select_card(item_id)
+            self.select_card(item_id) 
 
         self.dragging_card = True
         self.drag_start_x = event.x_root
@@ -755,7 +859,6 @@ class ProjectWindow:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def save_project(self):
-        # Speichert den aktuellen Zoom-Level im Projekt-Datenobjekt
         self.project["data"]["canvas_zoom_level"] = self.zoom_level 
         
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
@@ -783,13 +886,11 @@ class ProjectWindow:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
-            # Setzt den Zoom-Level des Fensters auf den geladenen Wert (letzter gespeicherter Zoom)
             self.zoom_level = updated_data.get("canvas_zoom_level", 1.0)
             
             items = updated_data.get("items", [])
             self.project["data"]["items"] = items
             
-            # Stellt sicher, dass der Zoom-Level in self.project["data"] aktualisiert ist
             self.project["data"]["canvas_zoom_level"] = self.zoom_level
 
             self.load_items_on_canvas()
@@ -799,7 +900,6 @@ class ProjectWindow:
     
     def back_to_projects(self):
         self.save_project()
-        # Wichtig: Thread-Pool sauber beenden, damit keine Fehlermeldung beim Schließen kommt
         self.executor.shutdown(wait=False) 
         self.main_frame.destroy()
         self.app.close_project()

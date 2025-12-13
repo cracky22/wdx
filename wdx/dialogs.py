@@ -15,7 +15,7 @@ class SourceDialog(tk.Toplevel):
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
-        self.iconbitmap("icon128.ico")
+        # self.iconbitmap("icon128.ico") # Auskommentiert, da Datei nicht existiert
 
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)
@@ -25,6 +25,10 @@ class SourceDialog(tk.Toplevel):
         ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         url_entry_frame = ttk.Frame(url_frame)
         url_entry_frame.pack(fill="x")
+        
+        # Setzt die Farbe im Entry auf weiß, wenn keine Farbe gespeichert ist (leerer String)
+        initial_color = self.source.get("color", "") or "#ffffff" 
+        
         self.url_var = tk.StringVar(value=self.source.get("url", ""))
         self.url_entry = ttk.Entry(url_entry_frame, textvariable=self.url_var, width=50)
         self.url_entry.pack(side="left", fill="x", expand=True)
@@ -37,10 +41,10 @@ class SourceDialog(tk.Toplevel):
 
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
-        # FIX: Vertikale Expansion entfernt (expand=True und fill="both" zu fill="x" geändert)
+        # FIX: Vertikale Expansion entfernt, um Buttons sichtbar zu halten
         text_frame.pack(fill="x", pady=(0,10)) 
         self.text_text = tk.Text(text_frame, height=10, wrap="word")
-        # FIX: Nur horizontale Füllung, nutzt die feste Höhe von 10 Zeilen
+        # FIX: Nur horizontale Füllung
         self.text_text.pack(fill="x") 
         self.text_text.insert("1.0", self.source.get("text", ""))
 
@@ -52,13 +56,13 @@ class SourceDialog(tk.Toplevel):
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0,15))
 
-        self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
+        self.color_var = tk.StringVar(value=initial_color)
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
 
         # KONSISTENZ-FIX: Farben aus der neuen 'items' Struktur holen
         all_items = project_window.project["data"].get("items", [])
-        used_colors = list({s.get("color", "#ffffff") for s in all_items if s.get("type") == "source" and s.get("color") != "#ffffff"})
+        used_colors = list({s.get("color", "") for s in all_items if s.get("type") == "source" and s.get("color", "")})
         
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
@@ -69,7 +73,7 @@ class SourceDialog(tk.Toplevel):
                 btn.pack(side="left", padx=2)
 
         btn_frame = ttk.Frame(main)
-        btn_frame.pack(fill="x", pady=(10, 0))
+        btn_frame.pack(fill="x", pady=(10, 0)) # Stellt sicher, dass die Buttons am Ende sind
         ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)
         ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle="primary", width=15).pack(side="right")
 
@@ -94,11 +98,18 @@ class SourceDialog(tk.Toplevel):
         if not url:
             messagebox.showerror("Fehler", "URL ist erforderlich!")
             return
+            
+        color = self.color_var.get().strip()
+        # Speichere leeren String, wenn die visuelle Standardfarbe (#ffffff) gewählt ist, 
+        # damit ProjectWindow den Theme-Standard verwenden kann.
+        if color == "#ffffff":
+            color = "" 
+            
         self.result = {
             "url": url,
             "title": self.title_var.get().strip(),
             "text": self.text_text.get("1.0", "end").strip(),
             "keywords": self.keywords_var.get().strip(),
-            "color": self.color_var.get().strip() or "#ffffff"
+            "color": color
         }
         self.destroy()
