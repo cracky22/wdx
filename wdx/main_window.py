@@ -35,6 +35,12 @@ class MainWindow:
         self.main_frame.rowconfigure(1, weight=1)
 
         self.update_project_tiles()
+        
+    def show(self):
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+    def hide(self):
+        self.main_frame.grid_forget()
 
     def show_settings(self):
         settings_window = ttk.Toplevel(self.root)

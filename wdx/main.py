@@ -34,12 +34,16 @@ class WdxApp:
     def open_project(self, project):
         """Öffnet das ProjectWindow für das gewählte Projekt."""
         self.main_window.hide()
+        # Hinweis: Das ProjectWindow sollte die App Instanz übergeben bekommen
         self.project_window = ProjectWindow(self.root, project, self)
         self.current_project_name = project["name"]
 
     def close_project(self):
         """Schließt das ProjectWindow und kehrt zum Hauptfenster zurück."""
         if hasattr(self, 'project_window'):
+            # Stoppt den Thread-Pool, falls er läuft (wichtig für sauberen Exit)
+            if hasattr(self.project_window, 'executor'):
+                self.project_window.executor.shutdown(wait=False) 
             self.project_window.main_frame.destroy()
             del self.project_window
         self.current_project_name = None
