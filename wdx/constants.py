@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = "v1.1.0"
+VERSION = "v1.1.3"
 APP_TITLE = f"wdx {VERSION}"
 
 WDX_DIR = Path.home() / "Documents" / "wdx"
