@@ -360,8 +360,10 @@ class ProjectWindow:
         self.root = root
         self.app = app
         self.source_frames = {}
-        self.selected_card = None  # Für blauen Border
-        self.dragging_card = None
+        self.selected_source_id = None
+        self.dragging_item = None
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
         self.space_pressed = False
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
@@ -377,7 +379,7 @@ class ProjectWindow:
         ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
         ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=0, column=2, sticky=tk.E, padx=20)
 
-        self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0, cursor="arrow")
+        self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0)
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.main_frame.rowconfigure(1, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
@@ -398,70 +400,66 @@ class ProjectWindow:
 
         self.load_sources_on_canvas()
 
-        # Tastatur- und Maus-Events
-        self.root.bind("<KeyPress-space>", self.on_space_press)
-        self.root.bind("<KeyRelease-space>", self.on_space_release)
-        self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
-        self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
-        self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
+        # Events
+        self.root.bind("<KeyPress-space>", lambda e: self.set_space(True))
+        self.root.bind("<KeyRelease-space>", lambda e: self.set_space(False))
+        self.canvas.bind("<ButtonPress-1>", self.on_press)
+        self.canvas.bind("<B1-Motion>", self.on_motion)
+        self.canvas.bind("<ButtonRelease-1>", self.on_release)
 
-    def on_space_press(self, event):
-        self.space_pressed = True
-        self.canvas.config(cursor="hand2")
+    def set_space(self, pressed):
+        self.space_pressed = pressed
+        self.canvas.config(cursor="hand2" if pressed else "arrow")
 
-    def on_space_release(self, event):
-        self.space_pressed = False
-        self.canvas.config(cursor="arrow")
-        if self.dragging_card:
-            self.dragging_card = None
+    def on_press(self, event):
+        # Finde das oberste Item unter der Maus
+        items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
+        if items:
+            item_id = items[-1]  # oberstes
+            if item_id in [wid for _, wid in self.source_frames.values()]:
+                if self.space_pressed:
+                    self.dragging_item = item_id
+                    self.drag_offset_x = event.x
+                    self.drag_offset_y = event.y
+                    self.canvas.tag_raise(item_id)  # Vordergrund
+                else:
+                    # Auswahl für Border
+                    for src_id, (_, wid) in self.source_frames.items():
+                        if wid == item_id:
+                            self.select_card(src_id)
+                            break
 
-    def on_canvas_press(self, event):
-        if not self.space_pressed:
-            # Normaler Klick: Auswahl für Border
-            item = self.canvas.find_withtag("current")
-            if item:
-                window_id = item[0]
-                for src_id, (_, wid) in self.source_frames.items():
-                    if wid == window_id:
-                        self.select_card(src_id)
-                        break
-            return
+    def on_motion(self, event):
+        if self.dragging_item and self.space_pressed:
+            dx = event.x - self.drag_offset_x
+            dy = event.y - self.drag_offset_y
+            self.canvas.move(self.dragging_item, dx, dy)
+            self.drag_offset_x = event.x
+            self.drag_offset_y = event.y
 
-        # Space gedrückt → Drag starten
-        item = self.canvas.find_closest(event.x, event.y)
-        if item:
-            window_id = item[0]
-            if window_id in [wid for _, wid in self.source_frames.values()]:
-                self.dragging_card = window_id
-                self.canvas.tag_raise(window_id)  # Bring to front
-
-    def on_canvas_motion(self, event):
-        if self.dragging_card and self.space_pressed:
-            self.canvas.coords(self.dragging_card, event.x - 150, event.y - 100)  # Offset für besseres Gefühl
-
-    def on_canvas_release(self, event):
-        if self.dragging_card and self.space_pressed:
-            coords = self.canvas.coords(self.dragging_card)
+    def on_release(self, event):
+        if self.dragging_item and self.space_pressed:
+            coords = self.canvas.coords(self.dragging_item)
             for src_id, (_, wid) in self.source_frames.items():
-                if wid == self.dragging_card:
+                if wid == self.dragging_item:
                     source = next(s for s in self.project["data"]["sources"] if s["id"] == src_id)
                     source["pos_x"] = coords[0]
                     source["pos_y"] = coords[1]
                     self.save_project()
                     break
-            self.dragging_card = None
+            self.dragging_item = None
             self.update_scrollregion()
 
     def select_card(self, source_id):
-        # Entferne alten Border
-        if self.selected_card:
-            old_frame = self.source_frames[self.selected_card][0]
-            old_frame.config(borderwidth=2, relief="raised")
+        # Alten Border entfernen
+        if self.selected_source_id:
+            old_frame = self.source_frames[self.selected_source_id][0]
+            old_frame.config(borderwidth=2, bootstyle="secondary")
 
-        # Neuer Border
-        self.selected_card = source_id
+        # Neuen Border
+        self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
-        frame.config(borderwidth=4, bootstyle="primary", relief="solid")
+        frame.config(borderwidth=5, bootstyle="primary")
 
     def load_sources_on_canvas(self):
         for source in self.project["data"]["sources"]:
@@ -495,7 +493,7 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
-        # Rechtsklick-Menü
+        # Rechtsklick
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
@@ -523,8 +521,8 @@ class ProjectWindow:
                 self.canvas.delete(item_id)
                 frame.destroy()
                 del self.source_frames[source["id"]]
-                if self.selected_card == source["id"]:
-                    self.selected_card = None
+                if self.selected_source_id == source["id"]:
+                    self.selected_source_id = None
                 self.save_project()
                 self.update_scrollregion()
 
