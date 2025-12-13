@@ -17,12 +17,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId === "save_text" && info.selectionText) {
     text = info.selectionText.trim();
-    keywords = prompt("Schlagworte (Kommas getrennt):") || "";
+    keywords = prompt("Schlagworte (Kommas getrennt, optional):") || "";
   } else if (info.menuItemId === "save_source") {
-    keywords = prompt("Schlagworte (Kommas getrennt):") || "";
+    keywords = prompt("Schlagworte (Kommas getrennt, optional):") || "";
   }
 
-  // Nachricht ans Popup senden – dort wird gespeichert und Meldung angezeigt
   chrome.runtime.sendMessage({
     type: info.menuItemId === "save_text" ? "save_text" : "save_page",
     url: tab.url,

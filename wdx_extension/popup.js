@@ -24,7 +24,7 @@ function applyTheme() {
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
-// Schöne Meldung unter dem Button (verschwindet nach 3 Sekunden)
+// Schöne Meldung unter dem Button
 function showMessage(text, type = 'success') {
   saveMessageEl.textContent = text;
   saveMessageEl.className = type;
@@ -93,6 +93,11 @@ saveBtn.addEventListener('click', async () => {
     keywords: ""
   };
 
+  await sendToWDX(payload, "Quelle erfolgreich gespeichert!");
+});
+
+// Funktion zum Senden an WDX (wiederverwendbar für Popup und Rechtsklick)
+async function sendToWDX(payload, successMessage) {
   try {
     const response = await fetch(API_ADD, {
       method: 'POST',
@@ -101,7 +106,7 @@ saveBtn.addEventListener('click', async () => {
     });
 
     if (response.ok) {
-      showMessage("Quelle erfolgreich in WDX gespeichert!");
+      showMessage(successMessage);
       updateConnection();
     } else {
       showMessage("Fehler beim Speichern", "error");
@@ -109,14 +114,19 @@ saveBtn.addEventListener('click', async () => {
   } catch (err) {
     showMessage("Keine Verbindung zum WDX-Server", "error");
   }
-});
+}
 
-// Nachrichten vom background.js empfangen (Rechtsklick-Menü)
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+// Wichtig: Nachrichten vom background.js empfangen (Rechtsklick-Menü)
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.type === "save_text" || message.type === "save_page") {
     if (!isConnected) {
-      showMessage("Keine Verbindung zu WDX", "error");
-      return;
+      // Auch wenn Popup nicht offen ist, versuchen wir zu speichern
+      // (aber nur wenn Verbindung besteht – sonst ignorieren)
+      const check = await fetch(API_STATUS).catch(() => null);
+      if (!check || !check.ok) {
+        // Keine Verbindung – nichts tun (kein nerviges Popup)
+        return;
+      }
     }
 
     const payload = {
@@ -126,22 +136,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       keywords: message.keywords || ""
     };
 
-    fetch(API_ADD, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(response => {
-      if (response.ok) {
-        showMessage(message.text ? "Auswahl erfolgreich gespeichert!" : "Quelle erfolgreich gespeichert!");
-        updateConnection();
-      } else {
-        showMessage("Fehler beim Speichern", "error");
-      }
-    })
-    .catch(() => {
-      showMessage("Keine Verbindung zum Server", "error");
-    });
+    const successMsg = message.text 
+      ? "Ausgewählter Text erfolgreich gespeichert!" 
+      : "Quelle erfolgreich gespeichert!";
+
+    await sendToWDX(payload, successMsg);
   }
 });
 
