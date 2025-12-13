@@ -21,9 +21,8 @@ class ProjectWindow:
         self.drag_start_x = 0
         self.drag_start_y = 0
 
-        # Für Auto-Refresh: Letzte bekannte Datei-Änderungszeit (mtime)
         self.last_file_mtime = 0
-        self.update_last_mtime()  # Initialwert setzen
+        self.update_last_mtime()
 
         self.main_frame = ttk.Frame(self.root, padding="0", bootstyle="light")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -59,11 +58,9 @@ class ProjectWindow:
 
         self.canvas.bind("<ButtonPress-1>", self.on_press)
 
-        # Live-Sync starten – leise und nur bei externen Änderungen
         self.start_auto_refresh()
 
     def update_last_mtime(self):
-        """Setzt den aktuellen mtime der Datei"""
         if os.path.exists(self.project["data_file"]):
             self.last_file_mtime = os.path.getmtime(self.project["data_file"])
         else:
@@ -84,14 +81,17 @@ class ProjectWindow:
     def create_source_card(self, source):
         color = source.get("color", "#ffffff")
 
+        # Karte mit Hintergrundfarbe, aber neutralem Rahmen
         frame = ttk.Frame(self.canvas, padding="15", relief="raised", borderwidth=2)
         frame.source_data = source
         frame.configure(style="Card.TFrame")
         self.root.style.configure("Card.TFrame", background=color)
         frame.configure(style="Card.TFrame")
 
+        # Titel
         title_text = source.get("title") or source["url"]
-        ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color).pack(anchor="w")
+        title_label = ttk.Label(frame, text=f"🌐 {title_text}", font=("Helvetica", 12, "bold"), foreground="#2c3e50", wraplength=320, background=color)
+        title_label.pack(anchor="w")
 
         if source.get("title"):
             ttk.Label(frame, text=source["url"], font=("Helvetica", 9), foreground="#7f8c8d", wraplength=350, background=color).pack(anchor="w")
@@ -108,10 +108,17 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Öffnen", bootstyle="success-outline", width=15,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
 
+        # NEU: Auswahl-Button mit Fadenkreuz-Icon oben rechts
+        select_btn = ttk.Button(frame, text="🎯", width=3, bootstyle="outline-secondary",
+                                command=lambda sid=source["id"]: self.toggle_select_card(sid))
+        select_btn.place(relx=1.0, rely=0, x=-10, y=10, anchor="ne")
+
+        # Rechtsklick-Menü
         frame.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, s=source: self.show_context_menu(e, s))
 
+        # Drag & Drop
         frame.bind("<ButtonPress-1>", lambda e: self.on_frame_press(e, source["id"]))
         frame.bind("<B1-Motion>", lambda e: self.on_frame_motion(e))
         frame.bind("<ButtonRelease-1>", lambda e: self.on_frame_release(e))
@@ -120,18 +127,23 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[source["id"]] = (frame, window_id)
 
+        # Rahmen aktualisieren, falls diese Karte ausgewählt ist
+        if self.selected_source_id == source["id"]:
+            frame.config(borderwidth=5, bootstyle="primary")
+
         self.update_scrollregion()
+
+    def toggle_select_card(self, source_id):
+        if self.selected_source_id == source_id:
+            self.deselect_card()
+        else:
+            self.select_card(source_id)
 
     def show_context_menu(self, event, source):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_source(source))
         self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(source))
         self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(source))
-
-        if self.selected_source_id == source["id"]:
-            self.context_menu.add_command(label="Karte abwählen", command=self.deselect_card)
-        else:
-            self.context_menu.add_command(label="Karte wählen", command=lambda: self.select_card(source["id"]))
 
         self.context_menu.post(event.x_root, event.y_root)
 
@@ -152,7 +164,7 @@ class ProjectWindow:
             self.project["data"]["sources"].append(new_source)
             self.create_source_card(new_source)
             self.save_project()
-            self.update_last_mtime()  # mtime aktualisieren, damit kein Reload triggert
+            self.update_last_mtime()
 
     def edit_source(self, source):
         dialog = SourceDialog(self.root, self, source)
@@ -171,18 +183,19 @@ class ProjectWindow:
             self.update_last_mtime()
 
     def select_card(self, source_id):
+        # Alten Rahmen zurücksetzen
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             old_frame = self.source_frames[self.selected_source_id][0]
-            old_frame.config(borderwidth=2)
+            old_frame.config(borderwidth=2, bootstyle="")
 
         self.selected_source_id = source_id
         frame = self.source_frames[source_id][0]
-        frame.config(borderwidth=5, bootstyle="primary", relief="solid")
+        frame.config(borderwidth=5, bootstyle="primary")
 
     def deselect_card(self):
         if self.selected_source_id and self.selected_source_id in self.source_frames:
             frame = self.source_frames[self.selected_source_id][0]
-            frame.config(borderwidth=2)
+            frame.config(borderwidth=2, bootstyle="")
         self.selected_source_id = None
 
     def on_frame_press(self, event, source_id):
@@ -207,7 +220,7 @@ class ProjectWindow:
             source["pos_x"] = coords[0]
             source["pos_y"] = coords[1]
             self.save_project()
-            self.update_last_mtime()  # Verhindert Reload bei Drag
+            self.update_last_mtime()
             self.dragging = False
             self.update_scrollregion()
 
@@ -243,7 +256,6 @@ class ProjectWindow:
         self.project["last_modified"] = datetime.datetime.now().isoformat()
         self.app.project_manager.save_projects()
 
-    # === Live-Sync: Nur bei externen Änderungen aktualisieren ===
     def start_auto_refresh(self):
         try:
             if os.path.exists(self.project["data_file"]):
@@ -252,9 +264,8 @@ class ProjectWindow:
                 current_mtime = 0
 
             if current_mtime > self.last_file_mtime:
-                # Nur bei externer Änderung (z. B. Erweiterung) → neu laden
                 self.reload_sources()
-                self.last_file_mtime = current_mtime  # Aktualisieren
+                self.last_file_mtime = current_mtime
         except Exception as e:
             print("Auto-Refresh Fehler:", e)
 
@@ -265,16 +276,13 @@ class ProjectWindow:
             with open(self.project["data_file"], "r", encoding="utf-8") as f:
                 updated_data = json.load(f)
 
-            # Alte Karten entfernen
             for frame, item_id in list(self.source_frames.values()):
                 self.canvas.delete(item_id)
                 frame.destroy()
             self.source_frames.clear()
 
-            # Neue Quellen übernehmen
             self.project["data"]["sources"] = updated_data.get("sources", [])
 
-            # Karten neu zeichnen
             self.load_sources_on_canvas()
         except Exception as e:
             print("Reload-Fehler:", e)
