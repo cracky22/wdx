@@ -16,6 +16,28 @@ from urllib.parse import urlparse
 import threading 
 import concurrent.futures 
 
+# NEUE HILFSFUNKTION FÜR KONTRAST-TEXTFARBE
+def get_contrast_color(hex_color):
+    """Gibt Weiß (#ffffff) oder Schwarz (#000000) zurück, abhängig von der Helligkeit der Hex-Farbe."""
+    if hex_color.startswith('#'):
+        hex_color = hex_color[1:]
+    
+    # Konvertiere Hex zu RGB
+    try:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+    except ValueError:
+        # Fallback für ungültige Hex-Werte, um Abstürze zu verhindern
+        return "#000000" 
+
+    # Berechne Leuchtdichte (Luminosity, ITU BT.709)
+    # Wenn die Leuchtdichte unter 128 (Mittelwert) liegt, ist die Farbe dunkel -> verwende weißen Text
+    # Formel: 0.2126 * R + 0.7152 * G + 0.0722 * B
+    luminosity = (0.2126 * r + 0.7152 * g + 0.0722 * b)
+    
+    return "#000000" if luminosity > 128 else "#ffffff"
+
 class ProjectWindow:
     
     # Neue Konstanten für das Farbsystem und die Auswahl
@@ -184,10 +206,13 @@ class ProjectWindow:
         if custom_color:
             return custom_color
         
+        # Verwende Theme-abhängige Farben für unkolorierte Karten
         if item["type"] == "source":
-            return self.DEFAULT_SOURCE_BG
+            # Nutzt die Standard-Hintergrundfarbe des aktuellen Themes
+            return self.app.style.lookup('TFrame', 'background') 
         else: # heading
-            return self.DEFAULT_HEADING_BG
+            # Nutzt eine leicht abgedunkelte/aufgehellte Farbe des aktuellen Themes
+            return self.app.style.lookup('TLabel', 'background')
     
     def _get_default_border_width(self, item):
         """Gibt die Standard-Randbreite basierend auf dem Item-Typ zurück."""
@@ -277,6 +302,8 @@ class ProjectWindow:
         """Erstellt die GUI-Elemente für eine Quelle (muss im Main-Thread sein)."""
         
         color = self._get_effective_bg_color(source)
+        # NEU: Kontrastfarbe bestimmen
+        text_color = get_contrast_color(color) 
         source["effective_color"] = color 
         item_id = source["id"]
         
@@ -292,58 +319,73 @@ class ProjectWindow:
 
 
         # 2. Frame erstellen und Style zuweisen
+        # OPTIK: Erhöhe Padding für abgerundeten Look
         frame = ttk.Frame(self.canvas, padding="15")
         frame.item_data = source
         frame.unique_style_name = style_name 
         
         frame.configure(style=style_name)
-        frame.config(relief="raised", borderwidth=self._get_default_border_width(source))
+        
+        # OPTIK: Subtiler Schatten
+        default_border = self._get_default_border_width(source)
+        frame.config(relief="raised", borderwidth=default_border)
 
-
+        # OPTIK: Hover-Effekt hinzufügen
+        def on_enter(e, f=frame):
+             # Erhöht den Rand leicht, um einen Schatteneffekt zu simulieren
+             f.config(borderwidth=default_border + 1, relief="ridge") 
+        def on_leave(e, f=frame):
+             f.config(borderwidth=default_border, relief="raised") 
+        
+        
         # --- Favicon/Globus ---
-        # FIX 2: background=color von ttk.Labels entfernt, um TclError zu vermeiden. Wird manuell unten gesetzt.
         if favicon_path:
             try:
                 original_img = tk.PhotoImage(file=favicon_path)
                 self.card_widgets[item_id]['original_icon_data'] = {'original_img': original_img, 'is_favicon': True}
                 favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                favicon_label = ttk.Label(frame, image=favicon_img) 
+                # Verwende tk.Label, um die Hintergrundfarbe zu garantieren
+                favicon_label = tk.Label(frame, image=favicon_img, bg=color) 
                 favicon_label.image = favicon_img 
                 favicon_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = favicon_label
             except Exception:
-                globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size))
+                globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
                 globe_label.pack(anchor="w")
                 self.card_widgets[item_id]['icon_label'] = globe_label
         else:
-            globe_label = ttk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size))
+            globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
             globe_label.pack(anchor="w")
             self.card_widgets[item_id]['icon_label'] = globe_label
 
         # --- Labels ---
-        # FIX 2: background=color von allen Labels entfernt
         title_text = source.get("title") or source["url"]
-        title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground="#2c3e50", wraplength=320)
+        # OPTIK: Textfarbe auf Kontrast setzen
+        title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground=text_color, wraplength=320)
         title_label.pack(anchor="w")
         self.card_widgets[item_id]['title_label'] = title_label
 
         if source.get("title"):
-            url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground="#7f8c8d", wraplength=350)
+            # OPTIK: Textfarbe auf Kontrast setzen
+            url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground=text_color, wraplength=350)
             url_label.pack(anchor="w")
             self.card_widgets[item_id]['url_label'] = url_label
 
         if source["text"]:
             preview = source["text"][:180] + ("..." if len(source["text"]) > 180 else "")
-            text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground="#34495e", wraplength=350)
+            # OPTIK: Textfarbe auf Kontrast setzen
+            text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground=text_color, wraplength=350)
             text_label.pack(anchor="w", pady=(6,0))
             self.card_widgets[item_id]['text_label'] = text_label
 
         if source["keywords"]:
-            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info")
+            # OPTIK: Textfarbe auf Kontrast setzen
+            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info", foreground=text_color)
             keywords_label.pack(anchor="w", pady=(4,0))
             self.card_widgets[item_id]['keywords_label'] = keywords_label
 
-        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground="#95a5a6")
+        # OPTIK: Textfarbe auf Kontrast setzen
+        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground=text_color)
         added_label.pack(anchor="w", pady=(8,0))
         self.card_widgets[item_id]['added_label'] = added_label 
 
@@ -352,12 +394,19 @@ class ProjectWindow:
         
         # --- Binden und Platzieren ---
         frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
+        frame.bind("<Enter>", on_enter) # Hover-Binding für Frame
+        frame.bind("<Leave>", on_leave) # Hover-Binding für Frame
+
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
-            # HACK: Manuelle Konfiguration der Label-Hintergründe, da ttk.Label sie sonst nicht korrekt vom Style erbt
+            # OPTIK: Hover-Binding für alle Kinder
+            child.bind("<Enter>", on_enter)
+            child.bind("<Leave>", on_leave)
+            
+            # WICHTIG: Manuelle Konfiguration der Label-Hintergründe und Vordergründe 
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
-                    child.config(background=color)
+                    child.config(background=color, foreground=text_color)
             except Exception:
                 pass
 
@@ -383,9 +432,10 @@ class ProjectWindow:
         """Erstellt die GUI-Elemente für eine Überschrift (muss im Main-Thread sein)."""
         
         color = self._get_effective_bg_color(heading)
+        # NEU: Kontrastfarbe bestimmen
+        text_color = get_contrast_color(color) 
         heading["effective_color"] = color 
         
-        text_color = "#212529" if color in [self.DEFAULT_HEADING_BG, "#e9ecef", "#ffffff"] else "#ffffff"
         item_id = heading["id"]
         
         # FIX 1: Einzigartiger Style-Name
@@ -400,23 +450,43 @@ class ProjectWindow:
              self.root.style.configure(style_name, relief="flat", borderwidth=self._get_default_border_width(heading))
 
         # 2. Frame erstellen und Style zuweisen
-        frame = ttk.Frame(self.canvas, padding="20")
+        # OPTIK: Erhöhe Padding für schickeren Look
+        frame = ttk.Frame(self.canvas, padding="15 20")
         frame.item_data = heading
         frame.unique_style_name = style_name 
         frame.configure(style=style_name)
-        frame.config(relief="flat", borderwidth=self._get_default_border_width(heading))
+        
+        # OPTIK: Subtiler Schatten
+        default_border = self._get_default_border_width(heading)
+        frame.config(relief="flat", borderwidth=default_border)
 
-        # FIX 2: background=color von Labels entfernt
-        label = ttk.Label(frame, text=heading["text"], font=self.base_font_heading, foreground=text_color)
+        # OPTIK: Hover-Effekt hinzufügen
+        def on_enter(e, f=frame):
+             # Leichter Groove-Effekt bei Hover
+             f.config(borderwidth=2, relief="groove")
+        def on_leave(e, f=frame):
+             f.config(borderwidth=default_border, relief="flat") 
+
+        # OPTIK: Textfarbe auf Kontrast setzen
+        # Verwende tk.Label, um die Hintergrundfarbe zu garantieren
+        label = tk.Label(frame, text=heading["text"], font=self.base_font_heading, fg=text_color, bg=color)
         label.pack()
         self.card_widgets[item_id]['heading_label'] = label
 
         frame.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
+        frame.bind("<Enter>", on_enter) # Hover-Binding für Frame
+        frame.bind("<Leave>", on_leave) # Hover-Binding für Frame
+        
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
+            # OPTIK: Hover-Binding für alle Kinder
+            child.bind("<Enter>", on_enter)
+            child.bind("<Leave>", on_leave)
+            
+            # WICHTIG: Manuelle Konfiguration der Label-Hintergründe und Vordergründe 
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
-                    child.config(background=color)
+                    child.config(background=color, foreground=text_color)
             except Exception:
                 pass
 
@@ -740,6 +810,10 @@ class ProjectWindow:
             self.selected_card_original_color = item.get('effective_color')
 
         self.selected_source_id = source_id
+        
+        # Hole die Kontrastfarbe der Originalfarbe, da der primary-Bootstyle 
+        # eine eigene Textfarbe mitbringt, die wir nicht wollen.
+        text_color = get_contrast_color(self.selected_card_original_color)
 
         # Wende den 'primary' Bootstyle für den Rand an und setze den dicken Rand
         frame.config(
@@ -748,12 +822,11 @@ class ProjectWindow:
             relief="raised" 
         )
         
-        # Der Bootstyle überschreibt den Frame-Hintergrund. Wir setzen die Label-Hintergründe 
-        # explizit auf die Originalfarbe, um die Lesbarkeit zu gewährleisten.
+        # Setze die Label-Hintergründe und -Vordergründe explizit
         for child in frame.winfo_children():
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
-                    child.config(background=item.get('effective_color'))
+                    child.config(background=self.selected_card_original_color, foreground=text_color)
             except Exception:
                 pass
 
@@ -771,6 +844,9 @@ class ProjectWindow:
             original_style_name = frame.unique_style_name
             original_color = item.get('effective_color')
             
+            # Kontrastfarbe für Labels
+            text_color = get_contrast_color(original_color)
+            
             # Konfiguriert den ursprünglichen Style mit der Originalfarbe
             self.root.style.configure(original_style_name, background=original_color) 
             
@@ -786,7 +862,7 @@ class ProjectWindow:
             for child in frame.winfo_children():
                 try:
                     if isinstance(child, (ttk.Label, tk.Label)):
-                        child.config(background=original_color)
+                        child.config(background=original_color, foreground=text_color)
                 except Exception:
                     pass
             
