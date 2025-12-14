@@ -15,7 +15,7 @@ class SourceDialog(tk.Toplevel):
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
-        # self.iconbitmap("icon128.ico") # Auskommentiert, da Datei nicht existiert
+        self.iconbitmap("icon128.ico")
 
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)
@@ -25,10 +25,6 @@ class SourceDialog(tk.Toplevel):
         ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         url_entry_frame = ttk.Frame(url_frame)
         url_entry_frame.pack(fill="x")
-        
-        # Setzt die Farbe im Entry auf weiß, wenn keine Farbe gespeichert ist (leerer String)
-        initial_color = self.source.get("color", "") or "#ffffff" 
-        
         self.url_var = tk.StringVar(value=self.source.get("url", ""))
         self.url_entry = ttk.Entry(url_entry_frame, textvariable=self.url_var, width=50)
         self.url_entry.pack(side="left", fill="x", expand=True)
@@ -41,11 +37,9 @@ class SourceDialog(tk.Toplevel):
 
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
-        # FIX: Vertikale Expansion entfernt, um Buttons sichtbar zu halten
-        text_frame.pack(fill="x", pady=(0,10)) 
+        text_frame.pack(fill="both", expand=True, pady=(0,10))
         self.text_text = tk.Text(text_frame, height=10, wrap="word")
-        # FIX: Nur horizontale Füllung
-        self.text_text.pack(fill="x") 
+        self.text_text.pack(fill="both", expand=True)
         self.text_text.insert("1.0", self.source.get("text", ""))
 
         ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -56,29 +50,96 @@ class SourceDialog(tk.Toplevel):
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0,15))
 
-        self.color_var = tk.StringVar(value=initial_color)
+        self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
+        
+        # NEU: Farbfeld zur Anzeige der aktuell gewählten Farbe
+        self.selected_color_swatch = tk.Label(
+            color_frame,
+            bg=self.color_var.get(),
+            width=3,
+            relief="solid",
+            borderwidth=1
+        )
+        self.selected_color_swatch.pack(side="left", padx=(0, 5))
+        
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
 
-        # KONSISTENZ-FIX: Farben aus der neuen 'items' Struktur holen
+        # Beobachter für Farbänderungen einrichten
+        self.color_var.trace_add("write", self.update_color_swatch)
+        
+        # KORRIGIERTER BEREICH: Farbfelder mit delayed BG-Setzung
         all_items = project_window.project["data"].get("items", [])
-        used_colors = list({s.get("color", "") for s in all_items if s.get("type") == "source" and s.get("color", "")})
+        
+        custom_colors = {
+            item.get("color").strip() 
+            for item in all_items 
+            if item.get("color") and item.get("color").strip()
+        }
+        
+        used_colors = list(custom_colors)
         
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
             palette = ttk.Frame(main)
             palette.pack(fill="x", pady=(0,15))
+            
             for col in used_colors:
-                btn = tk.Button(palette, bg=col, width=3, height=1, relief="solid", command=lambda c=col: self.color_var.set(c))
-                btn.pack(side="left", padx=2)
+                # Verwende tk.Label, um Thematisierung zu vermeiden
+                initial_relief = "flat"
+                initial_border = 1
+                
+                label = tk.Label(
+                    palette, 
+                    # bg wird hier nicht sofort gesetzt
+                    width=3, 
+                    height=1, 
+                    relief=initial_relief, 
+                    borderwidth=initial_border,
+                    cursor="hand2", 
+                    highlightbackground="#AAAAAA",
+                    highlightthickness=1
+                )
+                
+                # WICHTIG: Setze die Farbe verzögert (after(1)), um das Rendering-Problem zu umgehen.
+                # Dadurch wird die Farbe auf der Tcl-Ebene gesetzt, nachdem das Widget initialisiert wurde.
+                # Dadurch sollten die Farbfelder nun korrekt in der Hex-Farbe angezeigt werden.
+                self.after(1, lambda l=label, c=col: l.config(bg=c))
+                
+                # Binde Klick-Ereignis an das Label (setzt die Farbe im Eingabefeld und löst das Update aus)
+                label.bind("<Button-1>", lambda e, c=col: self.color_var.set(c))
+                
+                # Füge Hover-Feedback hinzu
+                def on_enter(event, l):
+                    l.config(relief="raised", borderwidth=2, highlightbackground="#FFFFFF", highlightthickness=2)
+                
+                def on_leave(event, l):
+                    l.config(relief=initial_relief, borderwidth=initial_border, highlightbackground="#AAAAAA", highlightthickness=1)
+
+                label.bind("<Enter>", lambda e, l=label: on_enter(e, l))
+                label.bind("<Leave>", lambda e, l=label: on_leave(e, l))
+
+                label.pack(side="left", padx=2)
+        # ENDE KORRIGIERTER BEREICH
 
         btn_frame = ttk.Frame(main)
-        btn_frame.pack(fill="x", pady=(10, 0)) # Stellt sicher, dass die Buttons am Ende sind
+        btn_frame.pack(fill="x", pady=(10, 0))
         ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)
         ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle="primary", width=15).pack(side="right")
 
         self.url_entry.focus_set()
         self.wait_window()
+
+    def update_color_swatch(self, *args):
+        """Aktualisiert das kleine Farbfeld neben dem Eingabefeld."""
+        color = self.color_var.get().strip()
+        if color:
+            try:
+                # Versucht, die Farbe zu setzen. Wenn die Eingabe ungültig ist, bleibt es beim alten Wert.
+                self.selected_color_swatch.config(bg=color)
+            except tk.TclError:
+                # Ignoriere ungültige Hex-Werte
+                pass
 
     def paste_clipboard(self):
         try:
@@ -98,18 +159,11 @@ class SourceDialog(tk.Toplevel):
         if not url:
             messagebox.showerror("Fehler", "URL ist erforderlich!")
             return
-            
-        color = self.color_var.get().strip()
-        # Speichere leeren String, wenn die visuelle Standardfarbe (#ffffff) gewählt ist, 
-        # damit ProjectWindow den Theme-Standard verwenden kann.
-        if color == "#ffffff":
-            color = "" 
-            
         self.result = {
             "url": url,
             "title": self.title_var.get().strip(),
             "text": self.text_text.get("1.0", "end").strip(),
             "keywords": self.keywords_var.get().strip(),
-            "color": color
+            "color": self.color_var.get().strip() or "#ffffff"
         }
         self.destroy()
