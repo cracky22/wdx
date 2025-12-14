@@ -81,6 +81,11 @@ class ProjectWindow:
         self.base_font_default = ("Helvetica", 9)
         self.base_icon_size = 20 
         self.base_favicon_subsample = 2 
+        
+        # Minimap-Einstellungen
+        self.minimap_canvas = None
+        self.viewport_rect_id = None
+        self._minimap_params = {}
 
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
@@ -102,6 +107,8 @@ class ProjectWindow:
         btn_frame = ttk.Frame(header_frame)
         btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
         ttk.Button(btn_frame, text="💾", width=3, bootstyle="outline-secondary", command=self.manual_save).pack(side="left", padx=2)
+        # NEU: Zoom Reset Button
+        ttk.Button(btn_frame, text="🔍", width=3, bootstyle="outline-secondary", command=self.reset_zoom).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="📥", width=3, bootstyle="outline-secondary", command=self.manual_export).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="🔄", width=3, bootstyle="outline-secondary", command=self.manual_reload).pack(side="left", padx=2)
 
@@ -128,6 +135,13 @@ class ProjectWindow:
                                      command=self.show_add_menu,
                                      bootstyle="primary-outline-toolbutton")
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
+        
+        # NEU: Minimap Canvas
+        self.minimap_canvas = tk.Canvas(self.main_frame, width=200, height=150, 
+                                        bg="#f5f7fa", highlightthickness=1, highlightbackground="#cccccc")
+        self.minimap_canvas.place(relx=1.0, rely=1.0, x=-70, y=-70, anchor="se")
+        self.minimap_canvas.bind("<ButtonPress-1>", self.on_minimap_click)
+
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
 
@@ -197,6 +211,7 @@ class ProjectWindow:
                 self._create_heading_card_gui(item)
                 
         self.update_scrollregion()
+        self._update_minimap() # NEU: Minimap nach dem Laden aktualisieren
 
     # --- COLOR HELPERS ---
 
@@ -256,6 +271,22 @@ class ProjectWindow:
         self._update_card_content_scale()
         
         self.update_scrollregion()
+        self._update_minimap() # NEU: Minimap aktualisieren
+        
+    def reset_zoom(self):
+        """Setzt den Zoom-Level auf 1.0 zurück (NEU)."""
+        if self.zoom_level == 1.0:
+            return
+
+        # Berechne den Skalierungsfaktor relativ zum Ursprung (0,0)
+        factor = 1.0 / self.zoom_level
+        self.canvas.scale("all", 0, 0, factor, factor)
+        
+        self.zoom_level = 1.0
+        
+        self._update_card_content_scale()
+        self.update_scrollregion()
+        self._update_minimap() # WICHTIG: Minimap aktualisieren
 
     def _update_card_content_scale(self):
         """Skaliert die Fonts und Bilder in allen Karten basierend auf dem Zoom-Level."""
@@ -505,7 +536,173 @@ class ProjectWindow:
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
             self._update_card_content_scale()
+            
+    # --- MINIMAP LOGIC (NEU) ---
     
+    def _update_minimap(self):
+        """Zeichnet alle Karten auf der Minimap und aktualisiert den Viewport-Rechteck."""
+        
+        if not self.minimap_canvas or not self.minimap_canvas.winfo_exists():
+            return
+            
+        self.minimap_canvas.delete("all")
+        
+        # 1. Bestimme die Gesamtgröße des Inhalts
+        # Ermittelt die Bounding Box aller Elemente auf dem Haupt-Canvas (bereits gezoomt)
+        bbox_all = self.canvas.bbox("all") 
+        if not bbox_all:
+             self.viewport_rect_id = None
+             self._update_minimap_viewport()
+             return
+
+        x1_main, y1_main, x2_main, y2_main = bbox_all
+        # Füge einen kleinen Puffer hinzu
+        buffer = 50 * self.zoom_level
+        x1_main -= buffer
+        y1_main -= buffer
+        x2_main += buffer
+        y2_main += buffer
+        
+        content_width = x2_main - x1_main
+        content_height = y2_main - y1_main
+
+        # 2. Skalierungsfaktor für Minimap bestimmen
+        map_w = self.minimap_canvas.winfo_width()
+        map_h = self.minimap_canvas.winfo_height()
+        
+        # Wähle den kleineren Faktor, um alles in die Minimap zu quetschen
+        # Verwende 90% der verfügbaren Fläche
+        if content_width > 0 and content_height > 0:
+            scale_x = map_w / content_width
+            scale_y = map_h / content_height
+            minimap_scale = min(scale_x, scale_y) * 0.9 
+        else:
+            minimap_scale = 1.0 # Fallback
+            
+        # Berechne den Versatz, um den Inhalt in der Minimap zu zentrieren
+        center_x_map = map_w / 2
+        center_y_map = map_h / 2
+        
+        offset_x = center_x_map - (x1_main + content_width / 2) * minimap_scale
+        offset_y = center_y_map - (y1_main + content_height / 2) * minimap_scale
+
+        # 3. Karten zeichnen
+        for item_id, (frame, window_id) in self.source_frames.items():
+            item = frame.item_data
+            
+            coords = self.canvas.coords(window_id)
+            if not coords: continue
+            
+            # Holen der aktuellen, skalierten Widget-Größe
+            frame_width = frame.winfo_reqwidth()
+            frame_height = frame.winfo_reqheight()
+
+            # Skalierte Positionen auf der Minimap
+            x_map_start = coords[0] * minimap_scale + offset_x
+            y_map_start = coords[1] * minimap_scale + offset_y
+            x_map_end = x_map_start + frame_width * minimap_scale
+            y_map_end = y_map_start + frame_height * minimap_scale
+
+            # Farbe verwenden
+            color = item.get("effective_color", "#cccccc")
+            outline_color = "#333333" if item["type"] == "source" else "" 
+            
+            self.minimap_canvas.create_rectangle(
+                x_map_start, y_map_start, x_map_end, y_map_end,
+                fill=color,
+                outline=outline_color,
+                width=1,
+                tags=("card_rect", item_id) 
+            )
+
+        # Speichern der Skalierungs- und Versatzparameter für die Viewport-Berechnung
+        self._minimap_params = {
+            "x1_main": x1_main, "y1_main": y1_main, "x2_main": x2_main, "y2_main": y2_main,
+            "minimap_scale": minimap_scale,
+            "offset_x": offset_x, "offset_y": offset_y
+        }
+        
+        # 4. Viewport-Rechteck zeichnen/aktualisieren
+        self._update_minimap_viewport()
+
+    def _update_minimap_viewport(self):
+        """Aktualisiert das Viewport-Rechteck auf der Minimap."""
+        
+        if not self.minimap_canvas or not self.minimap_canvas.winfo_exists() or not hasattr(self, '_minimap_params'):
+            return
+
+        params = self._minimap_params
+        minimap_scale = params["minimap_scale"]
+        offset_x = params["offset_x"]
+        offset_y = params["offset_y"]
+
+        # Gezoomte Haupt-Canvas Koordinaten des oberen linken Ecks des Viewports
+        x_start_zoomed = self.canvas.canvasx(0) 
+        y_start_zoomed = self.canvas.canvasy(0)
+
+        # Größe des Viewports in gezoomten Koordinaten
+        viewport_w_zoomed = self.canvas.winfo_width()
+        viewport_h_zoomed = self.canvas.winfo_height()
+
+        # Skalierte Positionen auf der Minimap
+        x_map_start = x_start_zoomed * minimap_scale + offset_x
+        y_map_start = y_start_zoomed * minimap_scale + offset_y
+        x_map_end = x_map_start + viewport_w_zoomed * minimap_scale
+        y_map_end = y_map_start + viewport_h_zoomed * minimap_scale
+        
+        # 3. Rechteck zeichnen/aktualisieren
+        if self.viewport_rect_id and self.minimap_canvas.find_withtag(self.viewport_rect_id):
+            self.minimap_canvas.coords(self.viewport_rect_id, x_map_start, y_map_start, x_map_end, y_map_end)
+            self.minimap_canvas.tag_raise(self.viewport_rect_id) 
+        else:
+            self.viewport_rect_id = self.minimap_canvas.create_rectangle(
+                x_map_start, y_map_start, x_map_end, y_map_end,
+                outline="#333333",
+                fill="", 
+                width=2,
+                stipple="gray50" # Grau-durchsichtig-Effekt
+            )
+
+    def on_minimap_click(self, event):
+        """Scrollt den Haupt-Canvas zur geklickten Position auf der Minimap."""
+        
+        if not hasattr(self, '_minimap_params'):
+            return
+
+        params = self._minimap_params
+        minimap_scale = params["minimap_scale"]
+        offset_x = params["offset_x"]
+        offset_y = params["offset_y"]
+        x1_main, y1_main, x2_main, y2_main = params["x1_main"], params["y1_main"], params["x2_main"], params["y2_main"]
+        
+        total_width = x2_main - x1_main
+        total_height = y2_main - y1_main
+        if total_width <= 0 or total_height <= 0: return # Schutz vor Division durch Null
+
+        # 1. Klickposition auf der Minimap in Haupt-Canvas-Koordinaten umrechnen (gezoomt)
+        target_x_zoomed = (event.x - offset_x) / minimap_scale
+        target_y_zoomed = (event.y - offset_y) / minimap_scale
+        
+        # 2. Den Viewport so positionieren, dass der Klickpunkt im Zentrum ist.
+        center_x_zoomed = self.canvas.winfo_width() / 2
+        center_y_zoomed = self.canvas.winfo_height() / 2
+        
+        new_x_start_zoomed = target_x_zoomed - center_x_zoomed
+        new_y_start_zoomed = target_y_zoomed - center_y_zoomed
+
+        # 3. Scrolle den Canvas
+        x_fraction = (new_x_start_zoomed - x1_main) / total_width
+        y_fraction = (new_y_start_zoomed - y1_main) / total_height
+        
+        # Begrenze die Fraktionen auf [0, 1] 
+        x_fraction = max(0.0, min(1.0, x_fraction))
+        y_fraction = max(0.0, min(1.0, y_fraction))
+
+        self.canvas.xview_moveto(x_fraction)
+        self.canvas.yview_moveto(y_fraction)
+        
+        self._update_minimap_viewport()
+
     # --- WEITERE METHODEN ---
 
     def show_add_menu(self, event=None):
@@ -690,6 +887,7 @@ class ProjectWindow:
             self._create_heading_card_gui(heading) 
             self.save_project()
             self.update_last_mtime()
+            self._update_minimap()
 
     def change_heading_color(self, heading):
         color = colorchooser.askcolor(title="Farbe wählen", initialcolor=heading["color"] or self.DEFAULT_HEADING_BG)[1]
@@ -705,6 +903,7 @@ class ProjectWindow:
             self._create_heading_card_gui(heading) 
             self.save_project()
             self.update_last_mtime()
+            self._update_minimap()
 
     def delete_item(self, item):
         if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
@@ -720,6 +919,8 @@ class ProjectWindow:
                 self.deselect_card()
             self.save_project()
             self.update_last_mtime()
+            self.update_scrollregion()
+            self._update_minimap()
 
     def add_heading(self):
         text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
@@ -743,6 +944,8 @@ class ProjectWindow:
         self._create_heading_card_gui(new_heading) 
         self.save_project()
         self.update_last_mtime()
+        self.update_scrollregion()
+        self._update_minimap()
 
     def add_source(self):
         dialog = SourceDialog(self.root, self)
@@ -767,6 +970,8 @@ class ProjectWindow:
             
             self.save_project()
             self.update_last_mtime()
+            self.update_scrollregion()
+            self._update_minimap()
 
     def edit_source(self, source):
         dialog = SourceDialog(self.root, self, source)
@@ -788,6 +993,8 @@ class ProjectWindow:
             
             self.save_project()
             self.update_last_mtime()
+            self.update_scrollregion()
+            self._update_minimap()
 
     # --- SELECTION LOGIC ---
     
@@ -895,6 +1102,7 @@ class ProjectWindow:
             self.update_last_mtime()
             self.dragging_card = False
             self.update_scrollregion()
+            self._update_minimap() # NEU: Minimap aktualisieren
 
     def on_canvas_press(self, event):
         # FIX: Vergrößere den Suchbereich, um sicherzustellen, dass nur direkte Klicks auf Karten 
@@ -923,17 +1131,26 @@ class ProjectWindow:
 
     def on_canvas_motion(self, event):
         if self.dragging_canvas:
-            dx = event.x - self.canvas_start_x
-            dy = event.y - self.canvas_start_y
+            # FIX 3: Dämpfungsfaktor (z.B. 0.7) für weniger aggressives Scrollen
+            damping = 0.7 
+            dx = int((event.x - self.canvas_start_x) * damping)
+            dy = int((event.y - self.canvas_start_y) * damping)
+            
+            # xview_scroll verwendet die definierten Scroll-Einheiten. 
+            # Mit int(dx*damping) wird der Scrollweg reduziert.
             self.canvas.xview_scroll(-dx, "units")
             self.canvas.yview_scroll(-dy, "units")
             self.canvas_start_x = event.x
             self.canvas_start_y = event.y
+            
+            # NEU: Minimap Viewport aktualisieren
+            self._update_minimap_viewport()
 
     def on_canvas_release(self, event):
         if self.dragging_canvas:
             self.dragging_canvas = False
             self.canvas.config(cursor="")
+            self.update_scrollregion() # Nach dem Verschieben Scrollregion aktualisieren (wg. padding)
 
     def create_citation(self, source):
         citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
@@ -941,8 +1158,29 @@ class ProjectWindow:
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
 
     def update_scrollregion(self):
+        """Aktualisiert die Scrollregion und fügt Polsterung hinzu, um das Scrollen in leere Bereiche zu ermöglichen (NEU)."""
         self.canvas.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        
+        bbox = self.canvas.bbox("all")
+        
+        if bbox:
+            # Füge Polsterung (z.B. 500px) hinzu, um Scrollen in den leeren Hintergrund zu ermöglichen
+            padding = 500
+            x1, y1, x2, y2 = bbox
+            new_scrollregion = (
+                x1 - padding, 
+                y1 - padding, 
+                x2 + padding, 
+                y2 + padding
+            )
+            self.canvas.configure(scrollregion=new_scrollregion)
+        else:
+            # Standardmäßig eine Mindest-Scrollregion, falls keine Elemente vorhanden sind
+            self.canvas.configure(scrollregion=(-500, -500, 1000, 1000))
+            
+        # Wenn die Scrollregion aktualisiert wird, muss auch die Minimap neu gezeichnet werden.
+        # Dies wird hier aufgerufen, da die bbox sich ändern kann.
+        self._update_minimap()
 
     def save_project(self):
         self.project["data"]["canvas_zoom_level"] = self.zoom_level 
