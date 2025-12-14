@@ -16,3 +16,4 @@ ren .\__pycache__\server.cpython-313.pyc server.pyc
 mkdir .\__pycache__\com.crackyOS.wdx
 move .\__pycache__\*.pyc .\__pycache__\com.crackyOS.wdx\
 copy ..\wdx_extension.crx .\__pycache__\com.crackyOS.wdx\
+copy .\icon128.ico .\__pycache__\com.crackyOS.wdx\
