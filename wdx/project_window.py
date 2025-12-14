@@ -897,11 +897,25 @@ class ProjectWindow:
             self.update_scrollregion()
 
     def on_canvas_press(self, event):
-        items = self.canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.x+5)
+        # FIX: Vergrößere den Suchbereich, um sicherzustellen, dass nur direkte Klicks auf Karten 
+        # die Bewegung des Canvas verhindern.
+        
+        # Konvertiere Mauskoordinaten zu Canvas-Koordinaten
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        
+        # Verwende einen kleinen, aber angemessenen Radius (z.B. 2 Pixel)
+        search_radius = 2 
+        
+        items = self.canvas.find_overlapping(x - search_radius, y - search_radius, x + search_radius, y + search_radius)
+        
         card_items = [wid for _, wid in self.source_frames.values()]
+        
+        # Prüfe, ob das Event (Mausklick) auf einem Karten-Element (window) stattfand
         if any(item in card_items for item in items):
+            # Es wurde eine Karte getroffen -> Canvas-Verschiebung verhindern
             return
 
+        # Keine Karte wurde getroffen -> Canvas-Verschiebung erlauben
         self.dragging_canvas = True
         self.canvas_start_x = event.x
         self.canvas_start_y = event.y
