@@ -52,7 +52,8 @@ class MainWindow:
         ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(pady=20)
 
         var = tk.BooleanVar(value=self.app.dark_mode)
-        switch = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var, bootstyle="round-toggle", command=lambda: self.app.toggle_dark_mode())
+        # KORREKTUR: Aufruf der korrekten Methode toggle_theme()
+        switch = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var, bootstyle="round-toggle", command=lambda: self.app.toggle_theme())
         switch.pack(pady=10)
 
         ttk.Button(settings_window, text="Schließen", command=settings_window.destroy, bootstyle="secondary").pack(pady=20)

@@ -4,9 +4,9 @@ from tkinter import simpledialog, messagebox
 import datetime
 import json
 import uuid
-import threading # NEU
-import requests # NEU (hier importiert für den Thread)
-from urllib.parse import urljoin, urlparse # NEU
+import threading 
+import requests 
+from urllib.parse import urljoin, urlparse 
 from constants import APP_TITLE
 from server import start_server
 from project_manager import ProjectManager
@@ -19,6 +19,10 @@ class WdxApp:
         self.root = root
         self.root.title(APP_TITLE)
         self.project_manager = ProjectManager()
+        
+        # KORREKTUR 1: Style-Objekt als Instanzvariable speichern
+        self.style = ttk.Style()
+        
         self.main_window = MainWindow(root, self)
         start_server(self)
 
@@ -59,7 +63,10 @@ class WdxApp:
             except:
                 return False
         return False
-
+    
+    # ENTFERNT: Die fehlerhafte toggle_dark_mode-Methode wird gelöscht,
+    # da die korrekte Logik bereits in toggle_theme existiert.
+    
     def save_dark_mode_setting(self, enabled):
         settings_dir = Path.home() / "Documents" / "wdx"
         settings_dir.mkdir(parents=True, exist_ok=True)
@@ -76,11 +83,11 @@ class WdxApp:
         self.save_dark_mode_setting(self.dark_mode)
 
     def apply_theme(self):
-        style = ttk.Style()
+        # KORREKTUR 2: self.style verwenden
         if self.dark_mode:
-            style.theme_use("darkly")
+            self.style.theme_use("darkly")
         else:
-            style.theme_use("litera")
+            self.style.theme_use("litera")
 
     def update_connection_status(self):
         # Status update logic kann hier bleiben
