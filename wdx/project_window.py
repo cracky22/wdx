@@ -1312,7 +1312,7 @@ class ProjectWindow:
                 label="Karte bearbeiten (Strg+e)", command=lambda: self.edit_source(item)
             )
             self.context_menu.add_command(
-                label="Aktuelle Seite neu laden (Strg+l)",
+                label="Seite erneut speichern (Strg+l)",
                 command=lambda: self.reload_current_page(item),
             )
 
