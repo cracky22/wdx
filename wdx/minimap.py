@@ -1,10 +1,9 @@
-# minimap.py
 import tkinter as tk
 
 class Minimap:
     def __init__(self, parent_frame, project_window):
-        self.parent = parent_frame          # main_frame (für place)
-        self.pw = project_window            # Zugriff auf canvas, source_frames, etc.
+        self.parent = parent_frame
+        self.pw = project_window
         self.minimap_canvas = None
         self.viewport_rect_id = None
 
@@ -18,8 +17,6 @@ class Minimap:
             highlightbackground="#cccccc"
         )
         self.minimap_canvas.place(relx=1.0, rely=1.0, x=-70, y=-70, anchor="se")
-
-        # Klick und Drag für Navigation
         self.minimap_canvas.bind("<ButtonPress-1>", self.on_press)
         self.minimap_canvas.bind("<B1-Motion>", self.on_drag)
 
@@ -38,11 +35,8 @@ class Minimap:
         if w <= 0 or h <= 0:
             return
 
-        # Zielkoordinate im Hauptcanvas
         target_x = x1 + (event.x / 200) * w
         target_y = y1 + (event.y / 150) * h
-
-        # Viewport zentrieren
         view_w = self.pw.canvas.winfo_width()
         view_h = self.pw.canvas.winfo_height()
         self.pw.canvas.xview_moveto((target_x - view_w / 2) / w)
@@ -62,7 +56,6 @@ class Minimap:
         if w <= 0 or h <= 0:
             return
 
-        # Karten zeichnen
         for item_id, (frame, canvas_id) in self.pw.source_frames.items():
             coords = self.pw.canvas.coords(canvas_id)
             if not coords:
@@ -70,14 +63,10 @@ class Minimap:
             cx, cy = coords
             cw = frame.winfo_width()
             ch = frame.winfo_height()
-
-            # Auf Minimap skalieren
             mx = (cx - x1) / w * 200
             my = (cy - y1) / h * 150
             mw = cw / w * 200
             mh = ch / h * 150
-
-            # Farbe vom Frame (über Style)
             try:
                 style = frame.cget("style")
                 color = self.pw.root.style.lookup(style, "background")
@@ -89,17 +78,14 @@ class Minimap:
                 fill=color, outline="#aaaaaa", width=1
             )
 
-        # Viewport-Rahmen (aktuell sichtbarer Bereich)
         vx1 = self.pw.canvas.canvasx(0)
         vy1 = self.pw.canvas.canvasy(0)
         vx2 = vx1 + self.pw.canvas.winfo_width()
         vy2 = vy1 + self.pw.canvas.winfo_height()
-
         mx1 = (vx1 - x1) / w * 200
         my1 = (vy1 - y1) / h * 150
         mx2 = (vx2 - x1) / w * 200
         my2 = (vy2 - y1) / h * 150
-
         if self.viewport_rect_id:
             self.minimap_canvas.delete(self.viewport_rect_id)
 

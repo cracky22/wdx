@@ -11,7 +11,6 @@ const projectEl = document.getElementById('currentProject');
 const projectNameEl = document.getElementById('projectName');
 const saveMessageEl = document.getElementById('saveMessage');
 
-// Dark Mode
 function applyTheme() {
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.classList.add('dark');

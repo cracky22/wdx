@@ -1,8 +1,4 @@
-# utils.py
 def get_contrast_color(hex_color: str) -> str:
-    """
-    Berechnet die passende Textfarbe (Schwarz oder Weiß) für einen gegebenen Hex-Hintergrundfarbenwert.
-    """
     if not hex_color:
         return "#000000"
 

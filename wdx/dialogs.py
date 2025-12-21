@@ -51,8 +51,6 @@ class SourceDialog(tk.Toplevel):
         color_frame.pack(fill="x", pady=(0,15))
 
         self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
-        
-        # NEU: Farbfeld zur Anzeige der aktuell gewählten Farbe
         self.selected_color_swatch = tk.Label(
             color_frame,
             bg=self.color_var.get(),
@@ -64,11 +62,7 @@ class SourceDialog(tk.Toplevel):
         
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5,0))
-
-        # Beobachter für Farbänderungen einrichten
         self.color_var.trace_add("write", self.update_color_swatch)
-        
-        # KORRIGIERTER BEREICH: Farbfelder mit delayed BG-Setzung
         all_items = project_window.project["data"].get("items", [])
         
         custom_colors = {
@@ -85,13 +79,11 @@ class SourceDialog(tk.Toplevel):
             palette.pack(fill="x", pady=(0,15))
             
             for col in used_colors:
-                # Verwende tk.Label, um Thematisierung zu vermeiden
                 initial_relief = "flat"
                 initial_border = 1
                 
                 label = tk.Label(
                     palette, 
-                    # bg wird hier nicht sofort gesetzt
                     width=3, 
                     height=1, 
                     relief=initial_relief, 
@@ -101,15 +93,10 @@ class SourceDialog(tk.Toplevel):
                     highlightthickness=1
                 )
                 
-                # WICHTIG: Setze die Farbe verzögert (after(1)), um das Rendering-Problem zu umgehen.
-                # Dadurch wird die Farbe auf der Tcl-Ebene gesetzt, nachdem das Widget initialisiert wurde.
-                # Dadurch sollten die Farbfelder nun korrekt in der Hex-Farbe angezeigt werden.
                 self.after(1, lambda l=label, c=col: l.config(bg=c))
                 
-                # Binde Klick-Ereignis an das Label (setzt die Farbe im Eingabefeld und löst das Update aus)
                 label.bind("<Button-1>", lambda e, c=col: self.color_var.set(c))
                 
-                # Füge Hover-Feedback hinzu
                 def on_enter(event, l):
                     l.config(relief="raised", borderwidth=2, highlightbackground="#FFFFFF", highlightthickness=2)
                 
@@ -120,7 +107,6 @@ class SourceDialog(tk.Toplevel):
                 label.bind("<Leave>", lambda e, l=label: on_leave(e, l))
 
                 label.pack(side="left", padx=2)
-        # ENDE KORRIGIERTER BEREICH
 
         btn_frame = ttk.Frame(main)
         btn_frame.pack(fill="x", pady=(10, 0))
@@ -131,14 +117,11 @@ class SourceDialog(tk.Toplevel):
         self.wait_window()
 
     def update_color_swatch(self, *args):
-        """Aktualisiert das kleine Farbfeld neben dem Eingabefeld."""
         color = self.color_var.get().strip()
         if color:
             try:
-                # Versucht, die Farbe zu setzen. Wenn die Eingabe ungültig ist, bleibt es beim alten Wert.
                 self.selected_color_swatch.config(bg=color)
             except tk.TclError:
-                # Ignoriere ungültige Hex-Werte
                 pass
 
     def paste_clipboard(self):

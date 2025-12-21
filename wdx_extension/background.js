@@ -24,7 +24,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     url: tab.url,
     title: tab.title || "Kein Titel",
     text: text,
-    keywords: ""  // Kein Schlagwort-Prompt mehr – optional leer
+    keywords: ""
   };
 
   try {

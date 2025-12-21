@@ -16,35 +16,23 @@ from urllib.parse import urlparse
 import threading 
 import concurrent.futures 
 
-# NEUE HILFSFUNKTION FÜR KONTRAST-TEXTFARBE
 def get_contrast_color(hex_color):
-    """Gibt Weiß (#ffffff) oder Schwarz (#000000) zurück, abhängig von der Helligkeit der Hex-Farbe."""
     if hex_color.startswith('#'):
         hex_color = hex_color[1:]
     
-    # Konvertiere Hex zu RGB
     try:
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
     except ValueError:
-        # Fallback für ungültige Hex-Werte, um Abstürze zu verhindern
         return "#000000" 
 
-    # Berechne Leuchtdichte (Luminosity, ITU BT.709)
-    # Wenn die Leuchtdichte unter 128 (Mittelwert) liegt, ist die Farbe dunkel -> verwende weißen Text
-    # Formel: 0.2126 * R + 0.7152 * G + 0.0722 * B
     luminosity = (0.2126 * r + 0.7152 * g + 0.0722 * b)
-    
     return "#000000" if luminosity > 128 else "#ffffff"
 
 class ProjectWindow:
-    
-    # Neue Konstanten für das Farbsystem und die Auswahl
     DEFAULT_SELECT_BORDER_WIDTH = 5
-    DEFAULT_SELECT_BORDER_COLOR = "primary" # Dies steuert die Borderfarbe (blau/dunkelblau)
-    
-    # Theme-abhängige Farben für unkolorierte Karten (Light Mode Defaults)
+    DEFAULT_SELECT_BORDER_COLOR = "primary"
     DEFAULT_SOURCE_BG = "#ffffff"   
     DEFAULT_HEADING_BG = "#e9ecef"
     
@@ -53,9 +41,7 @@ class ProjectWindow:
         self.root = root
         self.app = app
         self.source_frames = {} 
-        self.card_widgets = {}  
-        # Die alte Variable self.selected_source_id wird nur zum Initial-Laden 
-        # von gespeicherten Projekten verwendet.
+        self.card_widgets = {}
         self.selected_source_id = None
         
         self.dragging_card = False
@@ -65,33 +51,27 @@ class ProjectWindow:
         self.canvas_start_x = 0
         self.canvas_start_y = 0
 
-        # NEUE SELEKTIONS- & CLIPBOARD-VARIABLEN (FÜR MULTI-SELEKTION)
-        self.selected_source_ids = set() # Set für Multi-Selektion
-        self.card_original_colors = {} # {id: color} für Multi-Selektion
-        self.clipboard = None # Für Copy/Paste
+        self.selected_source_ids = set()
+        self.card_original_colors = {}
+        self.clipboard = None
         self.paste_offset_x = 50
         self.paste_offset_y = 50
-        # ENDE NEUE SELEKTIONS- & CLIPBOARD-VARIABLEN
 
         self.last_file_mtime = 0
         self.update_last_mtime()
-
-        # Thread-Pool für Multicore/I/O
+        
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
 
-        # Zoom-Einstellungen
         self.zoom_level = self.project["data"].get("canvas_zoom_level", 1.0) 
         self.max_zoom = 2.0
         self.min_zoom = 0.1
-        self.zoom_factor = 1.2 
-        # Basis-Fonts für Skalierung
+        self.zoom_factor = 1.2
         self.base_font_title = ("Helvetica", 12, "bold")
         self.base_font_heading = ("Helvetica", 16, "bold")
         self.base_font_default = ("Helvetica", 9)
         self.base_icon_size = 20 
         self.base_favicon_subsample = 2 
         
-        # Minimap-Einstellungen
         self.minimap_canvas = None
         self.viewport_rect_id = None
         self._minimap_params = {}
@@ -116,7 +96,6 @@ class ProjectWindow:
         btn_frame = ttk.Frame(header_frame)
         btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
         ttk.Button(btn_frame, text="💾", width=3, bootstyle="outline-secondary", command=self.manual_save).pack(side="left", padx=2)
-        # NEU: Zoom Reset Button
         ttk.Button(btn_frame, text="🔍", width=3, bootstyle="outline-secondary", command=self.reset_zoom).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="📥", width=3, bootstyle="outline-secondary", command=self.manual_export).pack(side="left", padx=2)
         ttk.Button(btn_frame, text="🔄", width=3, bootstyle="outline-secondary", command=self.manual_reload).pack(side="left", padx=2)
@@ -144,8 +123,7 @@ class ProjectWindow:
                                      command=self.show_add_menu,
                                      bootstyle="primary-outline-toolbutton")
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
-        
-        # NEU: Minimap Canvas
+
         self.minimap_canvas = tk.Canvas(self.main_frame, width=200, height=150, 
                                         bg="#f5f7fa", highlightthickness=1, highlightbackground="#cccccc")
         self.minimap_canvas.place(relx=1.0, rely=1.0, x=-70, y=-70, anchor="se")
@@ -154,73 +132,55 @@ class ProjectWindow:
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
 
-        # Startet den I/O-Ladevorgang asynchron
         self.load_items_on_canvas()
 
-        # Canvas-Bindings für Drag & Drop (wird in on_card_press überschrieben, falls Karte getroffen)
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
         
         self._bind_zoom_events()
-        self._bind_shortcuts() # NEU: Tastenkürzel binden
+        self._bind_shortcuts()
 
         self.start_auto_refresh()
 
-    # --- SHORTCUTS (NEU) ---
     def _bind_shortcuts(self):
-        """Bindet globale Tastenkürzel für Speichern, Neuladen, Export, etc."""
-        # Speichern: Ctrl+S (oder Cmd+S)
         self.root.bind("<Control-s>", lambda e: self.manual_save())
         self.root.bind("<Command-s>", lambda e: self.manual_save())
 
-        # Neuladen: Ctrl+R (oder Cmd+R)
         self.root.bind("<Control-r>", lambda e: self.manual_reload())
         self.root.bind("<Command-r>", lambda e: self.manual_reload())
         
-        # Export: Ctrl+E (oder Cmd+E)
         self.root.bind("<Control-e>", lambda e: self.manual_export())
         self.root.bind("<Command-e>", lambda e: self.manual_export())
         
-        # Zurück zu Projekten: Ctrl+B (oder Cmd+B)
         self.root.bind("<Control-b>", lambda e: self.back_to_projects())
         self.root.bind("<Command-b>", lambda e: self.back_to_projects())
 
-        # Duplizieren: Ctrl+D (oder Cmd+D)
         self.root.bind("<Control-d>", self._handle_duplicate_shortcut)
         self.root.bind("<Command-d>", self._handle_duplicate_shortcut)
 
-        # Kopieren: Ctrl+C (oder Cmd+C)
         self.root.bind("<Control-c>", self._handle_copy_shortcut)
         self.root.bind("<Command-c>", self._handle_copy_shortcut)
         
-        # Einfügen: Ctrl+V (oder Cmd+V)
         self.root.bind("<Control-v>", self._handle_paste_shortcut)
         self.root.bind("<Command-v>", self._handle_paste_shortcut)
 
     def _handle_duplicate_shortcut(self, event):
-        """Behandelt Ctrl/Cmd+D für das Duplizieren der ausgewählten Karten."""
         if self.selected_source_ids:
             self.duplicate_selected_items()
 
     def _handle_copy_shortcut(self, event):
-        """Behandelt Ctrl/Cmd+C für das Kopieren der ausgewählten Karten."""
         if self.selected_source_ids:
-            # Kopiere die zuletzt ausgewählte Karte (oder die erste in der Liste)
             item_id = next(iter(self.selected_source_ids))
             item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
             if item:
                 self.copy_card(item)
 
     def _handle_paste_shortcut(self, event):
-        """Behandelt Ctrl/Cmd+V für das Einfügen aus der Zwischenablage."""
         if self.clipboard:
             self.paste_card()
 
-    # --- MULTICORE & ERROR FIX ---
-
     def _process_item_data(self, item):
-        """Worker-Funktion, die in einem Hintergrund-Thread läuft. Führt I/O-Prüfungen durch."""
         if item.get("type") == "heading":
             return {"item": item, "is_source": False, "favicon_path": None}
 
@@ -234,12 +194,10 @@ class ProjectWindow:
 
 
     def load_items_on_canvas(self):
-        """Startet den synchronisierten Ladevorgang."""
         items_to_process = self.project["data"]["items"]
         threading.Thread(target=self._concurrent_load_worker, args=(items_to_process,), daemon=True).start()
         
     def _concurrent_load_worker(self, items_to_process):
-        """Blockiert im Hintergrund, um alle I/O-Aufgaben gleichzeitig zu erledigen."""
         try:
             processed_results = list(self.executor.map(self._process_item_data, items_to_process))
             
@@ -255,9 +213,6 @@ class ProjectWindow:
 
 
     def _create_all_cards_in_gui_thread(self, processed_results):
-        """Erstellt die Widgets aller Karten schnell und sequenziell im Main-Thread."""
-        
-        # Alte Karten löschen
         for frame, item_id in list(self.source_frames.values()):
             self.canvas.delete(item_id)
             frame.destroy()
@@ -267,8 +222,6 @@ class ProjectWindow:
         for result in processed_results:
             item = result["item"]
             
-            # WICHTIG: Prüfe hier, ob es eine gespeicherte Selektion aus dem Projekt gibt
-            # und setze self.selected_source_id (die alte Variable) entsprechend.
             if self.project["data"].get("selected_source_id") == item["id"]:
                  self.selected_source_id = item["id"]
             
@@ -278,38 +231,27 @@ class ProjectWindow:
                 self._create_heading_card_gui(item)
                 
         self.update_scrollregion()
-        self._update_minimap() # NEU: Minimap nach dem Laden aktualisieren
-
-    # --- COLOR HELPERS ---
+        self._update_minimap()
 
     def _get_effective_bg_color(self, item):
-        """Ermittelt die effektive Hintergrundfarbe: gewählte Farbe oder Theme-Standard."""
         custom_color = item.get("color", "").strip()
         if custom_color:
             return custom_color
         
-        # Verwende Theme-abhängige Farben für unkolorierte Karten
         if item["type"] == "source":
-            # Nutzt die Standard-Hintergrundfarbe des aktuellen Themes
             return self.app.style.lookup('TFrame', 'background') 
-        else: # heading
-            # Nutzt eine leicht abgedunkelte/aufgehellte Farbe des aktuellen Themes
+        else:
             return self.app.style.lookup('TLabel', 'background')
     
     def _get_default_border_width(self, item):
-        """Gibt die Standard-Randbreite basierend auf dem Item-Typ zurück."""
         return 2 if item["type"] == "source" else 0
-        
-    # --- ZOOM & SCALING ---
 
     def _bind_zoom_events(self):
-        """Bindet plattformspezifische Mausrad-Events für das Zoomen."""
         self.canvas.bind("<MouseWheel>", self._on_mousewheel) 
         self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True)) 
         self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False)) 
 
     def _on_mousewheel(self, event, up=None):
-        """Behandelt das Mausrad-Ereignis für das Zoomen."""
         if self.dragging_canvas or self.dragging_card:
             return
 
@@ -326,7 +268,6 @@ class ProjectWindow:
             self.zoom(1 / self.zoom_factor, x, y)
 
     def zoom(self, factor, x, y):
-        """Skaliert den Canvas-Inhalt und aktualisiert den Zoom-Level."""
         new_zoom = self.zoom_level * factor
         
         if new_zoom < self.min_zoom or new_zoom > self.max_zoom:
@@ -338,14 +279,12 @@ class ProjectWindow:
         self._update_card_content_scale()
         
         self.update_scrollregion()
-        self._update_minimap() # NEU: Minimap aktualisieren
+        self._update_minimap()
         
     def reset_zoom(self):
-        """Setzt den Zoom-Level auf 1.0 zurück (NEU)."""
         if self.zoom_level == 1.0:
             return
 
-        # Berechne den Skalierungsfaktor relativ zum Ursprung (0,0)
         factor = 1.0 / self.zoom_level
         self.canvas.scale("all", 0, 0, factor, factor)
         
@@ -353,19 +292,15 @@ class ProjectWindow:
         
         self._update_card_content_scale()
         self.update_scrollregion()
-        self._update_minimap() # WICHTIG: Minimap aktualisieren
+        self._update_minimap()
 
     def _update_card_content_scale(self):
-        """Skaliert die Fonts und Bilder in allen Karten basierend auf dem Zoom-Level."""
-        
         title_size = max(int(self.base_font_title[1] * self.zoom_level), 5)
         heading_size = max(int(self.base_font_heading[1] * self.zoom_level), 8)
         default_size = max(int(self.base_font_default[1] * self.zoom_level), 5)
         icon_size = max(int(self.base_icon_size * self.zoom_level), 10)
         
         for item_id, refs in self.card_widgets.items():
-            
-            # --- Fonts skalieren ---
             if 'title_label' in refs:
                 refs['title_label'].config(font=("Helvetica", title_size, "bold"))
             if 'url_label' in refs:
@@ -380,12 +315,10 @@ class ProjectWindow:
             if 'heading_label' in refs:
                 refs['heading_label'].config(font=("Helvetica", heading_size, "bold"))
 
-            # --- Icon skalieren ---
             if 'icon_label' in refs:
                 if 'original_icon_data' in refs and refs['original_icon_data']['is_favicon']:
                     original_img = refs['original_icon_data']['original_img']
                     new_subsample = max(1, int(self.base_favicon_subsample / self.zoom_level))
-                    
                     try:
                         new_img = original_img.subsample(new_subsample, new_subsample)
                         refs['icon_label'].config(image=new_img)
@@ -397,55 +330,36 @@ class ProjectWindow:
 
 
     def _create_source_card_gui(self, source, favicon_path):
-        """Erstellt die GUI-Elemente für eine Quelle (muss im Main-Thread sein)."""
-        
         color = self._get_effective_bg_color(source)
-        # NEU: Kontrastfarbe bestimmen
         text_color = get_contrast_color(color) 
         source["effective_color"] = color 
         item_id = source["id"]
-        
-        # FIX 1: Einzigartiger Style-Name, um die Hintergrundfarbe nur für diese Karte zu ändern
         style_name = f"Source.{item_id}.TFrame"
         self.card_widgets[item_id] = {}
-
-        # 1. Style konfigurieren
         try:
              self.root.style.configure(style_name, background=color)
         except tk.TclError:
              self.root.style.configure(style_name, relief="raised", borderwidth=self._get_default_border_width(source))
 
-
-        # 2. Frame erstellen und Style zuweisen
-        # OPTIK: Erhöhe Padding für abgerundeten Look
         frame = ttk.Frame(self.canvas, padding="15")
         frame.item_data = source
         frame.unique_style_name = style_name 
-        
         frame.configure(style=style_name)
-        
-        # OPTIK: Subtiler Schatten
         default_border = self._get_default_border_width(source)
         frame.config(relief="raised", borderwidth=default_border)
 
-        # OPTIK: Hover-Effekt hinzufügen
         def on_enter(e, f=frame):
-             # Erhöht den Rand leicht, um einen Schatteneffekt zu simulieren
              if f.item_data["id"] not in self.selected_source_ids:
                  f.config(borderwidth=default_border + 1, relief="ridge") 
         def on_leave(e, f=frame):
-             # Nur zurücksetzen, wenn die Karte nicht ausgewählt ist
              if f.item_data["id"] not in self.selected_source_ids:
                  f.config(borderwidth=default_border, relief="raised") 
         
-        
-        # --- Favicon/Globus ---
         if favicon_path:
             try:
                 original_img = tk.PhotoImage(file=favicon_path)
                 self.card_widgets[item_id]['original_icon_data'] = {'original_img': original_img, 'is_favicon': True}
                 favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                # Verwende tk.Label, um die Hintergrundfarbe zu garantieren
                 favicon_label = tk.Label(frame, image=favicon_img, bg=color) 
                 favicon_label.image = favicon_img 
                 favicon_label.pack(anchor="w")
@@ -459,33 +373,27 @@ class ProjectWindow:
             globe_label.pack(anchor="w")
             self.card_widgets[item_id]['icon_label'] = globe_label
 
-        # --- Labels ---
         title_text = source.get("title") or source["url"]
-        # OPTIK: Textfarbe auf Kontrast setzen
         title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground=text_color, wraplength=320)
         title_label.pack(anchor="w")
         self.card_widgets[item_id]['title_label'] = title_label
 
         if source.get("title"):
-            # OPTIK: Textfarbe auf Kontrast setzen
             url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground=text_color, wraplength=350)
             url_label.pack(anchor="w")
             self.card_widgets[item_id]['url_label'] = url_label
 
         if source["text"]:
             preview = source["text"][:180] + ("..." if len(source["text"]) > 180 else "")
-            # OPTIK: Textfarbe auf Kontrast setzen
             text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground=text_color, wraplength=350)
             text_label.pack(anchor="w", pady=(6,0))
             self.card_widgets[item_id]['text_label'] = text_label
 
         if source["keywords"]:
-            # OPTIK: Textfarbe auf Kontrast setzen
             keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info", foreground=text_color)
             keywords_label.pack(anchor="w", pady=(4,0))
             self.card_widgets[item_id]['keywords_label'] = keywords_label
 
-        # OPTIK: Textfarbe auf Kontrast setzen
         added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground=text_color)
         added_label.pack(anchor="w", pady=(8,0))
         self.card_widgets[item_id]['added_label'] = added_label 
@@ -493,18 +401,14 @@ class ProjectWindow:
         ttk.Button(frame, text="🔗 Original öffnen", bootstyle="success-outline", width=20,
                    command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
         
-        # --- Binden und Platzieren ---
         frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
-        frame.bind("<Enter>", on_enter) # Hover-Binding für Frame
-        frame.bind("<Leave>", on_leave) # Hover-Binding für Frame
-
+        frame.bind("<Enter>", on_enter)
+        frame.bind("<Leave>", on_leave)
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
-            # OPTIK: Hover-Binding für alle Kinder
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
             
-            # WICHTIG: Manuelle Konfiguration der Label-Hintergründe und Vordergründe 
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
                     child.config(background=color, foreground=text_color)
@@ -520,12 +424,11 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[item_id] = (frame, window_id)
 
-        # 4. Selektionsstatus prüfen und anwenden (Initial-Load)
         if self.selected_source_id == item_id:
              self.selected_source_ids.add(item_id)
              self.card_original_colors[item_id] = color
              self._apply_selection_style(item_id, color)
-             self.selected_source_id = None # Setze zurück
+             self.selected_source_id = None
             
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
@@ -533,64 +436,41 @@ class ProjectWindow:
 
 
     def _create_heading_card_gui(self, heading):
-        """Erstellt die GUI-Elemente für eine Überschrift (muss im Main-Thread sein)."""
-        
         color = self._get_effective_bg_color(heading)
-        # NEU: Kontrastfarbe bestimmen
         text_color = get_contrast_color(color) 
         heading["effective_color"] = color 
-        
         item_id = heading["id"]
-        
-        # FIX 1: Einzigartiger Style-Name
         style_name = f"Heading.{item_id}.TFrame"
-        
         self.card_widgets[item_id] = {}
 
-        # 1. Style konfigurieren
         try:
              self.root.style.configure(style_name, background=color)
         except tk.TclError:
              self.root.style.configure(style_name, relief="flat", borderwidth=self._get_default_border_width(heading))
 
-        # 2. Frame erstellen und Style zuweisen
-        # OPTIK: Erhöhe Padding für schickeren Look
         frame = ttk.Frame(self.canvas, padding="15 20")
         frame.item_data = heading
         frame.unique_style_name = style_name 
         frame.configure(style=style_name)
-        
-        # OPTIK: Subtiler Schatten
         default_border = self._get_default_border_width(heading)
         frame.config(relief="flat", borderwidth=default_border)
-
-        # OPTIK: Hover-Effekt hinzufügen
         def on_enter(e, f=frame):
-             # Leichter Groove-Effekt bei Hover
              if f.item_data["id"] not in self.selected_source_ids:
                  f.config(borderwidth=2, relief="groove")
         def on_leave(e, f=frame):
-             # Nur zurücksetzen, wenn die Karte nicht ausgewählt ist
              if f.item_data["id"] not in self.selected_source_ids:
                  f.config(borderwidth=default_border, relief="flat") 
 
-        # OPTIK: Textfarbe auf Kontrast setzen
-        # Verwende tk.Label, um die Hintergrundfarbe zu garantieren
         label = tk.Label(frame, text=heading["text"], font=self.base_font_heading, fg=text_color, bg=color)
         label.pack()
         self.card_widgets[item_id]['heading_label'] = label
-
         frame.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
-        frame.bind("<Enter>", on_enter) # Hover-Binding für Frame
-        frame.bind("<Leave>", on_leave) # Hover-Binding für Frame
-        
+        frame.bind("<Enter>", on_enter)
+        frame.bind("<Leave>", on_leave)
         for child in frame.winfo_children():
             child.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
-            # OPTIK: Hover-Binding für alle Kinder
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
-            
-            # WICHTIG: Manuelle Konfiguration der Label-Hintergründe und Vordergründe 
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
                     child.config(background=color, foreground=text_color)
@@ -605,30 +485,21 @@ class ProjectWindow:
         x, y = heading.get("pos_x", 300), heading.get("pos_y", 300)
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[item_id] = (frame, window_id)
-
-        # 4. Selektionsstatus prüfen und anwenden (Initial-Load)
         if self.selected_source_id == item_id:
              self.selected_source_ids.add(item_id)
              self.card_original_colors[item_id] = color
              self._apply_selection_style(item_id, color)
-             self.selected_source_id = None # Setze zurück
+             self.selected_source_id = None
 
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
             self._update_card_content_scale()
             
-    # --- MINIMAP LOGIC ---
-
     def _update_minimap(self):
-        """Zeichnet alle Karten auf der Minimap und aktualisiert den Viewport-Rechteck."""
-        
         if not self.minimap_canvas or not self.minimap_canvas.winfo_exists():
             return
             
         self.minimap_canvas.delete("all")
-        
-        # 1. Bestimme die Gesamtgröße des Inhalts
-        # Ermittelt die Bounding Box aller Elemente auf dem Haupt-Canvas (bereits gezoomt)
         bbox_all = self.canvas.bbox("all") 
         if not bbox_all:
              self.viewport_rect_id = None
@@ -636,7 +507,6 @@ class ProjectWindow:
              return
 
         x1_main, y1_main, x2_main, y2_main = bbox_all
-        # Füge einen kleinen Puffer hinzu
         buffer = 50 * self.zoom_level
         x1_main -= buffer
         y1_main -= buffer
@@ -645,48 +515,33 @@ class ProjectWindow:
         
         content_width = x2_main - x1_main
         content_height = y2_main - y1_main
-
-        # 2. Skalierungsfaktor für Minimap bestimmen
         map_w = self.minimap_canvas.winfo_width()
         map_h = self.minimap_canvas.winfo_height()
-        
-        # Wähle den kleineren Faktor, um alles in die Minimap zu quetschen
-        # Verwende 90% der verfügbaren Fläche
         if content_width > 0 and content_height > 0:
             scale_x = map_w / content_width
             scale_y = map_h / content_height
             minimap_scale = min(scale_x, scale_y) * 0.9 
         else:
-            minimap_scale = 1.0 # Fallback
+            minimap_scale = 1.0
             
-        # Berechne den Versatz, um den Inhalt in der Minimap zu zentrieren
         center_x_map = map_w / 2
         center_y_map = map_h / 2
-        
         offset_x = center_x_map - (x1_main + content_width / 2) * minimap_scale
         offset_y = center_y_map - (y1_main + content_height / 2) * minimap_scale
 
-        # 3. Karten zeichnen
         for item_id, (frame, window_id) in self.source_frames.items():
             item = frame.item_data
             
             coords = self.canvas.coords(window_id)
             if not coords: continue
-            
-            # Holen der aktuellen, skalierten Widget-Größe
             frame_width = frame.winfo_reqwidth()
             frame_height = frame.winfo_reqheight()
-
-            # Skalierte Positionen auf der Minimap
             x_map_start = coords[0] * minimap_scale + offset_x
             y_map_start = coords[1] * minimap_scale + offset_y
             x_map_end = x_map_start + frame_width * minimap_scale
             y_map_end = y_map_start + frame_height * minimap_scale
-
-            # Farbe verwenden
             color = item.get("effective_color", "#cccccc")
             outline_color = "#333333" if item["type"] == "source" else "" 
-            
             self.minimap_canvas.create_rectangle(
                 x_map_start, y_map_start, x_map_end, y_map_end,
                 fill=color,
@@ -695,19 +550,14 @@ class ProjectWindow:
                 tags=("card_rect", item_id) 
             )
 
-        # Speichern der Skalierungs- und Versatzparameter für die Viewport-Berechnung
         self._minimap_params = {
             "x1_main": x1_main, "y1_main": y1_main, "x2_main": x2_main, "y2_main": y2_main,
             "minimap_scale": minimap_scale,
             "offset_x": offset_x, "offset_y": offset_y
         }
-        
-        # 4. Viewport-Rechteck zeichnen/aktualisieren
         self._update_minimap_viewport()
 
     def _update_minimap_viewport(self):
-        """Aktualisiert das Viewport-Rechteck auf der Minimap."""
-        
         if not self.minimap_canvas or not self.minimap_canvas.winfo_exists() or not hasattr(self, '_minimap_params'):
             return
 
@@ -715,22 +565,14 @@ class ProjectWindow:
         minimap_scale = params["minimap_scale"]
         offset_x = params["offset_x"]
         offset_y = params["offset_y"]
-
-        # Gezoomte Haupt-Canvas Koordinaten des oberen linken Ecks des Viewports
         x_start_zoomed = self.canvas.canvasx(0) 
         y_start_zoomed = self.canvas.canvasy(0)
-
-        # Größe des Viewports in gezoomten Koordinaten
         viewport_w_zoomed = self.canvas.winfo_width()
         viewport_h_zoomed = self.canvas.winfo_height()
-
-        # Skalierte Positionen auf der Minimap
         x_map_start = x_start_zoomed * minimap_scale + offset_x
         y_map_start = y_start_zoomed * minimap_scale + offset_y
         x_map_end = x_map_start + viewport_w_zoomed * minimap_scale
         y_map_end = y_map_start + viewport_h_zoomed * minimap_scale
-        
-        # 3. Rechteck zeichnen/aktualisieren
         if self.viewport_rect_id and self.minimap_canvas.find_withtag(self.viewport_rect_id):
             self.minimap_canvas.coords(self.viewport_rect_id, x_map_start, y_map_start, x_map_end, y_map_end)
             self.minimap_canvas.tag_raise(self.viewport_rect_id) 
@@ -740,12 +582,10 @@ class ProjectWindow:
                 outline="#333333",
                 fill="", 
                 width=2,
-                stipple="gray50" # Grau-durchsichtig-Effekt
+                stipple="gray50"
             )
 
     def on_minimap_click(self, event):
-        """Scrollt den Haupt-Canvas zur geklickten Position auf der Minimap."""
-        
         if not hasattr(self, '_minimap_params'):
             return
 
@@ -754,85 +594,51 @@ class ProjectWindow:
         offset_x = params["offset_x"]
         offset_y = params["offset_y"]
         x1_main, y1_main, x2_main, y2_main = params["x1_main"], params["y1_main"], params["x2_main"], params["y2_main"]
-        
         total_width = x2_main - x1_main
         total_height = y2_main - y1_main
-        if total_width <= 0 or total_height <= 0: return # Schutz vor Division durch Null
-
-        # 1. Klickposition auf der Minimap in Haupt-Canvas-Koordinaten umrechnen (gezoomt)
+        if total_width <= 0 or total_height <= 0: return
         target_x_zoomed = (event.x - offset_x) / minimap_scale
         target_y_zoomed = (event.y - offset_y) / minimap_scale
-        
-        # 2. Den Viewport so positionieren, dass der Klickpunkt im Zentrum ist.
         center_x_zoomed = self.canvas.winfo_width() / 2
         center_y_zoomed = self.canvas.winfo_height() / 2
-        
         new_x_start_zoomed = target_x_zoomed - center_x_zoomed
         new_y_start_zoomed = target_y_zoomed - center_y_zoomed
-
-        # 3. Scrolle den Canvas
         x_fraction = (new_x_start_zoomed - x1_main) / total_width
         y_fraction = (new_y_start_zoomed - y1_main) / total_height
-        
-        # Begrenze die Fraktionen auf [0, 1] 
         x_fraction = max(0.0, min(1.0, x_fraction))
         y_fraction = max(0.0, min(1.0, y_fraction))
-
         self.canvas.xview_moveto(x_fraction)
         self.canvas.yview_moveto(y_fraction)
-        
         self._update_minimap_viewport()
 
-    # --- SELECTION & MOVEMENT LOGIC (REFACTOR FÜR MULTI-SELEKTION) ---
-
     def _apply_selection_style(self, item_id, color):
-        """Wendet den visuellen Auswahl-Stil auf eine einzelne Karte an."""
         frame = self.source_frames[item_id][0]
-        
-        # Kontrastfarbe der Originalfarbe
         text_color = get_contrast_color(color)
-
         frame.config(
             borderwidth=self.DEFAULT_SELECT_BORDER_WIDTH, 
-            bootstyle=self.DEFAULT_SELECT_BORDER_COLOR, # Primary Bootstyle für Randfarbe
+            bootstyle=self.DEFAULT_SELECT_BORDER_COLOR,
             relief="raised" 
         )
-        
-        # Setze die Label-Hintergründe und -Vordergründe explizit
         for child in frame.winfo_children():
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
-                    # Verwende die ursprüngliche Farbe für den Hintergrund der Labels
                     child.config(background=color, foreground=text_color)
             except Exception:
                 pass
 
     def _remove_selection_style(self, item_id, original_color, item_type):
-        """Entfernt den visuellen Auswahl-Stil von einer einzelnen Karte."""
         frame = self.source_frames[item_id][0]
         item = frame.item_data
-        
-        # Ursprünglichen Rand wiederherstellen
         border = self._get_default_border_width(item)
-        
-        # Ursprüngliche Hintergrundfarbe wiederherstellen
         original_style_name = frame.unique_style_name
-        
-        # Kontrastfarbe für Labels
         text_color = get_contrast_color(original_color)
-        
-        # Konfiguriert den ursprünglichen Style mit der Originalfarbe
-        self.root.style.configure(original_style_name, background=original_color) 
-        
-        # Setzt den Frame auf den ursprünglichen Style zurück und entfernt den Bootstyle/Rand
+        self.root.style.configure(original_style_name, background=original_color)
         frame.configure(
             style=original_style_name, 
             bootstyle=None, 
             borderwidth=border,
             relief="raised" if item_type == "source" else "flat"
         )
-        
-        # Setze die Label-Hintergründe auf die Originalfarbe zurück
         for child in frame.winfo_children():
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
@@ -841,58 +647,43 @@ class ProjectWindow:
                 pass
                 
     def handle_card_selection(self, item_id, event=None):
-        """Wählt eine Karte aus (Multi-Selektion mit Strg/Cmd-Klick)."""
-        
         frame = self.source_frames[item_id][0]
         item = frame.item_data
-        
-        # Strg-Taste (Windows/Linux) oder Cmd-Taste (Mac)
-        ctrl_pressed = event and (event.state & 0x4) 
-
-        # Speichere die ursprüngliche Farbe, wenn noch nicht geschehen
+        ctrl_pressed = event and (event.state & 0x4)
         original_color = item.get('effective_color')
         if item_id not in self.card_original_colors:
              self.card_original_colors[item_id] = original_color
 
         if ctrl_pressed:
             if item_id in self.selected_source_ids:
-                # Strg-Klick auf bereits ausgewählte Karte -> Deselektieren
                 self.selected_source_ids.remove(item_id)
                 self._remove_selection_style(item_id, original_color, item["type"])
                 self.card_original_colors.pop(item_id, None)
             else:
-                # Strg-Klick auf nicht ausgewählte Karte -> Hinzufügen
                 self.selected_source_ids.add(item_id)
                 self._apply_selection_style(item_id, original_color)
         else:
             if item_id in self.selected_source_ids and len(self.selected_source_ids) > 1:
-                 # Normaler Klick auf bereits ausgewählte Karte in einer Gruppe
-                 # -> behalte die Auswahl und warte auf on_card_motion zum Bewegen
                  pass
             elif item_id not in self.selected_source_ids:
-                 # Normaler Klick auf nicht ausgewählte Karte -> Alle anderen deselektieren und diese auswählen
                  self.deselect_all_cards(exclude_id=item_id)
                  self.selected_source_ids.add(item_id)
                  self._apply_selection_style(item_id, original_color)
                 
     def deselect_all_cards(self, exclude_id=None):
-        """Deselektiert alle ausgewählten Karten."""
         ids_to_remove = list(self.selected_source_ids)
         for item_id in ids_to_remove:
             if item_id != exclude_id and item_id in self.source_frames:
                 frame = self.source_frames[item_id][0]
                 item = frame.item_data
-                # Hole die Farbe aus dem Cache oder verwende Fallback
                 original_color = self.card_original_colors.pop(item_id, item.get('effective_color', "#ffffff"))
                 self._remove_selection_style(item_id, original_color, item["type"])
                 self.selected_source_ids.remove(item_id)
 
     def deselect_card(self):
-        """Deselektiert die ausgewählte(n) Karte(n) (Für Kontextmenü-Rückwärtskompatibilität)."""
         self.deselect_all_cards()
 
     def deselect_card_from_context(self, item_id):
-        """Deselektiert eine einzelne Karte (für Kontextmenü-Aktion)."""
         if item_id in self.selected_source_ids:
              frame = self.source_frames[item_id][0]
              item = frame.item_data
@@ -902,15 +693,11 @@ class ProjectWindow:
 
 
     def on_card_press(self, event, item_id):
-        # NEU: Multi-Selektionslogik
         self.handle_card_selection(item_id, event)
-
-        # Wenn die geklickte Karte ausgewählt ist (entweder einzeln oder in Gruppe)
         if item_id in self.selected_source_ids:
             self.dragging_card = True
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
-            # Bringe alle ausgewählten Karten in den Vordergrund
             for selected_id in self.selected_source_ids:
                  if selected_id in self.source_frames:
                     self.canvas.tag_raise(self.source_frames[selected_id][1])
@@ -919,8 +706,6 @@ class ProjectWindow:
         if self.dragging_card:
             dx = (event.x_root - self.drag_start_x) / self.zoom_level
             dy = (event.y_root - self.drag_start_y) / self.zoom_level
-            
-            # Verschiebe ALLE ausgewählten Karten
             for item_id in self.selected_source_ids:
                 if item_id in self.source_frames:
                     window_id = self.source_frames[item_id][1]
@@ -931,7 +716,6 @@ class ProjectWindow:
 
     def on_card_release(self, event):
         if self.dragging_card:
-            # Speichere die Positionen ALLER verschobenen Karten
             for item_id in self.selected_source_ids:
                  if item_id in self.source_frames:
                     coords = self.canvas.coords(self.source_frames[item_id][1])
@@ -944,28 +728,17 @@ class ProjectWindow:
             self.update_last_mtime()
             self.dragging_card = False
             self.update_scrollregion()
-            self._update_minimap() # NEU: Minimap aktualisieren
+            self._update_minimap()
 
     def on_canvas_press(self, event):
-        # Konvertiere Mauskoordinaten zu Canvas-Koordinaten
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        
-        # Verwende einen kleinen, aber angemessenen Radius (z.B. 2 Pixel)
         search_radius = 2 
-        
         items = self.canvas.find_overlapping(x - search_radius, y - search_radius, x + search_radius, y + search_radius)
-        
         card_items = [wid for _, wid in self.source_frames.values()]
-        
-        # Prüfe, ob das Event (Mausklick) auf einem Karten-Element (window) stattfand
         if any(item in card_items for item in items):
-            # Es wurde eine Karte getroffen -> Canvas-Verschiebung verhindern
             return
         
-        # NEU: Deselektiere alle, wenn ins Leere geklickt wird
-        self.deselect_all_cards() 
-
-        # Keine Karte wurde getroffen -> Canvas-Verschiebung erlauben
+        self.deselect_all_cards()
         self.dragging_canvas = True
         self.canvas_start_x = event.x
         self.canvas_start_y = event.y
@@ -977,71 +750,51 @@ class ProjectWindow:
             self.canvas.yview_scroll(int(-1 * (event.y - self.canvas_start_y) / self.zoom_level), "units")
             self.canvas_start_x = event.x
             self.canvas_start_y = event.y
-            self._update_minimap_viewport() # Minimap Viewport während des Dragging aktualisieren
+            self._update_minimap_viewport()
 
     def on_canvas_release(self, event):
         if self.dragging_canvas:
             self.dragging_canvas = False
             self.canvas.config(cursor="")
-            self._update_minimap_viewport() # Abschließende Aktualisierung
-
-    # --- DUPLIZIEREN & KOPIEREN/EINFÜGEN (NEU) ---
+            self._update_minimap_viewport()
     
     def _create_new_item_from_existing(self, original_item, new_x_offset, new_y_offset):
-        """Erstellt eine Kopie eines Items mit neuer ID und versetzter Position."""
-        
         new_item = original_item.copy()
         new_item["id"] = str(uuid.uuid4())
-        
-        # Position versetzen, relativ zum Original
         new_item["pos_x"] = original_item["pos_x"] + new_x_offset
         new_item["pos_y"] = original_item["pos_y"] + new_y_offset
-        
-        # Nur für Quellen: Aktualisiere das Hinzufügedatum
         if new_item["type"] == "source":
              new_item["added"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-             new_item.pop("effective_color", None) # Effektive Farbe entfernen, wird neu berechnet
+             new_item.pop("effective_color", None)
 
         return new_item
         
     def duplicate_item(self, item):
-        """Dupliziert eine einzelne Karte (aus dem Kontextmenü)."""
-        
         self.deselect_all_cards()
-        
         new_item = self._create_new_item_from_existing(item, self.paste_offset_x, self.paste_offset_y)
-        
         self.project["data"]["items"].append(new_item)
-        
         if new_item["type"] == "source":
-            # Asynchrones Laden für Quellen (wegen Favicon)
             threading.Thread(target=self._concurrent_reload_single_card, args=(new_item,), daemon=True).start()
         else:
             self._create_heading_card_gui(new_item)
             
-        # Neue Karte auswählen
         self.selected_source_ids.add(new_item["id"])
             
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
-        self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+        self.reset_zoom()
         self._update_minimap()
 
     def duplicate_selected_items(self):
-        """Dupliziert alle aktuell ausgewählten Karten (für Tastenkürzel)."""
-        
         if not self.selected_source_ids:
             return
 
         new_ids = []
         items_to_process = []
-        
-        # Speichere die aktuellen Original-Items
         original_items = [next(i for i in self.project["data"]["items"] if i["id"] == item_id) 
                           for item_id in list(self.selected_source_ids)]
                           
-        # Deselektiere zuerst alle alten Karten
         self.deselect_all_cards()
 
         for original_item in original_items:
@@ -1051,69 +804,49 @@ class ProjectWindow:
              items_to_process.append(new_item)
              new_ids.append(new_item["id"])
         
-        # Nach dem Duplizieren die Duplikate auswählen
         self.selected_source_ids.update(new_ids)
-        
-        # Neu erstellte Elemente rendern
         self._concurrent_load_worker(items_to_process) 
         
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
-        self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+        self.reset_zoom()
         self._update_minimap()
-        
-        # Setze den Offset für das nächste Mal
         self.paste_offset_x += 20
         self.paste_offset_y += 20
         if self.paste_offset_x > 100: self.paste_offset_x = 50
         if self.paste_offset_y > 100: self.paste_offset_y = 50
 
     def copy_card(self, item):
-        """Kopiert eine einzelne Karte in die interne Zwischenablage (für Strg+C und Kontextmenü)."""
-        # Kopiere das Datenobjekt, nicht die Referenz
         self.clipboard = item.copy() 
-        self.clipboard.pop("effective_color", None) # Entferne temporäre UI-Daten
+        self.clipboard.pop("effective_color", None)
         self.paste_offset_x = 50
         self.paste_offset_y = 50
 
     def paste_card(self):
-        """Fügt die Karte aus der internen Zwischenablage ein (für Strg+V und Kontextmenü)."""
         if not self.clipboard:
             return
 
         original_item = self.clipboard
-        
-        # 1. Erstelle neues Item mit Offset
         new_item = self._create_new_item_from_existing(original_item, self.paste_offset_x, self.paste_offset_y)
         self.project["data"]["items"].append(new_item)
-        
-        # 2. Rendern
         if new_item["type"] == "source":
-            # Asynchrones Laden für Quellen (wegen Favicon)
             threading.Thread(target=self._concurrent_reload_single_card, args=(new_item,), daemon=True).start()
         else:
             self._create_heading_card_gui(new_item)
             
-        # 3. Auswahl auf das neue Element setzen
         self.deselect_all_cards()
         self.selected_source_ids.add(new_item["id"])
-        
-        # 4. Offset für das nächste Mal erhöhen
         self.paste_offset_x += 20
         self.paste_offset_y += 20
         if self.paste_offset_x > 100: self.paste_offset_x = 50
         if self.paste_offset_y > 100: self.paste_offset_y = 50
-            
-        # 5. Speichern und aktualisieren
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
-        self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+        self.reset_zoom()
         self._update_minimap()
-        
-    # --- WEITERE METHODEN ---
-
+    
     def show_add_menu(self, event=None):
         self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
 
@@ -1180,18 +913,14 @@ class ProjectWindow:
             webbrowser.open(f"file://{file_path}")
 
     def reload_current_page(self, source):
-        """Startet den Reload-Prozess in einem Hintergrund-Thread."""
         threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
 
     def _reload_worker(self, source):
-        """Führt den Ladevorgang im Hintergrund-Thread (Netzwerk-I/O) aus."""
         sites_dir = Path(self.project["path"]) / "sites"
         images_dir = Path(self.project["path"]) / "images"
         sites_dir.mkdir(exist_ok=True)
         images_dir.mkdir(exist_ok=True)
-        
         new_favicon_name = None
-
         try:
             response = requests.get(source["url"], timeout=15)
             response.raise_for_status() 
@@ -1211,7 +940,7 @@ class ProjectWindow:
                 with open(favicon_path, "wb") as f:
                     f.write(favicon_response.content)
                 new_favicon_name = favicon_filename 
-
+                
             self.root.after(0, self._finalize_reload, source["id"], filename, timestamp, new_favicon_name)
 
         except requests.exceptions.Timeout:
@@ -1222,7 +951,6 @@ class ProjectWindow:
             self.root.after(0, lambda: messagebox.showerror("Fehler", f"Ein unerwarteter Fehler ist aufgetreten: {e}", parent=self.root))
 
     def _finalize_reload(self, source_id, filename, timestamp, new_favicon_name):
-        """Führt UI-Updates und Speicherung im Main-Thread aus."""
         source = next((item for item in self.project["data"].get("items", []) if item.get("id") == source_id and item.get("type") == "source"), None)
         
         if not source:
@@ -1241,24 +969,18 @@ class ProjectWindow:
             source["favicon"] = new_favicon_name
 
         self.save_project()
-        
-        # Visuelles Update der Karte (neu erstellen)
         if source_id in self.source_frames:
             frame, item_id_canvas = self.source_frames[source_id]
             self.canvas.delete(item_id_canvas)
             frame.destroy()
             del self.source_frames[source_id]
-            del self.card_widgets[source_id] 
-            
-            # WICHTIG: Auswahl-Status beibehalten, da es kein strukturelles Element ist
+            del self.card_widgets[source_id]
             threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
             
 
     def _concurrent_reload_single_card(self, source):
-        """Worker für das Neuladen einer einzelnen Karte."""
         try:
             result = self._process_item_data(source)
-            # Im Haupt-Thread neu erstellen und ggf. neu auswählen
             if source["type"] == "source":
                  self.root.after(0, self._create_source_card_gui, source, result["favicon_path"])
             else:
@@ -1270,13 +992,9 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(label="Löschen", command=lambda: self.delete_item(item))
-        
         item_id = item["id"]
-        
-        # NEU: Duplizieren
         self.context_menu.add_command(label="Duplizieren (Strg+D)", command=lambda: self.duplicate_item(item))
-        self.context_menu.add_separator() 
-
+        self.context_menu.add_separator()
         if item["type"] == "heading":
             self.context_menu.add_command(label="Umbenennen", command=lambda: self.rename_heading(item))
             self.context_menu.add_command(label="Farbe ändern", command=lambda: self.change_heading_color(item))
@@ -1289,7 +1007,6 @@ class ProjectWindow:
             self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(item))
             self.context_menu.add_command(label="Aktuelle Seite neu laden", command=lambda: self.reload_current_page(item))
         
-        # NEU: Copy/Paste für Quellen
         if item["type"] == "source":
             self.context_menu.add_separator()
             self.context_menu.add_command(label="Kopieren (Strg+C)", command=lambda: self.copy_card(item))
@@ -1300,7 +1017,6 @@ class ProjectWindow:
         if item_id in self.selected_source_ids:
             self.context_menu.add_command(label="Karte abwählen", command=lambda: self.deselect_card_from_context(item_id)) 
         else:
-            # Wählt nur diese eine Karte aus (ersetzt Multi-Selektion)
             self.context_menu.add_command(label="Karte wählen", command=lambda: self.deselect_all_cards(exclude_id=item_id) or self.handle_card_selection(item_id)) 
 
         self.context_menu.post(event.x_root, event.y_root)
@@ -1317,7 +1033,7 @@ class ProjectWindow:
             self._create_heading_card_gui(heading) 
             self.save_project()
             self.update_last_mtime()
-            self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+            self.reset_zoom()
             self._update_minimap()
 
     def change_heading_color(self, heading):
@@ -1325,7 +1041,6 @@ class ProjectWindow:
         
         if color and color != heading.get("color", ""):
             heading["color"] = "" if color == self.DEFAULT_HEADING_BG else color
-            
             frame, item_id = self.source_frames[heading["id"]]
             self.canvas.delete(item_id)
             frame.destroy()
@@ -1334,14 +1049,13 @@ class ProjectWindow:
             self._create_heading_card_gui(heading) 
             self.save_project()
             self.update_last_mtime()
-            self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+            self.reset_zoom()
             self._update_minimap()
 
     def delete_item(self, item):
         if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
             item_id = item["id"]
             self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
-
             frame, item_id_canvas = self.source_frames[item_id]
             self.canvas.delete(item_id_canvas)
             frame.destroy()
@@ -1352,7 +1066,7 @@ class ProjectWindow:
             self.save_project()
             self.update_last_mtime()
             self.update_scrollregion()
-            self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+            self.reset_zoom()
             self._update_minimap()
 
     def add_heading(self):
@@ -1361,9 +1075,7 @@ class ProjectWindow:
             return
 
         color = colorchooser.askcolor(title="Farbe wählen", initialcolor=self.DEFAULT_HEADING_BG)[1]
-        
         color_to_save = "" if not color or color == self.DEFAULT_HEADING_BG else color
-
         new_heading = {
             "id": str(uuid.uuid4()),
             "type": "heading",
@@ -1372,15 +1084,14 @@ class ProjectWindow:
             "pos_x": 300,
             "pos_y": 300
         }
-
         self.project["data"]["items"].append(new_heading)
-        self.deselect_all_cards() # Deselektiere alte
+        self.deselect_all_cards()
         self._create_heading_card_gui(new_heading) 
-        self.selected_source_ids.add(new_heading["id"]) # Wähle neue
+        self.selected_source_ids.add(new_heading["id"])
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
-        self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+        self.reset_zoom()
         self._update_minimap()
 
     def add_source(self):
@@ -1401,16 +1112,13 @@ class ProjectWindow:
                 "saved_pages": []
             }
             self.project["data"]["items"].append(new_source)
-            
-            self.deselect_all_cards() # Deselektiere alte
-            self.selected_source_ids.add(new_source["id"]) # Wähle neue
-            
+            self.deselect_all_cards()
+            self.selected_source_ids.add(new_source["id"])
             threading.Thread(target=self._concurrent_reload_single_card, args=(new_source,), daemon=True).start()
-            
             self.save_project()
             self.update_last_mtime()
             self.update_scrollregion()
-            self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+            self.reset_zoom()
             self._update_minimap()
 
     def edit_source(self, source):
@@ -1421,21 +1129,17 @@ class ProjectWindow:
             source["text"] = dialog.result["text"]
             source["keywords"] = dialog.result["keywords"]
             source["color"] = dialog.result["color"]
-            
             item_id = source["id"]
             frame, item_id_canvas = self.source_frames[item_id]
             self.canvas.delete(item_id_canvas)
             frame.destroy()
             del self.source_frames[item_id]
             del self.card_widgets[item_id]
-            
-            # Neu erstellen, um die Änderungen sichtbar zu machen (Auswahl bleibt erhalten)
             threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
-            
             self.save_project()
             self.update_last_mtime()
             self.update_scrollregion()
-            self.reset_zoom() # Zoom-Reset nach struktureller Änderung
+            self.reset_zoom()
             self._update_minimap()
 
     def create_citation(self, source):
@@ -1444,13 +1148,9 @@ class ProjectWindow:
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
 
     def update_scrollregion(self):
-        """Aktualisiert die Scrollregion und fügt Polsterung hinzu, um das Scrollen in leere Bereiche zu ermöglichen (NEU)."""
         self.canvas.update_idletasks()
-        
         bbox = self.canvas.bbox("all")
-        
         if bbox:
-            # Füge Polsterung (z.B. 500px) hinzu, um Scrollen in den leeren Hintergrund zu ermöglichen
             padding = 500
             x1, y1, x2, y2 = bbox
             new_scrollregion = (
@@ -1461,19 +1161,13 @@ class ProjectWindow:
             )
             self.canvas.configure(scrollregion=new_scrollregion)
         else:
-            # Standardmäßig eine Mindest-Scrollregion, falls keine Elemente vorhanden sind
             self.canvas.configure(scrollregion=(-500, -500, 1000, 1000))
             
-        # Wenn die Scrollregion aktualisiert wird, muss auch die Minimap neu gezeichnet werden.
-        # Dies wird hier aufgerufen, da die bbox sich ändern kann.
         self._update_minimap()
 
     def save_project(self):
-        self.project["data"]["canvas_zoom_level"] = self.zoom_level 
-        
-        # Speichere die ID der zuletzt ausgewählten Karte
+        self.project["data"]["canvas_zoom_level"] = self.zoom_level
         self.project["data"]["selected_source_id"] = next(iter(self.selected_source_ids)) if self.selected_source_ids else None
-        
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
             json.dump(self.project["data"], f, indent=4)
         self.project["last_modified"] = datetime.datetime.now().isoformat()
@@ -1500,15 +1194,10 @@ class ProjectWindow:
                 updated_data = json.load(f)
 
             self.zoom_level = updated_data.get("canvas_zoom_level", 1.0)
-            
             items = updated_data.get("items", [])
             self.project["data"]["items"] = items
-            
             self.project["data"]["canvas_zoom_level"] = self.zoom_level
-            
-            # NEU: Gespeicherte Selektion aus Datei laden (wird in load_items_on_canvas verarbeitet)
             self.selected_source_id = updated_data.get("selected_source_id")
-
             self.load_items_on_canvas()
             
         except Exception as e:

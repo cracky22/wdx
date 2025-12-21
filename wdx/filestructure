@@ -1,8 +1,0 @@
-wdx/
-├── main.py
-├── constants.py
-├── server.py
-├── project_manager.py
-├── dialogs.py
-├── main_window.py
-└── project_window.py

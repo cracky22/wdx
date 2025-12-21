@@ -5,12 +5,12 @@ from tkinter import messagebox, filedialog
 from zipfile import ZipFile
 import datetime
 import re
-import threading  # NEU
+import threading
 from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS
 
 class ProjectManager:
     def __init__(self):
-        self.lock = threading.Lock()  # NEU: Thread-Lock
+        self.lock = threading.Lock()
         self.projects = []
         self.load_projects()
 
@@ -33,7 +33,7 @@ class ProjectManager:
                 messagebox.showwarning("Warnung", "projects.json ist beschädigt. Initialisiere neue Datei.")
 
     def save_projects(self):
-        with self.lock:  # NEU: Thread-safe Block
+        with self.lock:
             projects_data = []
             for project in self.projects:
                 projects_data.append({
@@ -58,7 +58,6 @@ class ProjectManager:
         try:
             project_dir.mkdir(parents=True)
             data_file = project_dir / "project.json"
-            
             initial_data = {
                 "name": name,
                 "description": description,
@@ -66,7 +65,6 @@ class ProjectManager:
                 "last_modified": datetime.datetime.now().isoformat(),
                 "items": []
             }
-
             with open(data_file, "w", encoding="utf-8") as f:
                 json.dump(initial_data, f, indent=4)
 
@@ -79,7 +77,6 @@ class ProjectManager:
                 "data_file": data_file,
                 "data": initial_data
             }
-            
             self.projects.append(new_project)
             self.save_projects()
             return True, new_project
@@ -88,22 +85,15 @@ class ProjectManager:
             return False, str(e)
 
     def import_project(self, file_path):
-        #file_path = filedialog.askopenfilename(filetypes=[("Zip Files", "*.zip"), ("wdx Files", "*.wdx")])
-        #if not file_path:
-        #    return False
-            
         try:
             with ZipFile(file_path, 'r') as zip_ref:
-                # Prüfen ob project.json enthalten ist
                 if "project.json" not in zip_ref.namelist():
                     return False
                 
-                # Temporär entpacken um Namen zu lesen
                 with zip_ref.open("project.json") as f:
                     data = json.load(f)
                     name = data.get("name", "Imported Project")
                 
-                # Namenskollision vermeiden
                 original_name = name
                 counter = 1
                 while (WDX_DIR / name).exists():
@@ -113,17 +103,8 @@ class ProjectManager:
                 target_dir = WDX_DIR / name
                 target_dir.mkdir(parents=True)
                 zip_ref.extractall(target_dir)
-                
-                # Pfade im geladenen JSON anpassen falls nötig (hier laden wir neu)
-                self.load_projects() # Reload um sicher zu gehen oder manuell hinzufügen
-                
-                # Manuell hinzufügen, da load_projects nur die projects.json liest, 
-                # und der Import dort noch nicht drin steht.
-                
-                # Fix: Wir müssen das importierte Projekt sauber registrieren
+                self.load_projects()
                 data_file = target_dir / "project.json"
-                
-                # Ggf. Name in der project.json anpassen falls Ordner umbenannt wurde
                 if name != original_name:
                     with open(data_file, "r", encoding="utf-8") as f:
                         pj_data = json.load(f)
@@ -131,7 +112,6 @@ class ProjectManager:
                     with open(data_file, "w", encoding="utf-8") as f:
                         json.dump(pj_data, f, indent=4)
 
-                # Projekt zur Liste hinzufügen
                 new_proj = {
                     "name": name,
                     "description": data.get("description", ""),
@@ -141,7 +121,6 @@ class ProjectManager:
                     "data_file": data_file,
                     "data": data 
                 }
-                # Data neu laden, da wir es oben ggf geändert haben
                 with open(data_file, "r", encoding="utf-8") as f:
                      new_proj["data"] = json.load(f)
 
