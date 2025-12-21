@@ -4,15 +4,16 @@ from tkinter import simpledialog, messagebox
 import datetime
 import json
 import uuid
-import threading 
-import requests 
-from urllib.parse import urljoin, urlparse 
+import threading
+import requests
+from urllib.parse import urljoin, urlparse
 from constants import APP_TITLE
 from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
 from pathlib import Path
+
 
 class WdxApp:
     def __init__(self, root):
@@ -28,16 +29,16 @@ class WdxApp:
         self.dark_mode = self.load_dark_mode_setting()
         self.apply_theme()
         self.update_connection_status()
-        
+
     def open_project(self, project):
         self.main_window.hide()
         self.project_window = ProjectWindow(self.root, project, self)
         self.current_project_name = project["name"]
 
     def close_project(self):
-        if hasattr(self, 'project_window'):
-            if hasattr(self.project_window, 'executor'):
-                self.project_window.executor.shutdown(wait=False) 
+        if hasattr(self, "project_window"):
+            if hasattr(self.project_window, "executor"):
+                self.project_window.executor.shutdown(wait=False)
             self.project_window.main_frame.destroy()
             del self.project_window
         self.current_project_name = None
@@ -53,7 +54,7 @@ class WdxApp:
             except:
                 return False
         return False
-    
+
     def save_dark_mode_setting(self, enabled):
         settings_dir = Path.home() / "Documents" / "wdx"
         settings_dir.mkdir(parents=True, exist_ok=True)
@@ -93,22 +94,37 @@ class WdxApp:
 
         if self.current_project_name:
             try:
-                project = next(p for p in self.project_manager.projects if p["name"] == self.current_project_name)
+                project = next(
+                    p
+                    for p in self.project_manager.projects
+                    if p["name"] == self.current_project_name
+                )
             except StopIteration:
                 self.current_project_name = None
                 return
         else:
             project_names = [p["name"] for p in self.project_manager.projects]
             if not project_names:
-                messagebox.showerror("Fehler", "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.")
+                messagebox.showerror(
+                    "Fehler",
+                    "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.",
+                )
                 return
 
-            project_name = simpledialog.askstring("Projekt wählen", "In welches Projekt speichern?\n" + ", ".join(project_names), parent=self.root)
+            project_name = simpledialog.askstring(
+                "Projekt wählen",
+                "In welches Projekt speichern?\n" + ", ".join(project_names),
+                parent=self.root,
+            )
             if not project_name or project_name not in project_names:
                 return
-            project = next(p for p in self.project_manager.projects if p["name"] == project_name)
+            project = next(
+                p for p in self.project_manager.projects if p["name"] == project_name
+            )
 
-        threading.Thread(target=self._download_worker, args=(data, project), daemon=True).start()
+        threading.Thread(
+            target=self._download_worker, args=(data, project), daemon=True
+        ).start()
 
     def _download_worker(self, data, project):
         source_id = str(uuid.uuid4())
@@ -124,7 +140,7 @@ class WdxApp:
             "pos_x": 300,
             "pos_y": 300,
             "favicon": "",
-            "saved_pages": []
+            "saved_pages": [],
         }
         project_dir = project["path"]
         images_dir = project_dir / "images"
@@ -138,27 +154,31 @@ class WdxApp:
                 html_content = response.text
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 html_filename = f"page_{source_id}_{timestamp}.html"
-                
+
                 with open(sites_dir / html_filename, "w", encoding="utf-8") as f:
                     f.write(html_content)
 
-                new_source["saved_pages"].append({
-                    "file": html_filename,
-                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                })
-                
+                new_source["saved_pages"].append(
+                    {
+                        "file": html_filename,
+                        "timestamp": datetime.datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                    }
+                )
+
                 try:
                     parsed_uri = urlparse(data["url"])
-                    base_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
-                    favicon_url = urljoin(base_url, '/favicon.ico')
-                    
+                    base_url = "{uri.scheme}://{uri.netloc}".format(uri=parsed_uri)
+                    favicon_url = urljoin(base_url, "/favicon.ico")
+
                     fav_resp = requests.get(favicon_url, timeout=5)
                     if fav_resp.status_code == 200 and fav_resp.content:
                         if len(fav_resp.content) > 0:
                             fav_name = f"favicon_{source_id}.ico"
-                            if b'PNG' in fav_resp.content[:8]:
+                            if b"PNG" in fav_resp.content[:8]:
                                 fav_name = f"favicon_{source_id}.png"
-                                
+
                             with open(images_dir / fav_name, "wb") as f:
                                 f.write(fav_resp.content)
                             new_source["favicon"] = fav_name
@@ -173,13 +193,14 @@ class WdxApp:
     def _finalize_source_add(self, project, source):
         if "items" not in project["data"]:
             project["data"]["items"] = []
-        
+
         project["data"]["items"].append(source)
         project["last_modified"] = datetime.datetime.now().isoformat()
         with open(project["data_file"], "w", encoding="utf-8") as f:
             json.dump(project["data"], f, indent=4)
-        
+
         self.project_manager.save_projects()
+
 
 if __name__ == "__main__":
     root = ttk.Window()

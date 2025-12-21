@@ -1,5 +1,6 @@
 import tkinter as tk
 
+
 class Minimap:
     def __init__(self, parent_frame, project_window):
         self.parent = parent_frame
@@ -14,7 +15,7 @@ class Minimap:
             height=150,
             bg="#f5f7fa",
             highlightthickness=1,
-            highlightbackground="#cccccc"
+            highlightbackground="#cccccc",
         )
         self.minimap_canvas.place(relx=1.0, rely=1.0, x=-70, y=-70, anchor="se")
         self.minimap_canvas.bind("<ButtonPress-1>", self.on_press)
@@ -74,8 +75,7 @@ class Minimap:
                 color = "#ffffff"
 
             self.minimap_canvas.create_rectangle(
-                mx, my, mx + mw, my + mh,
-                fill=color, outline="#aaaaaa", width=1
+                mx, my, mx + mw, my + mh, fill=color, outline="#aaaaaa", width=1
             )
 
         vx1 = self.pw.canvas.canvasx(0)
@@ -90,6 +90,5 @@ class Minimap:
             self.minimap_canvas.delete(self.viewport_rect_id)
 
         self.viewport_rect_id = self.minimap_canvas.create_rectangle(
-            mx1, my1, mx2, my2,
-            outline="red", width=2, fill="", dash=(4, 4)
+            mx1, my1, mx2, my2, outline="red", width=2, fill="", dash=(4, 4)
         )

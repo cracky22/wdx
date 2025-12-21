@@ -4,15 +4,16 @@ import socketserver
 import json
 from constants import PORT
 
+
 class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, app=None, **kwargs):
         self.app = app
         super().__init__(*args, **kwargs)
 
     def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -46,10 +47,7 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/status":
             current_project = getattr(self.app, "current_project_name", None)
-            response = {
-                "connected": True,
-                "current_project": current_project
-            }
+            response = {"connected": True, "current_project": current_project}
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -63,6 +61,7 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
         else:
             super().do_HEAD()
+
 
 def start_server(app):
     handler = lambda *args, **kwargs: WdxHTTPRequestHandler(*args, app=app, **kwargs)

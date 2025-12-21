@@ -2,7 +2,7 @@ def get_contrast_color(hex_color: str) -> str:
     if not hex_color:
         return "#000000"
 
-    if hex_color.startswith('#'):
+    if hex_color.startswith("#"):
         hex_color = hex_color[1:]
 
     if len(hex_color) != 6:

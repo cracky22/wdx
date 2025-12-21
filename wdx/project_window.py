@@ -13,37 +13,39 @@ from pathlib import Path
 from constants import DEFAULT_COLOR
 import requests
 from urllib.parse import urlparse
-import threading 
-import concurrent.futures 
+import threading
+import concurrent.futures
+
 
 def get_contrast_color(hex_color):
-    if hex_color.startswith('#'):
+    if hex_color.startswith("#"):
         hex_color = hex_color[1:]
-    
+
     try:
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
     except ValueError:
-        return "#000000" 
+        return "#000000"
 
-    luminosity = (0.2126 * r + 0.7152 * g + 0.0722 * b)
+    luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b
     return "#000000" if luminosity > 128 else "#ffffff"
+
 
 class ProjectWindow:
     DEFAULT_SELECT_BORDER_WIDTH = 5
     DEFAULT_SELECT_BORDER_COLOR = "primary"
-    DEFAULT_SOURCE_BG = "#ffffff"   
+    DEFAULT_SOURCE_BG = "#ffffff"
     DEFAULT_HEADING_BG = "#e9ecef"
-    
+
     def __init__(self, root, project, app):
         self.project = project
         self.root = root
         self.app = app
-        self.source_frames = {} 
+        self.source_frames = {}
         self.card_widgets = {}
         self.selected_source_id = None
-        
+
         self.dragging_card = False
         self.dragging_canvas = False
         self.drag_start_x = 0
@@ -59,26 +61,30 @@ class ProjectWindow:
 
         self.last_file_mtime = 0
         self.update_last_mtime()
-        
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
 
-        self.zoom_level = self.project["data"].get("canvas_zoom_level", 1.0) 
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=os.cpu_count() or 4
+        )
+
+        self.zoom_level = self.project["data"].get("canvas_zoom_level", 1.0)
         self.max_zoom = 2.0
         self.min_zoom = 0.1
         self.zoom_factor = 1.2
         self.base_font_title = ("Helvetica", 12, "bold")
         self.base_font_heading = ("Helvetica", 16, "bold")
         self.base_font_default = ("Helvetica", 9)
-        self.base_icon_size = 20 
-        self.base_favicon_subsample = 2 
-        
+        self.base_icon_size = 20
+        self.base_favicon_subsample = 2
+
         self.minimap_canvas = None
         self.viewport_rect_id = None
         self._minimap_params = {}
 
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
-                self.project["data"]["items"] = [{"type": "source", **s} for s in self.project["data"]["sources"]]
+                self.project["data"]["items"] = [
+                    {"type": "source", **s} for s in self.project["data"]["sources"]
+                ]
             else:
                 self.project["data"]["items"] = []
 
@@ -91,44 +97,101 @@ class ProjectWindow:
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         header_frame.columnconfigure(1, weight=1)
 
-        ttk.Button(header_frame, text="← Zurück zu Projekten", command=self.back_to_projects, bootstyle="secondary-outline").grid(row=0, column=0, sticky=tk.W, padx=10)
+        ttk.Button(
+            header_frame,
+            text="← Zurück zu Projekten",
+            command=self.back_to_projects,
+            bootstyle="secondary-outline",
+        ).grid(row=0, column=0, sticky=tk.W, padx=10)
 
         btn_frame = ttk.Frame(header_frame)
         btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
-        ttk.Button(btn_frame, text="💾", width=3, bootstyle="outline-secondary", command=self.manual_save).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="🔍", width=3, bootstyle="outline-secondary", command=self.reset_zoom).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="📥", width=3, bootstyle="outline-secondary", command=self.manual_export).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="🔄", width=3, bootstyle="outline-secondary", command=self.manual_reload).pack(side="left", padx=2)
+        ttk.Button(
+            btn_frame,
+            text="💾",
+            width=3,
+            bootstyle="outline-secondary",
+            command=self.manual_save,
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            btn_frame,
+            text="🔍",
+            width=3,
+            bootstyle="outline-secondary",
+            command=self.reset_zoom,
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            btn_frame,
+            text="📥",
+            width=3,
+            bootstyle="outline-secondary",
+            command=self.manual_export,
+        ).pack(side="left", padx=2)
+        ttk.Button(
+            btn_frame,
+            text="🔄",
+            width=3,
+            bootstyle="outline-secondary",
+            command=self.manual_reload,
+        ).pack(side="left", padx=2)
 
-        ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
-        ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=1, column=1, sticky=tk.W, padx=20, columnspan=2)
+        ttk.Label(
+            header_frame,
+            text=f"Mindmap: {project['name']}",
+            font=("Helvetica", 18, "bold"),
+            bootstyle="inverse-primary",
+        ).grid(row=0, column=1, sticky=tk.W, padx=20)
+        ttk.Label(
+            header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)
+        ).grid(row=1, column=1, sticky=tk.W, padx=20, columnspan=2)
 
         self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0)
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.main_frame.rowconfigure(1, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
 
-        h_scroll = ttk.Scrollbar(self.main_frame, orient="horizontal", command=self.canvas.xview, bootstyle="round")
-        v_scroll = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview, bootstyle="round")
+        h_scroll = ttk.Scrollbar(
+            self.main_frame,
+            orient="horizontal",
+            command=self.canvas.xview,
+            bootstyle="round",
+        )
+        v_scroll = ttk.Scrollbar(
+            self.main_frame,
+            orient="vertical",
+            command=self.canvas.yview,
+            bootstyle="round",
+        )
         self.canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
-        self.canvas.config(xscrollincrement=1, yscrollincrement=1) 
+        self.canvas.config(xscrollincrement=1, yscrollincrement=1)
         h_scroll.grid(row=2, column=0, sticky=(tk.W, tk.E))
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
         self.add_menu = tk.Menu(self.root, tearoff=0)
         self.add_menu.add_command(label="Quelle hinzufügen", command=self.add_source)
-        self.add_menu.add_command(label="Überschrift hinzufügen", command=self.add_heading)
+        self.add_menu.add_command(
+            label="Überschrift hinzufügen", command=self.add_heading
+        )
 
-        self.add_button = ttk.Button(self.main_frame, text="+", width=4,
-                                     command=self.show_add_menu,
-                                     bootstyle="primary-outline-toolbutton")
+        self.add_button = ttk.Button(
+            self.main_frame,
+            text="+",
+            width=4,
+            command=self.show_add_menu,
+            bootstyle="primary-outline-toolbutton",
+        )
         self.add_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
-        self.minimap_canvas = tk.Canvas(self.main_frame, width=200, height=150, 
-                                        bg="#f5f7fa", highlightthickness=1, highlightbackground="#cccccc")
+        self.minimap_canvas = tk.Canvas(
+            self.main_frame,
+            width=200,
+            height=150,
+            bg="#f5f7fa",
+            highlightthickness=1,
+            highlightbackground="#cccccc",
+        )
         self.minimap_canvas.place(relx=1.0, rely=1.0, x=-70, y=-70, anchor="se")
         self.minimap_canvas.bind("<ButtonPress-1>", self.on_minimap_click)
-
 
         self.context_menu = tk.Menu(self.root, tearoff=0, font=("Helvetica", 10))
 
@@ -137,7 +200,7 @@ class ProjectWindow:
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
-        
+
         self._bind_zoom_events()
         self._bind_shortcuts()
 
@@ -149,10 +212,10 @@ class ProjectWindow:
 
         self.root.bind("<Control-r>", lambda e: self.manual_reload())
         self.root.bind("<Command-r>", lambda e: self.manual_reload())
-        
+
         self.root.bind("<Control-e>", lambda e: self.manual_export())
         self.root.bind("<Command-e>", lambda e: self.manual_export())
-        
+
         self.root.bind("<Control-b>", lambda e: self.back_to_projects())
         self.root.bind("<Command-b>", lambda e: self.back_to_projects())
 
@@ -161,7 +224,7 @@ class ProjectWindow:
 
         self.root.bind("<Control-c>", self._handle_copy_shortcut)
         self.root.bind("<Command-c>", self._handle_copy_shortcut)
-        
+
         self.root.bind("<Control-v>", self._handle_paste_shortcut)
         self.root.bind("<Command-v>", self._handle_paste_shortcut)
 
@@ -172,7 +235,9 @@ class ProjectWindow:
     def _handle_copy_shortcut(self, event):
         if self.selected_source_ids:
             item_id = next(iter(self.selected_source_ids))
-            item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
+            item = next(
+                (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+            )
             if item:
                 self.copy_card(item)
 
@@ -188,48 +253,57 @@ class ProjectWindow:
         if item.get("favicon"):
             check_path = Path(self.project["path"]) / "images" / item["favicon"]
             if check_path.exists():
-                favicon_path = check_path 
-        
-        return {"item": item, "is_source": True, "favicon_path": favicon_path}
+                favicon_path = check_path
 
+        return {"item": item, "is_source": True, "favicon_path": favicon_path}
 
     def load_items_on_canvas(self):
         items_to_process = self.project["data"]["items"]
-        threading.Thread(target=self._concurrent_load_worker, args=(items_to_process,), daemon=True).start()
-        
+        threading.Thread(
+            target=self._concurrent_load_worker, args=(items_to_process,), daemon=True
+        ).start()
+
     def _concurrent_load_worker(self, items_to_process):
         try:
-            processed_results = list(self.executor.map(self._process_item_data, items_to_process))
-            
-            if hasattr(self, 'main_frame') and self.main_frame.winfo_exists():
-                self.root.after(0, self._create_all_cards_in_gui_thread, processed_results)
-            
+            processed_results = list(
+                self.executor.map(self._process_item_data, items_to_process)
+            )
+
+            if hasattr(self, "main_frame") and self.main_frame.winfo_exists():
+                self.root.after(
+                    0, self._create_all_cards_in_gui_thread, processed_results
+                )
+
         except concurrent.futures.CancelledError:
-            pass 
+            pass
         except Exception as e:
             print(f"Fehler im Concurrent Load Worker: {e}")
-            if hasattr(self, 'main_frame') and self.main_frame.winfo_exists():
-                self.root.after(0, lambda: messagebox.showerror("Fehler", "Fehler beim parallelen Laden der Kartendaten."))
-
+            if hasattr(self, "main_frame") and self.main_frame.winfo_exists():
+                self.root.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Fehler", "Fehler beim parallelen Laden der Kartendaten."
+                    ),
+                )
 
     def _create_all_cards_in_gui_thread(self, processed_results):
         for frame, item_id in list(self.source_frames.values()):
             self.canvas.delete(item_id)
             frame.destroy()
         self.source_frames.clear()
-        self.card_widgets.clear() 
+        self.card_widgets.clear()
 
         for result in processed_results:
             item = result["item"]
-            
+
             if self.project["data"].get("selected_source_id") == item["id"]:
-                 self.selected_source_id = item["id"]
-            
+                self.selected_source_id = item["id"]
+
             if result["is_source"]:
                 self._create_source_card_gui(item, result["favicon_path"])
             else:
                 self._create_heading_card_gui(item)
-                
+
         self.update_scrollregion()
         self._update_minimap()
 
@@ -237,19 +311,23 @@ class ProjectWindow:
         custom_color = item.get("color", "").strip()
         if custom_color:
             return custom_color
-        
+
         if item["type"] == "source":
-            return self.app.style.lookup('TFrame', 'background') 
+            return self.app.style.lookup("TFrame", "background")
         else:
-            return self.app.style.lookup('TLabel', 'background')
-    
+            return self.app.style.lookup("TLabel", "background")
+
     def _get_default_border_width(self, item):
         return 2 if item["type"] == "source" else 0
 
     def _bind_zoom_events(self):
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel) 
-        self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True)) 
-        self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False)) 
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind(
+            "<Button-4>", lambda event: self._on_mousewheel(event, up=True)
+        )
+        self.canvas.bind(
+            "<Button-5>", lambda event: self._on_mousewheel(event, up=False)
+        )
 
     def _on_mousewheel(self, event, up=None):
         if self.dragging_canvas or self.dragging_card:
@@ -261,7 +339,7 @@ class ProjectWindow:
             direction = 1 if up else -1
 
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        
+
         if direction > 0:
             self.zoom(self.zoom_factor, x, y)
         else:
@@ -269,27 +347,27 @@ class ProjectWindow:
 
     def zoom(self, factor, x, y):
         new_zoom = self.zoom_level * factor
-        
+
         if new_zoom < self.min_zoom or new_zoom > self.max_zoom:
-            return 
+            return
 
         self.canvas.scale("all", x, y, factor, factor)
         self.zoom_level = new_zoom
-        
+
         self._update_card_content_scale()
-        
+
         self.update_scrollregion()
         self._update_minimap()
-        
+
     def reset_zoom(self):
         if self.zoom_level == 1.0:
             return
 
         factor = 1.0 / self.zoom_level
         self.canvas.scale("all", 0, 0, factor, factor)
-        
+
         self.zoom_level = 1.0
-        
+
         self._update_card_content_scale()
         self.update_scrollregion()
         self._update_minimap()
@@ -299,108 +377,172 @@ class ProjectWindow:
         heading_size = max(int(self.base_font_heading[1] * self.zoom_level), 8)
         default_size = max(int(self.base_font_default[1] * self.zoom_level), 5)
         icon_size = max(int(self.base_icon_size * self.zoom_level), 10)
-        
+
         for item_id, refs in self.card_widgets.items():
-            if 'title_label' in refs:
-                refs['title_label'].config(font=("Helvetica", title_size, "bold"))
-            if 'url_label' in refs:
-                refs['url_label'].config(font=("Helvetica", default_size))
-            if 'text_label' in refs:
-                refs['text_label'].config(font=("Helvetica", default_size))
-            if 'keywords_label' in refs:
-                refs['keywords_label'].config(font=("Helvetica", default_size))
-            if 'added_label' in refs:
-                refs['added_label'].config(font=("Helvetica", max(int(8 * self.zoom_level), 5)))
+            if "title_label" in refs:
+                refs["title_label"].config(font=("Helvetica", title_size, "bold"))
+            if "url_label" in refs:
+                refs["url_label"].config(font=("Helvetica", default_size))
+            if "text_label" in refs:
+                refs["text_label"].config(font=("Helvetica", default_size))
+            if "keywords_label" in refs:
+                refs["keywords_label"].config(font=("Helvetica", default_size))
+            if "added_label" in refs:
+                refs["added_label"].config(
+                    font=("Helvetica", max(int(8 * self.zoom_level), 5))
+                )
 
-            if 'heading_label' in refs:
-                refs['heading_label'].config(font=("Helvetica", heading_size, "bold"))
+            if "heading_label" in refs:
+                refs["heading_label"].config(font=("Helvetica", heading_size, "bold"))
 
-            if 'icon_label' in refs:
-                if 'original_icon_data' in refs and refs['original_icon_data']['is_favicon']:
-                    original_img = refs['original_icon_data']['original_img']
-                    new_subsample = max(1, int(self.base_favicon_subsample / self.zoom_level))
+            if "icon_label" in refs:
+                if (
+                    "original_icon_data" in refs
+                    and refs["original_icon_data"]["is_favicon"]
+                ):
+                    original_img = refs["original_icon_data"]["original_img"]
+                    new_subsample = max(
+                        1, int(self.base_favicon_subsample / self.zoom_level)
+                    )
                     try:
                         new_img = original_img.subsample(new_subsample, new_subsample)
-                        refs['icon_label'].config(image=new_img)
-                        refs['icon_label'].image = new_img
+                        refs["icon_label"].config(image=new_img)
+                        refs["icon_label"].image = new_img
                     except tk.TclError:
-                        pass 
+                        pass
                 else:
-                    refs['icon_label'].config(font=("Helvetica", icon_size))
-
+                    refs["icon_label"].config(font=("Helvetica", icon_size))
 
     def _create_source_card_gui(self, source, favicon_path):
         color = self._get_effective_bg_color(source)
-        text_color = get_contrast_color(color) 
-        source["effective_color"] = color 
+        text_color = get_contrast_color(color)
+        source["effective_color"] = color
         item_id = source["id"]
         style_name = f"Source.{item_id}.TFrame"
         self.card_widgets[item_id] = {}
         try:
-             self.root.style.configure(style_name, background=color)
+            self.root.style.configure(style_name, background=color)
         except tk.TclError:
-             self.root.style.configure(style_name, relief="raised", borderwidth=self._get_default_border_width(source))
+            self.root.style.configure(
+                style_name,
+                relief="raised",
+                borderwidth=self._get_default_border_width(source),
+            )
 
         frame = ttk.Frame(self.canvas, padding="15")
         frame.item_data = source
-        frame.unique_style_name = style_name 
+        frame.unique_style_name = style_name
         frame.configure(style=style_name)
         default_border = self._get_default_border_width(source)
         frame.config(relief="raised", borderwidth=default_border)
 
         def on_enter(e, f=frame):
-             if f.item_data["id"] not in self.selected_source_ids:
-                 f.config(borderwidth=default_border + 1, relief="ridge") 
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=default_border + 1, relief="ridge")
+
         def on_leave(e, f=frame):
-             if f.item_data["id"] not in self.selected_source_ids:
-                 f.config(borderwidth=default_border, relief="raised") 
-        
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=default_border, relief="raised")
+
         if favicon_path:
             try:
                 original_img = tk.PhotoImage(file=favicon_path)
-                self.card_widgets[item_id]['original_icon_data'] = {'original_img': original_img, 'is_favicon': True}
-                favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                favicon_label = tk.Label(frame, image=favicon_img, bg=color) 
-                favicon_label.image = favicon_img 
+                self.card_widgets[item_id]["original_icon_data"] = {
+                    "original_img": original_img,
+                    "is_favicon": True,
+                }
+                favicon_img = original_img.subsample(
+                    self.base_favicon_subsample, self.base_favicon_subsample
+                )
+                favicon_label = tk.Label(frame, image=favicon_img, bg=color)
+                favicon_label.image = favicon_img
                 favicon_label.pack(anchor="w")
-                self.card_widgets[item_id]['icon_label'] = favicon_label
+                self.card_widgets[item_id]["icon_label"] = favicon_label
             except Exception:
-                globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
+                globe_label = tk.Label(
+                    frame,
+                    text="🌐",
+                    font=("Helvetica", self.base_icon_size),
+                    bg=color,
+                    fg=text_color,
+                )
                 globe_label.pack(anchor="w")
-                self.card_widgets[item_id]['icon_label'] = globe_label
+                self.card_widgets[item_id]["icon_label"] = globe_label
         else:
-            globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
+            globe_label = tk.Label(
+                frame,
+                text="🌐",
+                font=("Helvetica", self.base_icon_size),
+                bg=color,
+                fg=text_color,
+            )
             globe_label.pack(anchor="w")
-            self.card_widgets[item_id]['icon_label'] = globe_label
+            self.card_widgets[item_id]["icon_label"] = globe_label
 
         title_text = source.get("title") or source["url"]
-        title_label = ttk.Label(frame, text=title_text, font=self.base_font_title, foreground=text_color, wraplength=320)
+        title_label = ttk.Label(
+            frame,
+            text=title_text,
+            font=self.base_font_title,
+            foreground=text_color,
+            wraplength=320,
+        )
         title_label.pack(anchor="w")
-        self.card_widgets[item_id]['title_label'] = title_label
+        self.card_widgets[item_id]["title_label"] = title_label
 
         if source.get("title"):
-            url_label = ttk.Label(frame, text=source["url"], font=self.base_font_default, foreground=text_color, wraplength=350)
+            url_label = ttk.Label(
+                frame,
+                text=source["url"],
+                font=self.base_font_default,
+                foreground=text_color,
+                wraplength=350,
+            )
             url_label.pack(anchor="w")
-            self.card_widgets[item_id]['url_label'] = url_label
+            self.card_widgets[item_id]["url_label"] = url_label
 
         if source["text"]:
-            preview = source["text"][:180] + ("..." if len(source["text"]) > 180 else "")
-            text_label = ttk.Label(frame, text=f"📝 {preview}", font=self.base_font_default, foreground=text_color, wraplength=350)
-            text_label.pack(anchor="w", pady=(6,0))
-            self.card_widgets[item_id]['text_label'] = text_label
+            preview = source["text"][:180] + (
+                "..." if len(source["text"]) > 180 else ""
+            )
+            text_label = ttk.Label(
+                frame,
+                text=f"📝 {preview}",
+                font=self.base_font_default,
+                foreground=text_color,
+                wraplength=350,
+            )
+            text_label.pack(anchor="w", pady=(6, 0))
+            self.card_widgets[item_id]["text_label"] = text_label
 
         if source["keywords"]:
-            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info", foreground=text_color)
-            keywords_label.pack(anchor="w", pady=(4,0))
-            self.card_widgets[item_id]['keywords_label'] = keywords_label
+            keywords_label = ttk.Label(
+                frame,
+                text=f"🏷 {source['keywords']}",
+                font=self.base_font_default,
+                bootstyle="info",
+                foreground=text_color,
+            )
+            keywords_label.pack(anchor="w", pady=(4, 0))
+            self.card_widgets[item_id]["keywords_label"] = keywords_label
 
-        added_label = ttk.Label(frame, text=f"📅 {source['added']}", font=("Helvetica", 8), foreground=text_color)
-        added_label.pack(anchor="w", pady=(8,0))
-        self.card_widgets[item_id]['added_label'] = added_label 
+        added_label = ttk.Label(
+            frame,
+            text=f"📅 {source['added']}",
+            font=("Helvetica", 8),
+            foreground=text_color,
+        )
+        added_label.pack(anchor="w", pady=(8, 0))
+        self.card_widgets[item_id]["added_label"] = added_label
 
-        ttk.Button(frame, text="🔗 Original öffnen", bootstyle="success-outline", width=20,
-                   command=lambda url=source["url"]: webbrowser.open(url)).pack(pady=(4,0))
-        
+        ttk.Button(
+            frame,
+            text="🔗 Original öffnen",
+            bootstyle="success-outline",
+            width=20,
+            command=lambda url=source["url"]: webbrowser.open(url),
+        ).pack(pady=(4, 0))
+
         frame.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
         frame.bind("<Enter>", on_enter)
         frame.bind("<Leave>", on_leave)
@@ -408,13 +550,12 @@ class ProjectWindow:
             child.bind("<Button-3>", lambda e, i=source: self.show_context_menu(e, i))
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
-            
+
             try:
                 if isinstance(child, (ttk.Label, tk.Label)):
                     child.config(background=color, foreground=text_color)
             except Exception:
                 pass
-
 
         frame.bind("<ButtonPress-1>", lambda e, iid=item_id: self.on_card_press(e, iid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
@@ -425,45 +566,56 @@ class ProjectWindow:
         self.source_frames[item_id] = (frame, window_id)
 
         if self.selected_source_id == item_id:
-             self.selected_source_ids.add(item_id)
-             self.card_original_colors[item_id] = color
-             self._apply_selection_style(item_id, color)
-             self.selected_source_id = None
-            
+            self.selected_source_ids.add(item_id)
+            self.card_original_colors[item_id] = color
+            self._apply_selection_style(item_id, color)
+            self.selected_source_id = None
+
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
             self._update_card_content_scale()
 
-
     def _create_heading_card_gui(self, heading):
         color = self._get_effective_bg_color(heading)
-        text_color = get_contrast_color(color) 
-        heading["effective_color"] = color 
+        text_color = get_contrast_color(color)
+        heading["effective_color"] = color
         item_id = heading["id"]
         style_name = f"Heading.{item_id}.TFrame"
         self.card_widgets[item_id] = {}
 
         try:
-             self.root.style.configure(style_name, background=color)
+            self.root.style.configure(style_name, background=color)
         except tk.TclError:
-             self.root.style.configure(style_name, relief="flat", borderwidth=self._get_default_border_width(heading))
+            self.root.style.configure(
+                style_name,
+                relief="flat",
+                borderwidth=self._get_default_border_width(heading),
+            )
 
         frame = ttk.Frame(self.canvas, padding="15 20")
         frame.item_data = heading
-        frame.unique_style_name = style_name 
+        frame.unique_style_name = style_name
         frame.configure(style=style_name)
         default_border = self._get_default_border_width(heading)
         frame.config(relief="flat", borderwidth=default_border)
-        def on_enter(e, f=frame):
-             if f.item_data["id"] not in self.selected_source_ids:
-                 f.config(borderwidth=2, relief="groove")
-        def on_leave(e, f=frame):
-             if f.item_data["id"] not in self.selected_source_ids:
-                 f.config(borderwidth=default_border, relief="flat") 
 
-        label = tk.Label(frame, text=heading["text"], font=self.base_font_heading, fg=text_color, bg=color)
+        def on_enter(e, f=frame):
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=2, relief="groove")
+
+        def on_leave(e, f=frame):
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=default_border, relief="flat")
+
+        label = tk.Label(
+            frame,
+            text=heading["text"],
+            font=self.base_font_heading,
+            fg=text_color,
+            bg=color,
+        )
         label.pack()
-        self.card_widgets[item_id]['heading_label'] = label
+        self.card_widgets[item_id]["heading_label"] = label
         frame.bind("<Button-3>", lambda e, i=heading: self.show_context_menu(e, i))
         frame.bind("<Enter>", on_enter)
         frame.bind("<Leave>", on_leave)
@@ -477,7 +629,6 @@ class ProjectWindow:
             except Exception:
                 pass
 
-
         frame.bind("<ButtonPress-1>", lambda e, iid=item_id: self.on_card_press(e, iid))
         frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
         frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
@@ -486,25 +637,25 @@ class ProjectWindow:
         window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
         self.source_frames[item_id] = (frame, window_id)
         if self.selected_source_id == item_id:
-             self.selected_source_ids.add(item_id)
-             self.card_original_colors[item_id] = color
-             self._apply_selection_style(item_id, color)
-             self.selected_source_id = None
+            self.selected_source_ids.add(item_id)
+            self.card_original_colors[item_id] = color
+            self._apply_selection_style(item_id, color)
+            self.selected_source_id = None
 
         if self.zoom_level != 1.0:
             self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
             self._update_card_content_scale()
-            
+
     def _update_minimap(self):
         if not self.minimap_canvas or not self.minimap_canvas.winfo_exists():
             return
-            
+
         self.minimap_canvas.delete("all")
-        bbox_all = self.canvas.bbox("all") 
+        bbox_all = self.canvas.bbox("all")
         if not bbox_all:
-             self.viewport_rect_id = None
-             self._update_minimap_viewport()
-             return
+            self.viewport_rect_id = None
+            self._update_minimap_viewport()
+            return
 
         x1_main, y1_main, x2_main, y2_main = bbox_all
         buffer = 50 * self.zoom_level
@@ -512,7 +663,7 @@ class ProjectWindow:
         y1_main -= buffer
         x2_main += buffer
         y2_main += buffer
-        
+
         content_width = x2_main - x1_main
         content_height = y2_main - y1_main
         map_w = self.minimap_canvas.winfo_width()
@@ -520,10 +671,10 @@ class ProjectWindow:
         if content_width > 0 and content_height > 0:
             scale_x = map_w / content_width
             scale_y = map_h / content_height
-            minimap_scale = min(scale_x, scale_y) * 0.9 
+            minimap_scale = min(scale_x, scale_y) * 0.9
         else:
             minimap_scale = 1.0
-            
+
         center_x_map = map_w / 2
         center_y_map = map_h / 2
         offset_x = center_x_map - (x1_main + content_width / 2) * minimap_scale
@@ -531,9 +682,10 @@ class ProjectWindow:
 
         for item_id, (frame, window_id) in self.source_frames.items():
             item = frame.item_data
-            
+
             coords = self.canvas.coords(window_id)
-            if not coords: continue
+            if not coords:
+                continue
             frame_width = frame.winfo_reqwidth()
             frame_height = frame.winfo_reqheight()
             x_map_start = coords[0] * minimap_scale + offset_x
@@ -541,31 +693,42 @@ class ProjectWindow:
             x_map_end = x_map_start + frame_width * minimap_scale
             y_map_end = y_map_start + frame_height * minimap_scale
             color = item.get("effective_color", "#cccccc")
-            outline_color = "#333333" if item["type"] == "source" else "" 
+            outline_color = "#333333" if item["type"] == "source" else ""
             self.minimap_canvas.create_rectangle(
-                x_map_start, y_map_start, x_map_end, y_map_end,
+                x_map_start,
+                y_map_start,
+                x_map_end,
+                y_map_end,
                 fill=color,
                 outline=outline_color,
                 width=1,
-                tags=("card_rect", item_id) 
+                tags=("card_rect", item_id),
             )
 
         self._minimap_params = {
-            "x1_main": x1_main, "y1_main": y1_main, "x2_main": x2_main, "y2_main": y2_main,
+            "x1_main": x1_main,
+            "y1_main": y1_main,
+            "x2_main": x2_main,
+            "y2_main": y2_main,
             "minimap_scale": minimap_scale,
-            "offset_x": offset_x, "offset_y": offset_y
+            "offset_x": offset_x,
+            "offset_y": offset_y,
         }
         self._update_minimap_viewport()
 
     def _update_minimap_viewport(self):
-        if not self.minimap_canvas or not self.minimap_canvas.winfo_exists() or not hasattr(self, '_minimap_params'):
+        if (
+            not self.minimap_canvas
+            or not self.minimap_canvas.winfo_exists()
+            or not hasattr(self, "_minimap_params")
+        ):
             return
 
         params = self._minimap_params
         minimap_scale = params["minimap_scale"]
         offset_x = params["offset_x"]
         offset_y = params["offset_y"]
-        x_start_zoomed = self.canvas.canvasx(0) 
+        x_start_zoomed = self.canvas.canvasx(0)
         y_start_zoomed = self.canvas.canvasy(0)
         viewport_w_zoomed = self.canvas.winfo_width()
         viewport_h_zoomed = self.canvas.winfo_height()
@@ -573,30 +736,43 @@ class ProjectWindow:
         y_map_start = y_start_zoomed * minimap_scale + offset_y
         x_map_end = x_map_start + viewport_w_zoomed * minimap_scale
         y_map_end = y_map_start + viewport_h_zoomed * minimap_scale
-        if self.viewport_rect_id and self.minimap_canvas.find_withtag(self.viewport_rect_id):
-            self.minimap_canvas.coords(self.viewport_rect_id, x_map_start, y_map_start, x_map_end, y_map_end)
-            self.minimap_canvas.tag_raise(self.viewport_rect_id) 
+        if self.viewport_rect_id and self.minimap_canvas.find_withtag(
+            self.viewport_rect_id
+        ):
+            self.minimap_canvas.coords(
+                self.viewport_rect_id, x_map_start, y_map_start, x_map_end, y_map_end
+            )
+            self.minimap_canvas.tag_raise(self.viewport_rect_id)
         else:
             self.viewport_rect_id = self.minimap_canvas.create_rectangle(
-                x_map_start, y_map_start, x_map_end, y_map_end,
+                x_map_start,
+                y_map_start,
+                x_map_end,
+                y_map_end,
                 outline="#333333",
-                fill="", 
+                fill="",
                 width=2,
-                stipple="gray50"
+                stipple="gray50",
             )
 
     def on_minimap_click(self, event):
-        if not hasattr(self, '_minimap_params'):
+        if not hasattr(self, "_minimap_params"):
             return
 
         params = self._minimap_params
         minimap_scale = params["minimap_scale"]
         offset_x = params["offset_x"]
         offset_y = params["offset_y"]
-        x1_main, y1_main, x2_main, y2_main = params["x1_main"], params["y1_main"], params["x2_main"], params["y2_main"]
+        x1_main, y1_main, x2_main, y2_main = (
+            params["x1_main"],
+            params["y1_main"],
+            params["x2_main"],
+            params["y2_main"],
+        )
         total_width = x2_main - x1_main
         total_height = y2_main - y1_main
-        if total_width <= 0 or total_height <= 0: return
+        if total_width <= 0 or total_height <= 0:
+            return
         target_x_zoomed = (event.x - offset_x) / minimap_scale
         target_y_zoomed = (event.y - offset_y) / minimap_scale
         center_x_zoomed = self.canvas.winfo_width() / 2
@@ -615,9 +791,9 @@ class ProjectWindow:
         frame = self.source_frames[item_id][0]
         text_color = get_contrast_color(color)
         frame.config(
-            borderwidth=self.DEFAULT_SELECT_BORDER_WIDTH, 
+            borderwidth=self.DEFAULT_SELECT_BORDER_WIDTH,
             bootstyle=self.DEFAULT_SELECT_BORDER_COLOR,
-            relief="raised" 
+            relief="raised",
         )
         for child in frame.winfo_children():
             try:
@@ -634,10 +810,10 @@ class ProjectWindow:
         text_color = get_contrast_color(original_color)
         self.root.style.configure(original_style_name, background=original_color)
         frame.configure(
-            style=original_style_name, 
-            bootstyle=None, 
+            style=original_style_name,
+            bootstyle=None,
             borderwidth=border,
-            relief="raised" if item_type == "source" else "flat"
+            relief="raised" if item_type == "source" else "flat",
         )
         for child in frame.winfo_children():
             try:
@@ -645,14 +821,14 @@ class ProjectWindow:
                     child.config(background=original_color, foreground=text_color)
             except Exception:
                 pass
-                
+
     def handle_card_selection(self, item_id, event=None):
         frame = self.source_frames[item_id][0]
         item = frame.item_data
         ctrl_pressed = event and (event.state & 0x4)
-        original_color = item.get('effective_color')
+        original_color = item.get("effective_color")
         if item_id not in self.card_original_colors:
-             self.card_original_colors[item_id] = original_color
+            self.card_original_colors[item_id] = original_color
 
         if ctrl_pressed:
             if item_id in self.selected_source_ids:
@@ -663,20 +839,25 @@ class ProjectWindow:
                 self.selected_source_ids.add(item_id)
                 self._apply_selection_style(item_id, original_color)
         else:
-            if item_id in self.selected_source_ids and len(self.selected_source_ids) > 1:
-                 pass
+            if (
+                item_id in self.selected_source_ids
+                and len(self.selected_source_ids) > 1
+            ):
+                pass
             elif item_id not in self.selected_source_ids:
-                 self.deselect_all_cards(exclude_id=item_id)
-                 self.selected_source_ids.add(item_id)
-                 self._apply_selection_style(item_id, original_color)
-                
+                self.deselect_all_cards(exclude_id=item_id)
+                self.selected_source_ids.add(item_id)
+                self._apply_selection_style(item_id, original_color)
+
     def deselect_all_cards(self, exclude_id=None):
         ids_to_remove = list(self.selected_source_ids)
         for item_id in ids_to_remove:
             if item_id != exclude_id and item_id in self.source_frames:
                 frame = self.source_frames[item_id][0]
                 item = frame.item_data
-                original_color = self.card_original_colors.pop(item_id, item.get('effective_color', "#ffffff"))
+                original_color = self.card_original_colors.pop(
+                    item_id, item.get("effective_color", "#ffffff")
+                )
                 self._remove_selection_style(item_id, original_color, item["type"])
                 self.selected_source_ids.remove(item_id)
 
@@ -685,12 +866,13 @@ class ProjectWindow:
 
     def deselect_card_from_context(self, item_id):
         if item_id in self.selected_source_ids:
-             frame = self.source_frames[item_id][0]
-             item = frame.item_data
-             original_color = self.card_original_colors.pop(item_id, item.get('effective_color', "#ffffff"))
-             self._remove_selection_style(item_id, original_color, item["type"])
-             self.selected_source_ids.remove(item_id)
-
+            frame = self.source_frames[item_id][0]
+            item = frame.item_data
+            original_color = self.card_original_colors.pop(
+                item_id, item.get("effective_color", "#ffffff")
+            )
+            self._remove_selection_style(item_id, original_color, item["type"])
+            self.selected_source_ids.remove(item_id)
 
     def on_card_press(self, event, item_id):
         self.handle_card_selection(item_id, event)
@@ -699,7 +881,7 @@ class ProjectWindow:
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
             for selected_id in self.selected_source_ids:
-                 if selected_id in self.source_frames:
+                if selected_id in self.source_frames:
                     self.canvas.tag_raise(self.source_frames[selected_id][1])
 
     def on_card_motion(self, event):
@@ -710,20 +892,22 @@ class ProjectWindow:
                 if item_id in self.source_frames:
                     window_id = self.source_frames[item_id][1]
                     self.canvas.move(window_id, dx, dy)
-                
+
             self.drag_start_x = event.x_root
             self.drag_start_y = event.y_root
 
     def on_card_release(self, event):
         if self.dragging_card:
             for item_id in self.selected_source_ids:
-                 if item_id in self.source_frames:
+                if item_id in self.source_frames:
                     coords = self.canvas.coords(self.source_frames[item_id][1])
-                    item = next(i for i in self.project["data"]["items"] if i["id"] == item_id)
-                    
+                    item = next(
+                        i for i in self.project["data"]["items"] if i["id"] == item_id
+                    )
+
                     item["pos_x"] = coords[0]
                     item["pos_y"] = coords[1]
-                 
+
             self.save_project()
             self.update_last_mtime()
             self.dragging_card = False
@@ -732,12 +916,14 @@ class ProjectWindow:
 
     def on_canvas_press(self, event):
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        search_radius = 2 
-        items = self.canvas.find_overlapping(x - search_radius, y - search_radius, x + search_radius, y + search_radius)
+        search_radius = 2
+        items = self.canvas.find_overlapping(
+            x - search_radius, y - search_radius, x + search_radius, y + search_radius
+        )
         card_items = [wid for _, wid in self.source_frames.values()]
         if any(item in card_items for item in items):
             return
-        
+
         self.deselect_all_cards()
         self.dragging_canvas = True
         self.canvas_start_x = event.x
@@ -746,8 +932,12 @@ class ProjectWindow:
 
     def on_canvas_motion(self, event):
         if self.dragging_canvas:
-            self.canvas.xview_scroll(int(-1 * (event.x - self.canvas_start_x) / self.zoom_level), "units")
-            self.canvas.yview_scroll(int(-1 * (event.y - self.canvas_start_y) / self.zoom_level), "units")
+            self.canvas.xview_scroll(
+                int(-1 * (event.x - self.canvas_start_x) / self.zoom_level), "units"
+            )
+            self.canvas.yview_scroll(
+                int(-1 * (event.y - self.canvas_start_y) / self.zoom_level), "units"
+            )
             self.canvas_start_x = event.x
             self.canvas_start_y = event.y
             self._update_minimap_viewport()
@@ -757,29 +947,35 @@ class ProjectWindow:
             self.dragging_canvas = False
             self.canvas.config(cursor="")
             self._update_minimap_viewport()
-    
+
     def _create_new_item_from_existing(self, original_item, new_x_offset, new_y_offset):
         new_item = original_item.copy()
         new_item["id"] = str(uuid.uuid4())
         new_item["pos_x"] = original_item["pos_x"] + new_x_offset
         new_item["pos_y"] = original_item["pos_y"] + new_y_offset
         if new_item["type"] == "source":
-             new_item["added"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-             new_item.pop("effective_color", None)
+            new_item["added"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            new_item.pop("effective_color", None)
 
         return new_item
-        
+
     def duplicate_item(self, item):
         self.deselect_all_cards()
-        new_item = self._create_new_item_from_existing(item, self.paste_offset_x, self.paste_offset_y)
+        new_item = self._create_new_item_from_existing(
+            item, self.paste_offset_x, self.paste_offset_y
+        )
         self.project["data"]["items"].append(new_item)
         if new_item["type"] == "source":
-            threading.Thread(target=self._concurrent_reload_single_card, args=(new_item,), daemon=True).start()
+            threading.Thread(
+                target=self._concurrent_reload_single_card,
+                args=(new_item,),
+                daemon=True,
+            ).start()
         else:
             self._create_heading_card_gui(new_item)
-            
+
         self.selected_source_ids.add(new_item["id"])
-            
+
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
@@ -792,21 +988,25 @@ class ProjectWindow:
 
         new_ids = []
         items_to_process = []
-        original_items = [next(i for i in self.project["data"]["items"] if i["id"] == item_id) 
-                          for item_id in list(self.selected_source_ids)]
-                          
+        original_items = [
+            next(i for i in self.project["data"]["items"] if i["id"] == item_id)
+            for item_id in list(self.selected_source_ids)
+        ]
+
         self.deselect_all_cards()
 
         for original_item in original_items:
-             new_item = self._create_new_item_from_existing(original_item, self.paste_offset_x, self.paste_offset_y)
-             
-             self.project["data"]["items"].append(new_item)
-             items_to_process.append(new_item)
-             new_ids.append(new_item["id"])
-        
+            new_item = self._create_new_item_from_existing(
+                original_item, self.paste_offset_x, self.paste_offset_y
+            )
+
+            self.project["data"]["items"].append(new_item)
+            items_to_process.append(new_item)
+            new_ids.append(new_item["id"])
+
         self.selected_source_ids.update(new_ids)
-        self._concurrent_load_worker(items_to_process) 
-        
+        self._concurrent_load_worker(items_to_process)
+
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
@@ -814,11 +1014,13 @@ class ProjectWindow:
         self._update_minimap()
         self.paste_offset_x += 20
         self.paste_offset_y += 20
-        if self.paste_offset_x > 100: self.paste_offset_x = 50
-        if self.paste_offset_y > 100: self.paste_offset_y = 50
+        if self.paste_offset_x > 100:
+            self.paste_offset_x = 50
+        if self.paste_offset_y > 100:
+            self.paste_offset_y = 50
 
     def copy_card(self, item):
-        self.clipboard = item.copy() 
+        self.clipboard = item.copy()
         self.clipboard.pop("effective_color", None)
         self.paste_offset_x = 50
         self.paste_offset_y = 50
@@ -828,27 +1030,38 @@ class ProjectWindow:
             return
 
         original_item = self.clipboard
-        new_item = self._create_new_item_from_existing(original_item, self.paste_offset_x, self.paste_offset_y)
+        new_item = self._create_new_item_from_existing(
+            original_item, self.paste_offset_x, self.paste_offset_y
+        )
         self.project["data"]["items"].append(new_item)
         if new_item["type"] == "source":
-            threading.Thread(target=self._concurrent_reload_single_card, args=(new_item,), daemon=True).start()
+            threading.Thread(
+                target=self._concurrent_reload_single_card,
+                args=(new_item,),
+                daemon=True,
+            ).start()
         else:
             self._create_heading_card_gui(new_item)
-            
+
         self.deselect_all_cards()
         self.selected_source_ids.add(new_item["id"])
         self.paste_offset_x += 20
         self.paste_offset_y += 20
-        if self.paste_offset_x > 100: self.paste_offset_x = 50
-        if self.paste_offset_y > 100: self.paste_offset_y = 50
+        if self.paste_offset_x > 100:
+            self.paste_offset_x = 50
+        if self.paste_offset_y > 100:
+            self.paste_offset_y = 50
         self.save_project()
         self.update_last_mtime()
         self.update_scrollregion()
         self.reset_zoom()
         self._update_minimap()
-    
+
     def show_add_menu(self, event=None):
-        self.add_menu.post(self.add_button.winfo_rootx(), self.add_button.winfo_rooty() + self.add_button.winfo_height())
+        self.add_menu.post(
+            self.add_button.winfo_rootx(),
+            self.add_button.winfo_rooty() + self.add_button.winfo_height(),
+        )
 
     def manual_save(self):
         self.save_project()
@@ -869,7 +1082,9 @@ class ProjectWindow:
 
     def show_saved_pages_popup(self, source):
         if not source.get("saved_pages"):
-            messagebox.showinfo("Keine Versionen", "Es gibt keine gespeicherten Versionen dieser Seite.")
+            messagebox.showinfo(
+                "Keine Versionen", "Es gibt keine gespeicherten Versionen dieser Seite."
+            )
             return
 
         popup = tk.Toplevel(self.root)
@@ -878,7 +1093,11 @@ class ProjectWindow:
         popup.transient(self.root)
         popup.grab_set()
 
-        ttk.Label(popup, text=f"Gespeicherte Versionen von:\n{source['url']}", font=("Helvetica", 12, "bold")).pack(pady=10)
+        ttk.Label(
+            popup,
+            text=f"Gespeicherte Versionen von:\n{source['url']}",
+            font=("Helvetica", 12, "bold"),
+        ).pack(pady=10)
 
         listbox = tk.Listbox(popup, height=15)
         listbox.pack(fill="both", expand=True, padx=20, pady=10)
@@ -893,14 +1112,22 @@ class ProjectWindow:
             filename = saved["file"]
             listbox.insert(tk.END, f"{timestamp} – {filename}")
 
-
-        listbox.bind("<Double-Button-1>", lambda e: self.open_selected_version_from_popup())
+        listbox.bind(
+            "<Double-Button-1>", lambda e: self.open_selected_version_from_popup()
+        )
 
         def open_selected():
             self.open_selected_version_from_popup()
 
-        ttk.Button(popup, text="Ausgewählte öffnen", command=self.open_selected_version_from_popup, bootstyle="primary").pack(pady=10)
-        ttk.Button(popup, text="Schließen", command=popup.destroy, bootstyle="secondary").pack(pady=5)
+        ttk.Button(
+            popup,
+            text="Ausgewählte öffnen",
+            command=self.open_selected_version_from_popup,
+            bootstyle="primary",
+        ).pack(pady=10)
+        ttk.Button(
+            popup, text="Schließen", command=popup.destroy, bootstyle="secondary"
+        ).pack(pady=5)
 
     def open_selected_version_from_popup(self):
         selection = self.current_listbox.curselection()
@@ -913,7 +1140,9 @@ class ProjectWindow:
             webbrowser.open(f"file://{file_path}")
 
     def reload_current_page(self, source):
-        threading.Thread(target=self._reload_worker, args=(source,), daemon=True).start()
+        threading.Thread(
+            target=self._reload_worker, args=(source,), daemon=True
+        ).start()
 
     def _reload_worker(self, source):
         sites_dir = Path(self.project["path"]) / "sites"
@@ -923,47 +1152,89 @@ class ProjectWindow:
         new_favicon_name = None
         try:
             response = requests.get(source["url"], timeout=15)
-            response.raise_for_status() 
-            
+            response.raise_for_status()
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"page_{source['id']}_{timestamp}.html"
-            
+
             with open(sites_dir / filename, "w", encoding="utf-8") as f:
                 f.write(response.text)
 
             parsed = urlparse(source["url"])
             favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
             favicon_response = requests.get(favicon_url, timeout=5)
-            if favicon_response.status_code == 200 and "image" in favicon_response.headers.get("Content-Type", ""):
+            if (
+                favicon_response.status_code == 200
+                and "image" in favicon_response.headers.get("Content-Type", "")
+            ):
                 favicon_filename = f"favicon_{source['id']}_{timestamp}.ico"
                 favicon_path = images_dir / favicon_filename
                 with open(favicon_path, "wb") as f:
                     f.write(favicon_response.content)
-                new_favicon_name = favicon_filename 
-                
-            self.root.after(0, self._finalize_reload, source["id"], filename, timestamp, new_favicon_name)
+                new_favicon_name = favicon_filename
+
+            self.root.after(
+                0,
+                self._finalize_reload,
+                source["id"],
+                filename,
+                timestamp,
+                new_favicon_name,
+            )
 
         except requests.exceptions.Timeout:
-            self.root.after(0, lambda: messagebox.showerror("Fehler", "Download-Timeout: Die Seite hat zu lange gebraucht.", parent=self.root))
+            self.root.after(
+                0,
+                lambda: messagebox.showerror(
+                    "Fehler",
+                    "Download-Timeout: Die Seite hat zu lange gebraucht.",
+                    parent=self.root,
+                ),
+            )
         except requests.exceptions.RequestException as e:
-            self.root.after(0, lambda: messagebox.showerror("Fehler", f"Download-Fehler: {e}", parent=self.root))
+            self.root.after(
+                0,
+                lambda: messagebox.showerror(
+                    "Fehler", f"Download-Fehler: {e}", parent=self.root
+                ),
+            )
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Fehler", f"Ein unerwarteter Fehler ist aufgetreten: {e}", parent=self.root))
+            self.root.after(
+                0,
+                lambda: messagebox.showerror(
+                    "Fehler",
+                    f"Ein unerwarteter Fehler ist aufgetreten: {e}",
+                    parent=self.root,
+                ),
+            )
 
     def _finalize_reload(self, source_id, filename, timestamp, new_favicon_name):
-        source = next((item for item in self.project["data"].get("items", []) if item.get("id") == source_id and item.get("type") == "source"), None)
-        
+        source = next(
+            (
+                item
+                for item in self.project["data"].get("items", [])
+                if item.get("id") == source_id and item.get("type") == "source"
+            ),
+            None,
+        )
+
         if not source:
-            messagebox.showerror("Fehler", "Quelle zum Aktualisieren nicht im Projekt gefunden.", parent=self.root)
+            messagebox.showerror(
+                "Fehler",
+                "Quelle zum Aktualisieren nicht im Projekt gefunden.",
+                parent=self.root,
+            )
             return
 
         if "saved_pages" not in source:
             source["saved_pages"] = []
-            
-        source["saved_pages"].append({
-            "file": filename,
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+
+        source["saved_pages"].append(
+            {
+                "file": filename,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
 
         if new_favicon_name:
             source["favicon"] = new_favicon_name
@@ -975,54 +1246,89 @@ class ProjectWindow:
             frame.destroy()
             del self.source_frames[source_id]
             del self.card_widgets[source_id]
-            threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
-            
+            threading.Thread(
+                target=self._concurrent_reload_single_card, args=(source,), daemon=True
+            ).start()
 
     def _concurrent_reload_single_card(self, source):
         try:
             result = self._process_item_data(source)
             if source["type"] == "source":
-                 self.root.after(0, self._create_source_card_gui, source, result["favicon_path"])
+                self.root.after(
+                    0, self._create_source_card_gui, source, result["favicon_path"]
+                )
             else:
-                 self.root.after(0, self._create_heading_card_gui, source)
+                self.root.after(0, self._create_heading_card_gui, source)
 
         except Exception as e:
             print(f"Fehler beim Neuladen der Einzelkarte: {e}")
 
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
-        self.context_menu.add_command(label="Löschen", command=lambda: self.delete_item(item))
+        self.context_menu.add_command(
+            label="Löschen", command=lambda: self.delete_item(item)
+        )
         item_id = item["id"]
-        self.context_menu.add_command(label="Duplizieren (Strg+D)", command=lambda: self.duplicate_item(item))
+        self.context_menu.add_command(
+            label="Duplizieren (Strg+D)", command=lambda: self.duplicate_item(item)
+        )
         self.context_menu.add_separator()
         if item["type"] == "heading":
-            self.context_menu.add_command(label="Umbenennen", command=lambda: self.rename_heading(item))
-            self.context_menu.add_command(label="Farbe ändern", command=lambda: self.change_heading_color(item))
+            self.context_menu.add_command(
+                label="Umbenennen", command=lambda: self.rename_heading(item)
+            )
+            self.context_menu.add_command(
+                label="Farbe ändern", command=lambda: self.change_heading_color(item)
+            )
         else:
             if item.get("saved_pages") and len(item["saved_pages"]) > 0:
-                self.context_menu.add_command(label="Gespeicherte Versionen anzeigen", command=lambda: self.show_saved_pages_popup(item)) 
-                self.context_menu.add_separator() 
-                
-            self.context_menu.add_command(label="Quellenangabe erstellen", command=lambda: self.create_citation(item))
-            self.context_menu.add_command(label="Karte bearbeiten", command=lambda: self.edit_source(item))
-            self.context_menu.add_command(label="Aktuelle Seite neu laden", command=lambda: self.reload_current_page(item))
-        
+                self.context_menu.add_command(
+                    label="Gespeicherte Versionen anzeigen",
+                    command=lambda: self.show_saved_pages_popup(item),
+                )
+                self.context_menu.add_separator()
+
+            self.context_menu.add_command(
+                label="Quellenangabe erstellen",
+                command=lambda: self.create_citation(item),
+            )
+            self.context_menu.add_command(
+                label="Karte bearbeiten", command=lambda: self.edit_source(item)
+            )
+            self.context_menu.add_command(
+                label="Aktuelle Seite neu laden",
+                command=lambda: self.reload_current_page(item),
+            )
+
         if item["type"] == "source":
             self.context_menu.add_separator()
-            self.context_menu.add_command(label="Kopieren (Strg+C)", command=lambda: self.copy_card(item))
+            self.context_menu.add_command(
+                label="Kopieren (Strg+C)", command=lambda: self.copy_card(item)
+            )
             if self.clipboard:
-                 self.context_menu.add_command(label="Einfügen (Strg+V)", command=self.paste_card)
+                self.context_menu.add_command(
+                    label="Einfügen (Strg+V)", command=self.paste_card
+                )
 
         self.context_menu.add_separator()
         if item_id in self.selected_source_ids:
-            self.context_menu.add_command(label="Karte abwählen", command=lambda: self.deselect_card_from_context(item_id)) 
+            self.context_menu.add_command(
+                label="Karte abwählen",
+                command=lambda: self.deselect_card_from_context(item_id),
+            )
         else:
-            self.context_menu.add_command(label="Karte wählen", command=lambda: self.deselect_all_cards(exclude_id=item_id) or self.handle_card_selection(item_id)) 
+            self.context_menu.add_command(
+                label="Karte wählen",
+                command=lambda: self.deselect_all_cards(exclude_id=item_id)
+                or self.handle_card_selection(item_id),
+            )
 
         self.context_menu.post(event.x_root, event.y_root)
 
     def rename_heading(self, heading):
-        new_text = simpledialog.askstring("Umbenennen", "Neuer Text:", initialvalue=heading["text"], parent=self.root)
+        new_text = simpledialog.askstring(
+            "Umbenennen", "Neuer Text:", initialvalue=heading["text"], parent=self.root
+        )
         if new_text is not None and new_text != heading["text"]:
             heading["text"] = new_text
             frame, item_id = self.source_frames[heading["id"]]
@@ -1030,15 +1336,18 @@ class ProjectWindow:
             frame.destroy()
             del self.source_frames[heading["id"]]
             del self.card_widgets[heading["id"]]
-            self._create_heading_card_gui(heading) 
+            self._create_heading_card_gui(heading)
             self.save_project()
             self.update_last_mtime()
             self.reset_zoom()
             self._update_minimap()
 
     def change_heading_color(self, heading):
-        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=heading["color"] or self.DEFAULT_HEADING_BG)[1]
-        
+        color = colorchooser.askcolor(
+            title="Farbe wählen",
+            initialcolor=heading["color"] or self.DEFAULT_HEADING_BG,
+        )[1]
+
         if color and color != heading.get("color", ""):
             heading["color"] = "" if color == self.DEFAULT_HEADING_BG else color
             frame, item_id = self.source_frames[heading["id"]]
@@ -1046,16 +1355,22 @@ class ProjectWindow:
             frame.destroy()
             del self.source_frames[heading["id"]]
             del self.card_widgets[heading["id"]]
-            self._create_heading_card_gui(heading) 
+            self._create_heading_card_gui(heading)
             self.save_project()
             self.update_last_mtime()
             self.reset_zoom()
             self._update_minimap()
 
     def delete_item(self, item):
-        if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
+        if messagebox.askyesno(
+            "Bestätigen",
+            f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?",
+            parent=self.root,
+        ):
             item_id = item["id"]
-            self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
+            self.project["data"]["items"] = [
+                i for i in self.project["data"]["items"] if i["id"] != item_id
+            ]
             frame, item_id_canvas = self.source_frames[item_id]
             self.canvas.delete(item_id_canvas)
             frame.destroy()
@@ -1070,11 +1385,15 @@ class ProjectWindow:
             self._update_minimap()
 
     def add_heading(self):
-        text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
+        text = simpledialog.askstring(
+            "Überschrift hinzufügen", "Text der Überschrift:", parent=self.root
+        )
         if not text:
             return
 
-        color = colorchooser.askcolor(title="Farbe wählen", initialcolor=self.DEFAULT_HEADING_BG)[1]
+        color = colorchooser.askcolor(
+            title="Farbe wählen", initialcolor=self.DEFAULT_HEADING_BG
+        )[1]
         color_to_save = "" if not color or color == self.DEFAULT_HEADING_BG else color
         new_heading = {
             "id": str(uuid.uuid4()),
@@ -1082,11 +1401,11 @@ class ProjectWindow:
             "text": text,
             "color": color_to_save,
             "pos_x": 300,
-            "pos_y": 300
+            "pos_y": 300,
         }
         self.project["data"]["items"].append(new_heading)
         self.deselect_all_cards()
-        self._create_heading_card_gui(new_heading) 
+        self._create_heading_card_gui(new_heading)
         self.selected_source_ids.add(new_heading["id"])
         self.save_project()
         self.update_last_mtime()
@@ -1109,12 +1428,16 @@ class ProjectWindow:
                 "pos_x": 300 + len(self.project["data"]["items"]) * 80,
                 "pos_y": 300,
                 "favicon": "",
-                "saved_pages": []
+                "saved_pages": [],
             }
             self.project["data"]["items"].append(new_source)
             self.deselect_all_cards()
             self.selected_source_ids.add(new_source["id"])
-            threading.Thread(target=self._concurrent_reload_single_card, args=(new_source,), daemon=True).start()
+            threading.Thread(
+                target=self._concurrent_reload_single_card,
+                args=(new_source,),
+                daemon=True,
+            ).start()
             self.save_project()
             self.update_last_mtime()
             self.update_scrollregion()
@@ -1135,7 +1458,9 @@ class ProjectWindow:
             frame.destroy()
             del self.source_frames[item_id]
             del self.card_widgets[item_id]
-            threading.Thread(target=self._concurrent_reload_single_card, args=(source,), daemon=True).start()
+            threading.Thread(
+                target=self._concurrent_reload_single_card, args=(source,), daemon=True
+            ).start()
             self.save_project()
             self.update_last_mtime()
             self.update_scrollregion()
@@ -1153,21 +1478,18 @@ class ProjectWindow:
         if bbox:
             padding = 500
             x1, y1, x2, y2 = bbox
-            new_scrollregion = (
-                x1 - padding, 
-                y1 - padding, 
-                x2 + padding, 
-                y2 + padding
-            )
+            new_scrollregion = (x1 - padding, y1 - padding, x2 + padding, y2 + padding)
             self.canvas.configure(scrollregion=new_scrollregion)
         else:
             self.canvas.configure(scrollregion=(-500, -500, 1000, 1000))
-            
+
         self._update_minimap()
 
     def save_project(self):
         self.project["data"]["canvas_zoom_level"] = self.zoom_level
-        self.project["data"]["selected_source_id"] = next(iter(self.selected_source_ids)) if self.selected_source_ids else None
+        self.project["data"]["selected_source_id"] = (
+            next(iter(self.selected_source_ids)) if self.selected_source_ids else None
+        )
         with open(self.project["data_file"], "w", encoding="utf-8") as f:
             json.dump(self.project["data"], f, indent=4)
         self.project["last_modified"] = datetime.datetime.now().isoformat()
@@ -1199,12 +1521,12 @@ class ProjectWindow:
             self.project["data"]["canvas_zoom_level"] = self.zoom_level
             self.selected_source_id = updated_data.get("selected_source_id")
             self.load_items_on_canvas()
-            
+
         except Exception as e:
             print("Reload-Fehler:", e)
-    
+
     def back_to_projects(self):
         self.save_project()
-        self.executor.shutdown(wait=False) 
+        self.executor.shutdown(wait=False)
         self.main_frame.destroy()
         self.app.close_project()

@@ -8,6 +8,7 @@ import re
 import threading
 from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS
 
+
 class ProjectManager:
     def __init__(self):
         self.lock = threading.Lock()
@@ -30,20 +31,24 @@ class ProjectManager:
                         proj["data_file"] = data_file
                         self.projects.append(proj)
             except json.JSONDecodeError:
-                messagebox.showwarning("Warnung", "projects.json ist beschädigt. Initialisiere neue Datei.")
+                messagebox.showwarning(
+                    "Warnung", "projects.json ist beschädigt. Initialisiere neue Datei."
+                )
 
     def save_projects(self):
         with self.lock:
             projects_data = []
             for project in self.projects:
-                projects_data.append({
-                    "name": project["name"],
-                    "description": project["description"],
-                    "created": project["created"],
-                    "last_modified": project["last_modified"],
-                    "path": str(project["path"]),
-                    "data_file": str(project["data_file"])
-                })
+                projects_data.append(
+                    {
+                        "name": project["name"],
+                        "description": project["description"],
+                        "created": project["created"],
+                        "last_modified": project["last_modified"],
+                        "path": str(project["path"]),
+                        "data_file": str(project["data_file"]),
+                    }
+                )
             try:
                 with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
                     json.dump(projects_data, f, indent=4)
@@ -54,7 +59,7 @@ class ProjectManager:
         project_dir = WDX_DIR / name
         if project_dir.exists():
             return False, "Ein Projekt mit diesem Namen existiert bereits!"
-        
+
         try:
             project_dir.mkdir(parents=True)
             data_file = project_dir / "project.json"
@@ -63,7 +68,7 @@ class ProjectManager:
                 "description": description,
                 "created": datetime.datetime.now().isoformat(),
                 "last_modified": datetime.datetime.now().isoformat(),
-                "items": []
+                "items": [],
             }
             with open(data_file, "w", encoding="utf-8") as f:
                 json.dump(initial_data, f, indent=4)
@@ -75,7 +80,7 @@ class ProjectManager:
                 "last_modified": initial_data["last_modified"],
                 "path": project_dir,
                 "data_file": data_file,
-                "data": initial_data
+                "data": initial_data,
             }
             self.projects.append(new_project)
             self.save_projects()
@@ -86,20 +91,20 @@ class ProjectManager:
 
     def import_project(self, file_path):
         try:
-            with ZipFile(file_path, 'r') as zip_ref:
+            with ZipFile(file_path, "r") as zip_ref:
                 if "project.json" not in zip_ref.namelist():
                     return False
-                
+
                 with zip_ref.open("project.json") as f:
                     data = json.load(f)
                     name = data.get("name", "Imported Project")
-                
+
                 original_name = name
                 counter = 1
                 while (WDX_DIR / name).exists():
                     name = f"{original_name}_{counter}"
                     counter += 1
-                
+
                 target_dir = WDX_DIR / name
                 target_dir.mkdir(parents=True)
                 zip_ref.extractall(target_dir)
@@ -119,14 +124,14 @@ class ProjectManager:
                     "last_modified": datetime.datetime.now().isoformat(),
                     "path": target_dir,
                     "data_file": data_file,
-                    "data": data 
+                    "data": data,
                 }
                 with open(data_file, "r", encoding="utf-8") as f:
-                     new_proj["data"] = json.load(f)
+                    new_proj["data"] = json.load(f)
 
                 self.projects.append(new_proj)
                 self.save_projects()
-                
+
                 return True
         except Exception as e:
             messagebox.showerror("Import Fehler", str(e))
@@ -160,9 +165,13 @@ class ProjectManager:
         self.save_projects()
 
     def export_project(self, project):
-        file_path = filedialog.asksaveasfilename(defaultextension=".wdx", filetypes=[("wdx Files", "*.wdx")], initialfile=f"{project['name']}.wdx")
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".wdx",
+            filetypes=[("wdx Files", "*.wdx")],
+            initialfile=f"{project['name']}.wdx",
+        )
         if file_path:
-            shutil.make_archive(file_path.replace(".wdx", ""), 'zip', project["path"])
+            shutil.make_archive(file_path.replace(".wdx", ""), "zip", project["path"])
             shutil.move(file_path.replace(".wdx", ".zip"), file_path)
             return True, file_path
         return False, None
