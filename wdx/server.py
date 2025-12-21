@@ -2,8 +2,8 @@ import threading
 import http.server
 import socketserver
 import json
+from tkinter import messagebox
 from constants import PORT
-
 
 class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, app=None, **kwargs):
@@ -30,7 +30,7 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length).decode("utf-8")
             try:
                 data = json.loads(post_data)
-                self.app.handle_communication(data)
+                self.app.root.after(0, lambda: self.app.handle_communication(data))
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -62,10 +62,20 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             super().do_HEAD()
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
 
 def start_server(app):
-    handler = lambda *args, **kwargs: WdxHTTPRequestHandler(*args, app=app, **kwargs)
-    httpd = socketserver.TCPServer(("", PORT), handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    def run_server():
+        try:
+            handler = lambda *args, **kwargs: WdxHTTPRequestHandler(*args, app=app, **kwargs)
+            httpd = ReusableTCPServer(("", PORT), handler)
+            app.httpd = httpd
+            httpd.serve_forever()
+        except OSError as e:
+            app.root.after(0, lambda: messagebox.showerror("Server Fehler", f"Konnte Server auf Port {PORT} nicht starten.\n{e}"))
+        except Exception as e:
+            print(f"Server error: {e}")
+
+    thread = threading.Thread(target=run_server, daemon=True)
     thread.start()
-    app.httpd = httpd

@@ -3,24 +3,20 @@ from tkinter import ttk, colorchooser, messagebox
 import pyperclip
 from ttkbootstrap.constants import *
 
-
 class SourceDialog(tk.Toplevel):
     def __init__(self, parent, project_window, source=None):
         super().__init__(parent)
         self.project_window = project_window
         self.source = source or {}
         self.result = None
-
         self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
         self.geometry("540x800")
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
         self.iconbitmap("icon128.ico")
-
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)
-
         url_frame = ttk.Frame(main)
         url_frame.pack(fill="x", pady=(0, 10))
         ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(
@@ -35,36 +31,30 @@ class SourceDialog(tk.Toplevel):
             url_entry_frame, text="📋", width=3, command=self.paste_clipboard
         )
         paste_btn.pack(side="right", padx=(5, 0))
-
         ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(
             anchor="w", pady=(10, 0)
         )
         self.title_var = tk.StringVar(value=self.source.get("title", ""))
         ttk.Entry(main, textvariable=self.title_var).pack(fill="x", pady=(0, 10))
-
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
         text_frame.pack(fill="both", expand=True, pady=(0, 10))
         self.text_text = tk.Text(text_frame, height=10, wrap="word")
         self.text_text.pack(fill="both", expand=True)
         self.text_text.insert("1.0", self.source.get("text", ""))
-
         ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(
             anchor="w"
         )
         self.keywords_var = tk.StringVar(value=self.source.get("keywords", ""))
         ttk.Entry(main, textvariable=self.keywords_var).pack(fill="x", pady=(0, 10))
-
         ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0, 15))
-
         self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
         self.selected_color_swatch = tk.Label(
             color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1
         )
         self.selected_color_swatch.pack(side="left", padx=(0, 5))
-
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
         ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(
             side="left", padx=(5, 0)
@@ -79,7 +69,6 @@ class SourceDialog(tk.Toplevel):
         }
 
         used_colors = list(custom_colors)
-
         if used_colors:
             ttk.Label(
                 main, text="Bereits verwendete Farben:", font=("Helvetica", 9)
@@ -90,7 +79,6 @@ class SourceDialog(tk.Toplevel):
             for col in used_colors:
                 initial_relief = "flat"
                 initial_border = 1
-
                 label = tk.Label(
                     palette,
                     width=3,
@@ -103,7 +91,6 @@ class SourceDialog(tk.Toplevel):
                 )
 
                 self.after(1, lambda l=label, c=col: l.config(bg=c))
-
                 label.bind("<Button-1>", lambda e, c=col: self.color_var.set(c))
 
                 def on_enter(event, l):
@@ -124,7 +111,6 @@ class SourceDialog(tk.Toplevel):
 
                 label.bind("<Enter>", lambda e, l=label: on_enter(e, l))
                 label.bind("<Leave>", lambda e, l=label: on_leave(e, l))
-
                 label.pack(side="left", padx=2)
 
         btn_frame = ttk.Frame(main)
@@ -142,7 +128,6 @@ class SourceDialog(tk.Toplevel):
             bootstyle="primary",
             width=15,
         ).pack(side="right")
-
         self.url_entry.focus_set()
         self.wait_window()
 
@@ -163,9 +148,9 @@ class SourceDialog(tk.Toplevel):
             pass
 
     def choose_color(self):
-        color = colorchooser.askcolor(initialcolor=self.color_var.get())[1]
-        if color:
-            self.color_var.set(color)
+        result = colorchooser.askcolor(initialcolor=self.color_var.get())
+        if result and result[1]:
+            self.color_var.set(result[1])
 
     def save(self):
         url = self.url_var.get().strip()

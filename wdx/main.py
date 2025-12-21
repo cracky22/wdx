@@ -39,7 +39,8 @@ class WdxApp:
         if hasattr(self, "project_window"):
             if hasattr(self.project_window, "executor"):
                 self.project_window.executor.shutdown(wait=False)
-            self.project_window.main_frame.destroy()
+            if hasattr(self.project_window, "main_frame") and self.project_window.main_frame.winfo_exists():
+                self.project_window.main_frame.destroy()
             del self.project_window
         self.current_project_name = None
         self.main_window.show()
@@ -89,9 +90,14 @@ class WdxApp:
     def handle_communication(self, data):
         self.last_connection = datetime.datetime.now()
         self.connection_count += 1
-        self.root.deiconify()
-        self.root.lift()
+        
+        try:
+            self.root.deiconify()
+            self.root.lift()
+        except Exception:
+            pass
 
+        project = None
         if self.current_project_name:
             try:
                 project = next(
@@ -122,9 +128,12 @@ class WdxApp:
                 p for p in self.project_manager.projects if p["name"] == project_name
             )
 
-        threading.Thread(
-            target=self._download_worker, args=(data, project), daemon=True
-        ).start()
+        if self.current_project_name == project["name"] and hasattr(self, 'project_window'):
+            self.project_window.handle_external_data(data)
+        else:
+            threading.Thread(
+                target=self._download_worker, args=(data, project), daemon=True
+            ).start()
 
     def _download_worker(self, data, project):
         source_id = str(uuid.uuid4())
@@ -188,18 +197,16 @@ class WdxApp:
         except Exception as e:
             print(f"Download Fehler: {e}")
 
-        self.root.after(0, self._finalize_source_add, project, new_source)
+        self.root.after(0, lambda: self._finalize_source_add_safe(project, new_source))
 
-    def _finalize_source_add(self, project, source):
-        if "items" not in project["data"]:
-            project["data"]["items"] = []
-
-        project["data"]["items"].append(source)
-        project["last_modified"] = datetime.datetime.now().isoformat()
-        with open(project["data_file"], "w", encoding="utf-8") as f:
-            json.dump(project["data"], f, indent=4)
-
-        self.project_manager.save_projects()
+    def _finalize_source_add_safe(self, project, source):
+        def update_logic(data):
+            if "items" not in data:
+                data["items"] = []
+            data["items"].append(source)
+            
+        self.project_manager.update_project_file_safe(project, update_logic)
+        messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
 
 
 if __name__ == "__main__":

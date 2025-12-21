@@ -1,6 +1,5 @@
 import tkinter as tk
 
-
 class Minimap:
     def __init__(self, parent_frame, project_window):
         self.parent = parent_frame
