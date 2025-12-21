@@ -1,33 +1,38 @@
-const API_BASE = 'http://127.0.0.1:8765';
-const API_ADD = API_BASE + '/api/add_source';
-const API_STATUS = API_BASE + '/api/status';
+const API_BASE = "http://127.0.0.1:8765";
+const API_ADD = API_BASE + "/api/add_source";
+const API_STATUS = API_BASE + "/api/status";
 
 let isConnected = false;
 
-const statusEl = document.getElementById('status');
-const connectBtn = document.getElementById('connectBtn');
-const saveBtn = document.getElementById('saveBtn');
-const projectEl = document.getElementById('currentProject');
-const projectNameEl = document.getElementById('projectName');
-const saveMessageEl = document.getElementById('saveMessage');
+const statusEl = document.getElementById("status");
+const connectBtn = document.getElementById("connectBtn");
+const saveBtn = document.getElementById("saveBtn");
+const projectEl = document.getElementById("currentProject");
+const projectNameEl = document.getElementById("projectName");
+const saveMessageEl = document.getElementById("saveMessage");
 
 function applyTheme() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-    document.body.classList.remove('light');
+  if (
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    document.body.classList.add("dark");
+    document.body.classList.remove("light");
   } else {
-    document.body.classList.add('light');
-    document.body.classList.remove('dark');
+    document.body.classList.add("light");
+    document.body.classList.remove("dark");
   }
 }
 applyTheme();
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+window
+  .matchMedia("(prefers-color-scheme: dark)")
+  .addEventListener("change", applyTheme);
 
-function showMessage(text, type = 'success') {
+function showMessage(text, type = "success") {
   saveMessageEl.textContent = text;
   saveMessageEl.className = type;
   saveMessageEl.style.opacity = 1;
-  setTimeout(() => saveMessageEl.style.opacity = 0, 3000);
+  setTimeout(() => (saveMessageEl.style.opacity = 0), 3000);
 }
 
 async function updateConnection() {
@@ -35,7 +40,7 @@ async function updateConnection() {
   connectBtn.textContent = "Prüfe Verbindung...";
 
   try {
-    const response = await fetch(API_STATUS, { method: 'GET' });
+    const response = await fetch(API_STATUS, { method: "GET" });
     if (response.ok) {
       const data = await response.json();
       isConnected = true;
@@ -44,7 +49,8 @@ async function updateConnection() {
       connectBtn.textContent = "Verbunden ✓";
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
-      projectNameEl.textContent = data.current_project || "Kein Projekt geöffnet";
+      projectNameEl.textContent =
+        data.current_project || "Kein Projekt geöffnet";
       projectEl.style.display = "block";
     } else {
       throw new Error();
@@ -61,9 +67,9 @@ async function updateConnection() {
   connectBtn.disabled = false;
 }
 
-connectBtn.addEventListener('click', updateConnection);
+connectBtn.addEventListener("click", updateConnection);
 
-saveBtn.addEventListener('click', async () => {
+saveBtn.addEventListener("click", async () => {
   if (!isConnected) {
     showMessage("Keine Verbindung zu wdx", "error");
     return;
@@ -75,14 +81,14 @@ saveBtn.addEventListener('click', async () => {
     url: tab.url,
     title: tab.title,
     text: "",
-    keywords: ""
+    keywords: "",
   };
 
   try {
     const response = await fetch(API_ADD, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {

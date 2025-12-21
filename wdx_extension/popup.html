@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,19 +13,23 @@
       margin: 0;
       transition: background 0.3s, color 0.3s;
     }
+
     body.light {
       background: #ffffff;
       color: #000000;
     }
+
     body.dark {
       background: #1e1e1e;
       color: #ffffff;
     }
+
     h1 {
       font-size: 18px;
       margin: 0 0 15px 0;
       text-align: center;
     }
+
     .status {
       padding: 12px;
       border-radius: 8px;
@@ -33,22 +38,26 @@
       font-weight: bold;
       font-size: 14px;
     }
+
     .connected {
       background: #d4edda;
       color: #155724;
     }
+
     .disconnected {
       background: #f8d7da;
       color: #721c24;
     }
+
     .project {
       margin: 15px 0;
       padding: 12px;
-      background: rgba(0,0,0,0.08);
+      background: rgba(0, 0, 0, 0.08);
       border-radius: 8px;
       text-align: center;
       font-size: 14px;
     }
+
     button {
       width: 100%;
       padding: 14px;
@@ -60,30 +69,38 @@
       cursor: pointer;
       transition: background 0.2s;
     }
+
     #connectBtn {
       background: #007bff;
       color: white;
     }
+
     #connectBtn:hover {
       background: #0056b3;
     }
+
     #connectBtn.connected {
       background: #28a745;
     }
+
     #connectBtn.connected:hover {
       background: #218838;
     }
+
     #saveBtn {
       background: #28a745;
       color: white;
     }
+
     #saveBtn:disabled {
       background: #6c757d;
       cursor: not-allowed;
     }
+
     #saveBtn:hover:not(:disabled) {
       background: #218838;
     }
+
     #saveMessage {
       margin-top: 10px;
       padding: 10px;
@@ -94,16 +111,19 @@
       opacity: 0;
       transition: opacity 0.5s ease;
     }
+
     .success {
       background: #d4edda;
       color: #155724;
     }
+
     .error {
       background: #f8d7da;
       color: #721c24;
     }
   </style>
 </head>
+
 <body class="light">
   <h1>wdx Quellen</h1>
 
@@ -123,4 +143,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>

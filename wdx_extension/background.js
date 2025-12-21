@@ -2,12 +2,12 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "save_source",
     title: "Quelle in wdx sichern",
-    contexts: ["page"]
+    contexts: ["page"],
   });
   chrome.contextMenus.create({
     id: "save_text",
     title: "Ausgewählten Text in wdx sichern",
-    contexts: ["selection"]
+    contexts: ["selection"],
   });
 });
 
@@ -24,14 +24,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     url: tab.url,
     title: tab.title || "Kein Titel",
     text: text,
-    keywords: ""
+    keywords: "",
   };
 
   try {
     const response = await fetch("http://127.0.0.1:8765/api/add_source", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {
@@ -39,7 +39,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         type: "basic",
         iconUrl: "icon48.png",
         title: "wdx",
-        message: text ? "Ausgewählter Text erfolgreich gespeichert!" : "Quelle erfolgreich gespeichert!"
+        message: text
+          ? "Ausgewählter Text erfolgreich gespeichert!"
+          : "Quelle erfolgreich gespeichert!",
       });
     } else {
       throw new Error("Server error");
@@ -49,7 +51,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       type: "basic",
       iconUrl: "icon48.png",
       title: "wdx Fehler",
-      message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?"
+      message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?",
     });
   }
 });
