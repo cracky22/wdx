@@ -13,9 +13,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab || !tab.url) return;
-
   let text = "";
-
   if (info.menuItemId === "save_text" && info.selectionText) {
     text = info.selectionText.trim();
   }
@@ -37,7 +35,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (response.ok) {
       chrome.notifications.create({
         type: "basic",
-        iconUrl: "icon48.png",
+        iconUrl: "icon128.png",
         title: "wdx",
         message: text
           ? "Ausgewählter Text erfolgreich gespeichert!"
@@ -49,8 +47,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } catch (err) {
     chrome.notifications.create({
       type: "basic",
-      iconUrl: "icon48.png",
-      title: "wdx Fehler",
+      iconUrl: "icon128.png",
+      title: "Fehler in wdx",
       message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?",
     });
   }

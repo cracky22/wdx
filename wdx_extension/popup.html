@@ -4,12 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./fonts.css">
   <title>wdx</title>
   <style>
     body {
       width: 360px;
       padding: 20px;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: "Rubik";
       margin: 0;
       transition: background 0.3s, color 0.3s;
     }
@@ -52,7 +54,7 @@
     .project {
       margin: 15px 0;
       padding: 12px;
-      background: rgba(0, 0, 0, 0.08);
+      background: rgba(108, 108, 108, 0.194);
       border-radius: 8px;
       text-align: center;
       font-size: 14px;
@@ -67,6 +69,7 @@
       font-size: 16px;
       font-weight: 500;
       cursor: pointer;
+      font-family: "Rubik";
       transition: background 0.2s;
     }
 
@@ -121,6 +124,10 @@
       background: #f8d7da;
       color: #721c24;
     }
+
+    pre {
+      font-family: "Rubik";
+    }
   </style>
 </head>
 
@@ -130,16 +137,13 @@
   <div id="status" class="status disconnected">
     Nicht verbunden
   </div>
-
   <button id="connectBtn">Verbinden</button>
-
   <div id="currentProject" class="project" style="display: none;">
     Aktuelles Projekt: <strong id="projectName">—</strong>
   </div>
-
   <button id="saveBtn" disabled>Speichern in wdx</button>
-
   <div id="saveMessage"></div>
+  <pre id="version" style="text-align: center;"></pre>
 
   <script src="popup.js"></script>
 </body>

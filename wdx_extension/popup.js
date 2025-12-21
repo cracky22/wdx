@@ -1,15 +1,19 @@
 const API_BASE = "http://127.0.0.1:8765";
 const API_ADD = API_BASE + "/api/add_source";
 const API_STATUS = API_BASE + "/api/status";
+const EXTENSION_VERION = "v1.2.0";
 
 let isConnected = false;
 
 const statusEl = document.getElementById("status");
 const connectBtn = document.getElementById("connectBtn");
 const saveBtn = document.getElementById("saveBtn");
+const version = document.getElementById("version");
 const projectEl = document.getElementById("currentProject");
 const projectNameEl = document.getElementById("projectName");
 const saveMessageEl = document.getElementById("saveMessage");
+
+version.innerText = EXTENSION_VERION;
 
 function applyTheme() {
   if (
@@ -37,7 +41,8 @@ function showMessage(text, type = "success") {
 
 async function updateConnection() {
   connectBtn.disabled = true;
-  connectBtn.textContent = "Prüfe Verbindung...";
+  connectBtn.style.opacity = "0.5";
+  connectBtn.textContent = "Verbinde wdx...";
 
   try {
     const response = await fetch(API_STATUS, { method: "GET" });
@@ -49,6 +54,7 @@ async function updateConnection() {
       connectBtn.textContent = "Verbunden ✓";
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
+      saveBtn.style.opacity = "1";
       projectNameEl.textContent =
         data.current_project || "Kein Projekt geöffnet";
       projectEl.style.display = "block";
@@ -62,9 +68,11 @@ async function updateConnection() {
     connectBtn.textContent = "Verbinden";
     connectBtn.classList.remove("connected");
     saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.5";
     projectEl.style.display = "none";
   }
   connectBtn.disabled = false;
+  connectBtn.style.opacity = "1";
 }
 
 connectBtn.addEventListener("click", updateConnection);
