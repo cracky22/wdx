@@ -8,7 +8,7 @@ import datetime
 import re
 import threading
 import winreg
-from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS
+from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS, CODENAME
 
 class ProjectManager:
     def __init__(self):
@@ -21,12 +21,12 @@ class ProjectManager:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\wdx", 0, winreg.KEY_READ)
             value, _ = winreg.QueryValueEx(key, "ExportPassword")
             winreg.CloseKey(key)
-            return value if value else None
+            return value if value else CODENAME
         except FileNotFoundError:
-            return None
+            return CODENAME
         except Exception as e:
             print(f"Registry Fehler: {e}")
-            return None
+            return CODENAME
 
     def load_projects(self):
         self.projects = []
