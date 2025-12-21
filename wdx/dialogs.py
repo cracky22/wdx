@@ -19,21 +19,15 @@ class SourceDialog(tk.Toplevel):
         main.pack(fill="both", expand=True)
         url_frame = ttk.Frame(main)
         url_frame.pack(fill="x", pady=(0, 10))
-        ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(
-            anchor="w"
-        )
+        ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         url_entry_frame = ttk.Frame(url_frame)
         url_entry_frame.pack(fill="x")
         self.url_var = tk.StringVar(value=self.source.get("url", ""))
         self.url_entry = ttk.Entry(url_entry_frame, textvariable=self.url_var, width=50)
         self.url_entry.pack(side="left", fill="x", expand=True)
-        paste_btn = ttk.Button(
-            url_entry_frame, text="📋", width=3, command=self.paste_clipboard
-        )
+        paste_btn = ttk.Button(url_entry_frame, text="📋", width=3, command=self.paste_clipboard)
         paste_btn.pack(side="right", padx=(5, 0))
-        ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(
-            anchor="w", pady=(10, 0)
-        )
+        ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(10, 0))
         self.title_var = tk.StringVar(value=self.source.get("title", ""))
         ttk.Entry(main, textvariable=self.title_var).pack(fill="x", pady=(0, 10))
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -42,23 +36,17 @@ class SourceDialog(tk.Toplevel):
         self.text_text = tk.Text(text_frame, height=10, wrap="word")
         self.text_text.pack(fill="both", expand=True)
         self.text_text.insert("1.0", self.source.get("text", ""))
-        ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(
-            anchor="w"
-        )
+        ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         self.keywords_var = tk.StringVar(value=self.source.get("keywords", ""))
         ttk.Entry(main, textvariable=self.keywords_var).pack(fill="x", pady=(0, 10))
         ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0, 15))
         self.color_var = tk.StringVar(value=self.source.get("color", "#ffffff"))
-        self.selected_color_swatch = tk.Label(
-            color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1
-        )
+        self.selected_color_swatch = tk.Label(color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1)
         self.selected_color_swatch.pack(side="left", padx=(0, 5))
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
-        ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(
-            side="left", padx=(5, 0)
-        )
+        ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5, 0))
         self.color_var.trace_add("write", self.update_color_swatch)
         all_items = project_window.project["data"].get("items", [])
 
@@ -70,9 +58,7 @@ class SourceDialog(tk.Toplevel):
 
         used_colors = list(custom_colors)
         if used_colors:
-            ttk.Label(
-                main, text="Bereits verwendete Farben:", font=("Helvetica", 9)
-            ).pack(anchor="w")
+            ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
             palette = ttk.Frame(main)
             palette.pack(fill="x", pady=(0, 15))
 
@@ -94,20 +80,10 @@ class SourceDialog(tk.Toplevel):
                 label.bind("<Button-1>", lambda e, c=col: self.color_var.set(c))
 
                 def on_enter(event, l):
-                    l.config(
-                        relief="raised",
-                        borderwidth=2,
-                        highlightbackground="#FFFFFF",
-                        highlightthickness=2,
-                    )
+                    l.config(relief="raised", borderwidth=2, highlightbackground="#FFFFFF", highlightthickness=2)
 
                 def on_leave(event, l):
-                    l.config(
-                        relief=initial_relief,
-                        borderwidth=initial_border,
-                        highlightbackground="#AAAAAA",
-                        highlightthickness=1,
-                    )
+                    l.config(relief=initial_relief, borderwidth=initial_border, highlightbackground="#AAAAAA", highlightthickness=1)
 
                 label.bind("<Enter>", lambda e, l=label: on_enter(e, l))
                 label.bind("<Leave>", lambda e, l=label: on_leave(e, l))
@@ -115,19 +91,8 @@ class SourceDialog(tk.Toplevel):
 
         btn_frame = ttk.Frame(main)
         btn_frame.pack(fill="x", pady=(10, 0))
-        ttk.Button(
-            btn_frame,
-            text="Abbrechen",
-            command=self.destroy,
-            bootstyle="secondary-outline",
-        ).pack(side="right", padx=10)
-        ttk.Button(
-            btn_frame,
-            text="Speichern",
-            command=self.save,
-            bootstyle="primary",
-            width=15,
-        ).pack(side="right")
+        ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)
+        ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle="primary", width=15).pack(side="right")
         self.url_entry.focus_set()
         self.wait_window()
 

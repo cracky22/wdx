@@ -195,14 +195,26 @@ class ProjectWindow:
         self.root.bind("<Control-q>", lambda e: self.shortcut_citation())
         self.root.bind("<Command-q>", lambda e: self.shortcut_citation())
         
+        self.root.bind("<Control-g>", lambda e: self.delete_shortcut())
+        self.root.bind("<Command-g>", lambda e: self.delete_shortcut())
+        
+        self.root.bind("<Control-h>", lambda e: self.show_saved_shortcut())
+        self.root.bind("<Command-h>", lambda e: self.show_saved_shortcut())
+        
+        self.root.bind("<Control-l>", lambda e: self.reload_current_page_shortcut())
+        self.root.bind("<Command-l>", lambda e: self.reload_current_page_shortcut())
+        
+        self.root.bind("<Control-e>", lambda e: self.edit_shortcut())
+        self.root.bind("<Command-e>", lambda e: self.edit_shortcut())
+        
         self.root.bind("<Control-w>", lambda e: self.back_to_projects())
         self.root.bind("<Command-w>", lambda e: self.back_to_projects())
         
         self.root.bind("<Control-r>", lambda e: self.reset_zoom())
         self.root.bind("<Command-r>", lambda e: self.reset_zoom())
 
-        self.root.bind("<Control-e>", lambda e: self.manual_export())
-        self.root.bind("<Command-e>", lambda e: self.manual_export())
+        self.root.bind("<Control-x>", lambda e: self.manual_export())
+        self.root.bind("<Command-x>", lambda e: self.manual_export())
 
         self.root.bind("<Control-b>", lambda e: self.manual_reload())
         self.root.bind("<Command-b>", lambda e: self.manual_reload())
@@ -1118,6 +1130,13 @@ class ProjectWindow:
         ttk.Button(
             popup, text="Schließen", command=popup.destroy, bootstyle="secondary"
         ).pack(pady=5)
+        
+    def show_saved_shortcut(self):
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        self.show_saved_pages_popup(item)
 
     def open_selected_version_from_popup(self):
         selection = self.current_listbox.curselection()
@@ -1133,6 +1152,13 @@ class ProjectWindow:
         threading.Thread(
             target=self._reload_worker, args=(source,), daemon=True
         ).start()
+        
+    def reload_current_page_shortcut(self):
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        self.reload_current_page(item)
 
     def _reload_worker(self, source):
         sites_dir = Path(self.project["path"]) / "sites"
@@ -1256,11 +1282,11 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(
-            label="Löschen", command=lambda: self.delete_item(item)
+            label="Löschen (Strg+g)", command=lambda: self.delete_item(item)
         )
         item_id = item["id"]
         self.context_menu.add_command(
-            label="Duplizieren (Strg+D)", command=lambda: self.duplicate_item(item)
+            label="Duplizieren (Strg+d)", command=lambda: self.duplicate_item(item)
         )
         self.context_menu.add_separator()
         if item["type"] == "heading":
@@ -1273,31 +1299,31 @@ class ProjectWindow:
         else:
             if item.get("saved_pages") and len(item["saved_pages"]) > 0:
                 self.context_menu.add_command(
-                    label="Gespeicherte Versionen anzeigen",
+                    label="Gespeicherte Versionen (Strg+h)",
                     command=lambda: self.show_saved_pages_popup(item),
                 )
                 self.context_menu.add_separator()
 
             self.context_menu.add_command(
-                label="Quellenangabe erstellen",
+                label="Quellenangabe erstellen (Strg+q)",
                 command=lambda: self.create_citation(item),
             )
             self.context_menu.add_command(
-                label="Karte bearbeiten", command=lambda: self.edit_source(item)
+                label="Karte bearbeiten (Strg+e)", command=lambda: self.edit_source(item)
             )
             self.context_menu.add_command(
-                label="Aktuelle Seite neu laden",
+                label="Aktuelle Seite neu laden (Strg+l)",
                 command=lambda: self.reload_current_page(item),
             )
 
         if item["type"] == "source":
             self.context_menu.add_separator()
             self.context_menu.add_command(
-                label="Kopieren (Strg+C)", command=lambda: self.copy_card(item)
+                label="Kopieren (Strg+c)", command=lambda: self.copy_card(item)
             )
             if self.clipboard:
                 self.context_menu.add_command(
-                    label="Einfügen (Strg+V)", command=self.paste_card
+                    label="Einfügen (Strg+v)", command=self.paste_card
                 )
 
         self.context_menu.add_separator()
@@ -1376,6 +1402,13 @@ class ProjectWindow:
             self.update_scrollregion()
             self.reset_zoom()
             self._update_minimap()
+            
+    def delete_shortcut(self):
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        self.delete_item(item)
 
     def add_heading(self):
         text = simpledialog.askstring(
@@ -1461,6 +1494,13 @@ class ProjectWindow:
             self.update_scrollregion()
             self.reset_zoom()
             self._update_minimap()
+            
+    def edit_shortcut(self):
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        self.edit_source(item)
 
     def create_citation(self, source):
         #             google.de     , zuletzt aufgerufen am 31.12.2025
