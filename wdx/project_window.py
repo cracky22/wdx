@@ -959,7 +959,7 @@ class ProjectWindow:
         new_item["pos_x"] = original_item["pos_x"] + new_x_offset
         new_item["pos_y"] = original_item["pos_y"] + new_y_offset
         if new_item["type"] == "source":
-            new_item["added"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            new_item["added"] = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
             new_item.pop("effective_color", None)
 
         return new_item
@@ -1251,7 +1251,7 @@ class ProjectWindow:
         source["saved_pages"].append(
             {
                 "file": filename,
-                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
             }
         )
 
@@ -1455,7 +1455,7 @@ class ProjectWindow:
                 "text": dialog.result["text"],
                 "keywords": dialog.result["keywords"],
                 "color": dialog.result["color"],
-                "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "added": datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
                 "pos_x": 300 + len(self.project["data"]["items"]) * 80,
                 "pos_y": 300,
                 "favicon": "",
@@ -1544,7 +1544,7 @@ class ProjectWindow:
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
             "color": "#ffffff",
-            "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "added": datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
             "pos_x": 300,
             "pos_y": 300,
             "favicon": "",
@@ -1567,7 +1567,7 @@ class ProjectWindow:
                     f.write(html_content)
                 new_source["saved_pages"].append({
                     "file": html_filename,
-                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "timestamp": datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
                 })
                 
                 try:
