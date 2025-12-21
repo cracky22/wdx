@@ -35,7 +35,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (response.ok) {
       chrome.notifications.create({
         type: "basic",
-        iconUrl: "icon128.png",
+        iconUrl: "icon512.png",
         title: "wdx",
         message: text
           ? "Ausgewählter Text erfolgreich gespeichert!"
@@ -47,7 +47,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } catch (err) {
     chrome.notifications.create({
       type: "basic",
-      iconUrl: "icon128.png",
+      iconUrl: "icon512.png",
       title: "Fehler in wdx",
       message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?",
     });
