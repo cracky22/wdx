@@ -4,7 +4,9 @@ from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, filedialog
 import datetime
 from constants import APP_TITLE
+from constants import CODENAME
 import re
+import winreg
 from constants import INVALID_CHARS
 
 
@@ -57,17 +59,68 @@ class MainWindow:
     def hide(self):
         self.main_frame.grid_forget()
 
+    def get_registry_password(self):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\wdx", 0, winreg.KEY_READ)
+            value, _ = winreg.QueryValueEx(key, "ExportPassword")
+            winreg.CloseKey(key)
+            return value
+        except FileNotFoundError:
+            return None
+
+    def set_registry_password(self, password):
+        try:
+            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\wdx")
+            if password:
+                winreg.SetValueEx(key, "ExportPassword", 0, winreg.REG_SZ, password)
+            else:
+                try:
+                    winreg.DeleteValue(key, "ExportPassword")
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception as e:
+            messagebox.showerror("Fehler", f"Konnte Einstellung nicht speichern: {e}")
+
     def show_settings(self):
         settings_window = ttk.Toplevel(self.root)
         settings_window.title("Einstellungen")
-        settings_window.geometry("400x200")
+        settings_window.geometry("400x300")
         settings_window.transient(self.root)
         settings_window.grab_set()
-        ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(pady=20)
-        var = tk.BooleanVar(value=self.app.dark_mode)
-        switch = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var, bootstyle="round-toggle", command=lambda: self.app.toggle_theme())
-        switch.pack(pady=10)
-        ttk.Button(settings_window, text="Schließen", command=settings_window.destroy, bootstyle="secondary").pack(pady=20)
+        
+        # Dark Mode
+        ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(pady=(20, 5))
+        var_dark = tk.BooleanVar(value=self.app.dark_mode)
+        switch_dark = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var_dark, bootstyle="round-toggle", command=lambda: self.app.toggle_theme())
+        switch_dark.pack(pady=5)
+
+        # Passwortschutz
+        ttk.Label(settings_window, text="Passwortschutz (Import/Export)", font=("Helvetica", 12)).pack(pady=(20, 5))
+        
+        current_pwd = self.get_registry_password()
+        var_pwd = tk.BooleanVar(value=bool(current_pwd))
+        
+        def toggle_password():
+            if var_pwd.get():
+                # Aktivieren -> Passwort abfragen
+                pwd = simpledialog.askstring("Passwort setzen", "Bitte Passwort für Export/Import eingeben:", show="*", parent=settings_window)
+                if pwd:
+                    self.set_registry_password(pwd)
+                else:
+                    # Abgebrochen -> Checkbox zurücksetzen
+                    var_pwd.set(False)
+            else:
+                # Deaktivieren -> Passwort löschen
+                if messagebox.askyesno("Bestätigen", "Passwortschutz entfernen?", parent=settings_window):
+                    self.set_registry_password(None)
+                else:
+                    var_pwd.set(True)
+
+        switch_pwd = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var_pwd, bootstyle="round-toggle", command=toggle_password)
+        switch_pwd.pack(pady=5)
+
+        ttk.Button(settings_window, text="Schließen", command=settings_window.destroy, bootstyle="secondary").pack(pady=30)
 
     def create_project(self):
         name = simpledialog.askstring("Neues Projekt", "Projektname:", parent=self.root)
@@ -88,8 +141,9 @@ class MainWindow:
             success = self.project_manager.import_project(file_path)
             if success:
                 self.update_project_tiles()
-            else:
-                messagebox.showerror("Fehler", "Import fehlgeschlagen.")
+            # Fehlermeldung wird in import_project gehandelt oder hier generisch, 
+            # aber da import_project nun Strings oder True zurückgibt in meinem Mod, 
+            # hab ich es dort bei bool belassen und die MsgBox dort eingebaut.
 
     def update_project_tiles(self):
         for widget in self.projects_frame.winfo_children():

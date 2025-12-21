@@ -8,6 +8,7 @@ import threading
 import requests
 from urllib.parse import urljoin, urlparse
 from constants import APP_TITLE
+from constants import CODENAME
 from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow

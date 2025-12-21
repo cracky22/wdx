@@ -1,11 +1,13 @@
 import json
 import shutil
+import os
 from pathlib import Path
 from tkinter import messagebox, filedialog
-from zipfile import ZipFile
+import pyzipper  # Ersetzt zipfile für AES Support
 import datetime
 import re
 import threading
+import winreg
 from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS
 
 class ProjectManager:
@@ -13,6 +15,18 @@ class ProjectManager:
         self.lock = threading.Lock()
         self.projects = []
         self.load_projects()
+
+    def get_registry_password(self):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\wdx", 0, winreg.KEY_READ)
+            value, _ = winreg.QueryValueEx(key, "ExportPassword")
+            winreg.CloseKey(key)
+            return value if value else None
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            print(f"Registry Fehler: {e}")
+            return None
 
     def load_projects(self):
         self.projects = []
@@ -119,17 +133,33 @@ class ProjectManager:
 
     def import_project(self, file_path):
         try:
-            with ZipFile(file_path, "r") as zip_ref:
-                for name in zip_ref.namelist():
+            pwd = self.get_registry_password()
+            pwd_bytes = pwd.encode('utf-8') if pwd else None
+
+            # Nutze pyzipper für AES Support
+            with pyzipper.AESZipFile(file_path, "r") as zip_ref:
+                if pwd_bytes:
+                    zip_ref.setpassword(pwd_bytes)
+                
+                # Check Namen ohne Extraktion
+                try:
+                    namelist = zip_ref.namelist()
+                except RuntimeError:
+                    return False, "Passwort falsch oder Archiv verschlüsselt."
+
+                for name in namelist:
                     if name.startswith("/") or ".." in name:
                         return False
 
-                if "project.json" not in zip_ref.namelist():
+                if "project.json" not in namelist:
                     return False
 
-                with zip_ref.open("project.json") as f:
-                    data = json.load(f)
-                    name = data.get("name", "Imported Project")
+                try:
+                    with zip_ref.open("project.json") as f:
+                        data = json.load(f)
+                        name = data.get("name", "Imported Project")
+                except RuntimeError:
+                     return False  # Passwort falsch beim Lesen der Datei
 
                 original_name = name
                 counter = 1
@@ -139,7 +169,9 @@ class ProjectManager:
 
                 target_dir = WDX_DIR / name
                 target_dir.mkdir(parents=True)
-                zip_ref.extractall(target_dir)
+                
+                # Alles extrahieren
+                zip_ref.extractall(target_dir, pwd=pwd_bytes)
                 
                 data_file = target_dir / "project.json"
                 
@@ -210,8 +242,26 @@ class ProjectManager:
             initialfile=f"{project['name']}.wdx",
         )
         if file_path:
-            base_name = file_path.replace(".wdx", "")
-            shutil.make_archive(base_name, "zip", project["path"])
-            shutil.move(base_name + ".zip", file_path)
-            return True, file_path
+            pwd = self.get_registry_password()
+            
+            try:
+                # Manuelles Zippen mit pyzipper für Verschlüsselung
+                compression = pyzipper.ZIP_DEFLATED
+                encryption = pyzipper.WZ_AES if pwd else None
+                
+                with pyzipper.AESZipFile(file_path, 'w', compression=compression, encryption=encryption) as zf:
+                    if pwd:
+                        zf.setpassword(pwd.encode('utf-8'))
+                    
+                    path_root = project["path"]
+                    for root, dirs, files in os.walk(path_root):
+                        for file in files:
+                            full_path = Path(root) / file
+                            arcname = full_path.relative_to(path_root)
+                            zf.write(full_path, arcname)
+                            
+                return True, file_path
+            except Exception as e:
+                print(f"Export Fehler: {e}")
+                return False, None
         return False, None

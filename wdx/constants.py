@@ -2,6 +2,7 @@ from pathlib import Path
 
 VERSION = "v1.2.1"
 APP_TITLE = f"wdx {VERSION}"
+CODENAME = "com.crackyOS.wdx"
 
 WDX_DIR = Path.home() / "Documents" / "wdx"
 PROJECTS_FILE = WDX_DIR / "projects.json"
