@@ -1094,6 +1094,7 @@ class ProjectWindow:
 
         popup = tk.Toplevel(self.root)
         popup.title("Gespeicherte Versionen")
+        popup.iconbitmap("icon128.ico")
         popup.geometry("500x400")
         popup.transient(self.root)
         popup.grab_set()
