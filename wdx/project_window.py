@@ -210,14 +210,14 @@ class ProjectWindow:
         self.root.bind("<Control-s>", lambda e: self.manual_save())
         self.root.bind("<Command-s>", lambda e: self.manual_save())
 
-        self.root.bind("<Control-r>", lambda e: self.manual_reload())
-        self.root.bind("<Command-r>", lambda e: self.manual_reload())
+        self.root.bind("<Control-r>", lambda e: self.reset_zoom())
+        self.root.bind("<Command-r>", lambda e: self.reset_zoom())
 
         self.root.bind("<Control-e>", lambda e: self.manual_export())
         self.root.bind("<Command-e>", lambda e: self.manual_export())
 
-        self.root.bind("<Control-b>", lambda e: self.back_to_projects())
-        self.root.bind("<Command-b>", lambda e: self.back_to_projects())
+        self.root.bind("<Control-b>", lambda e: self.manual_reload())
+        self.root.bind("<Command-b>", lambda e: self.manual_reload())
 
         self.root.bind("<Control-d>", self._handle_duplicate_shortcut)
         self.root.bind("<Command-d>", self._handle_duplicate_shortcut)
