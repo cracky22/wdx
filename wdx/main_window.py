@@ -25,21 +25,21 @@ class MainWindow:
             header_frame,
             text="Neues Projekt",
             command=self.create_project,
-            bootstyle="primary-outline",
+            bootstyle="info",
             width=15,
         ).grid(row=0, column=0, padx=5)
         ttk.Button(
             header_frame,
             text="Projekt importieren",
             command=self.import_project,
-            bootstyle="secondary-outline",
+            bootstyle="info-outline",
             width=15,
         ).grid(row=0, column=1, padx=5)
         ttk.Button(
             header_frame,
             text="Einstellungen",
             command=self.show_settings,
-            bootstyle="info-outline",
+            bootstyle="secondary",
             width=15,
         ).grid(row=0, column=2, padx=5)
         self.status_label = ttk.Label(
@@ -63,32 +63,17 @@ class MainWindow:
         settings_window.geometry("400x200")
         settings_window.transient(self.root)
         settings_window.grab_set()
-        ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(
-            pady=20
-        )
+        ttk.Label(settings_window, text="Dark Mode", font=("Helvetica", 12)).pack(pady=20)
         var = tk.BooleanVar(value=self.app.dark_mode)
-        switch = ttk.Checkbutton(
-            settings_window,
-            text="Aktiviert",
-            variable=var,
-            bootstyle="round-toggle",
-            command=lambda: self.app.toggle_theme(),
-        )
+        switch = ttk.Checkbutton(settings_window, text="Aktiviert", variable=var, bootstyle="round-toggle", command=lambda: self.app.toggle_theme())
         switch.pack(pady=10)
-        ttk.Button(
-            settings_window,
-            text="Schließen",
-            command=settings_window.destroy,
-            bootstyle="secondary",
-        ).pack(pady=20)
+        ttk.Button(settings_window, text="Schließen", command=settings_window.destroy, bootstyle="secondary").pack(pady=20)
 
     def create_project(self):
         name = simpledialog.askstring("Neues Projekt", "Projektname:", parent=self.root)
         if not name:
             return
-        description = simpledialog.askstring(
-            "Neues Projekt", "Projektbeschreibung:", parent=self.root
-        )
+        description = simpledialog.askstring("Neues Projekt", "Projektbeschreibung:", parent=self.root)
         if description is None:
             return
         success, result = self.project_manager.create_project(name, description)
@@ -110,59 +95,19 @@ class MainWindow:
         for widget in self.projects_frame.winfo_children():
             widget.destroy()
 
-        for project in sorted(
-            self.project_manager.projects,
-            key=lambda p: p["last_modified"],
-            reverse=True,
-        ):
-            tile = ttk.Frame(
-                self.projects_frame, padding="20", relief="raised", borderwidth=2
-            )
+        for project in sorted(self.project_manager.projects, key=lambda p: p["last_modified"], reverse=True):
+            tile = ttk.Frame(self.projects_frame, padding="20", relief="raised", borderwidth=2)
             tile.pack(fill="x", pady=10, padx=20)
-            ttk.Label(tile, text=project["name"], font=("Helvetica", 16, "bold")).pack(
-                anchor="w"
-            )
-            ttk.Label(tile, text=project["description"], font=("Helvetica", 10)).pack(
-                anchor="w", pady=(5, 0)
-            )
-            ttk.Label(
-                tile,
-                text=f"Zuletzt geändert: {project['last_modified'][:16].replace('T', ' ')}",
-                font=("Helvetica", 8),
-                foreground="gray",
-            ).pack(anchor="w")
+            ttk.Label(tile, text=project["name"], font=("Helvetica", 16, "bold")).pack(anchor="w")
+            ttk.Label(tile, text=project["description"], font=("Helvetica", 10)).pack(anchor="w", pady=(5, 0))
+            ttk.Label(tile, text=f"Zuletzt geändert: {project['last_modified'][:16].replace('T', ' ')}", font=("Helvetica", 8), foreground="gray").pack(anchor="w")
             btn_frame = ttk.Frame(tile)
             btn_frame.pack(anchor="e", pady=10)
-            ttk.Button(
-                btn_frame,
-                text="Öffnen",
-                command=lambda p=project: self.app.open_project(p),
-                bootstyle="primary",
-            ).pack(side="left", padx=5)
-            ttk.Button(
-                btn_frame,
-                text="Umbenennen",
-                command=lambda p=project: self.rename_project(p),
-                bootstyle="secondary-outline",
-            ).pack(side="left", padx=5)
-            ttk.Button(
-                btn_frame,
-                text="Beschreibung ändern",
-                command=lambda p=project: self.edit_project(p),
-                bootstyle="secondary-outline",
-            ).pack(side="left", padx=5)
-            ttk.Button(
-                btn_frame,
-                text="Exportieren",
-                command=lambda p=project: self.export_project(p),
-                bootstyle="info-outline",
-            ).pack(side="left", padx=5)
-            ttk.Button(
-                btn_frame,
-                text="Löschen",
-                command=lambda p=project: self.delete_project(p),
-                bootstyle="danger-outline",
-            ).pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Öffnen", command=lambda p=project: self.app.open_project(p), bootstyle="primary").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Umbenennen", command=lambda p=project: self.rename_project(p), bootstyle="secondary-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Beschreibung ändern", command=lambda p=project: self.edit_project(p), bootstyle="secondary-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Exportieren", command=lambda p=project: self.export_project(p), bootstyle="info-outline").pack(side="left", padx=5)
+            ttk.Button(btn_frame, text="Löschen", command=lambda p=project: self.delete_project(p), bootstyle="danger-outline").pack(side="left", padx=5)
 
     def rename_project(self, project):
         new_name = simpledialog.askstring(

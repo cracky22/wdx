@@ -94,7 +94,7 @@ class ProjectWindow:
             header_frame,
             text="← Zurück zu Projekten",
             command=self.back_to_projects,
-            bootstyle="secondary-outline",
+            bootstyle="info-outline",
         ).grid(row=0, column=0, sticky=tk.W, padx=10)
         btn_frame = ttk.Frame(header_frame)
         btn_frame.grid(row=0, column=2, sticky=tk.E, padx=20)
@@ -102,28 +102,28 @@ class ProjectWindow:
             btn_frame,
             text="💾",
             width=3,
-            bootstyle="outline-secondary",
+            bootstyle="info-outline",
             command=self.manual_save,
         ).pack(side="left", padx=2)
         ttk.Button(
             btn_frame,
             text="🔍",
             width=3,
-            bootstyle="outline-secondary",
+            bootstyle="info-outline",
             command=self.reset_zoom,
         ).pack(side="left", padx=2)
         ttk.Button(
             btn_frame,
             text="📥",
             width=3,
-            bootstyle="outline-secondary",
+            bootstyle="info-outline",
             command=self.manual_export,
         ).pack(side="left", padx=2)
         ttk.Button(
             btn_frame,
             text="🔄",
             width=3,
-            bootstyle="outline-secondary",
+            bootstyle="info-outline",
             command=self.manual_reload,
         ).pack(side="left", padx=2)
         ttk.Label(
@@ -157,10 +157,8 @@ class ProjectWindow:
         v_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
         self.add_menu = tk.Menu(self.root, tearoff=0)
-        self.add_menu.add_command(label="Quelle hinzufügen", command=self.add_source)
-        self.add_menu.add_command(
-            label="Überschrift hinzufügen", command=self.add_heading
-        )
+        self.add_menu.add_command(label="Überschrift (Strg+u)", command=self.add_heading)
+        self.add_menu.add_command(label="Quellenangabe (Strg+n)", command=self.add_source)
         self.add_button = ttk.Button(
             self.main_frame,
             text="+",
@@ -195,8 +193,7 @@ class ProjectWindow:
         self.root.bind("<Control-q>", lambda e: self.shortcut_citation())
         self.root.bind("<Command-q>", lambda e: self.shortcut_citation())
         
-        self.root.bind("<Control-g>", lambda e: self.delete_shortcut())
-        self.root.bind("<Command-g>", lambda e: self.delete_shortcut())
+        self.root.bind("<Delete>", lambda e: self.delete_shortcut())
         
         self.root.bind("<Control-h>", lambda e: self.show_saved_shortcut())
         self.root.bind("<Command-h>", lambda e: self.show_saved_shortcut())
@@ -213,8 +210,8 @@ class ProjectWindow:
         self.root.bind("<Control-r>", lambda e: self.reset_zoom())
         self.root.bind("<Command-r>", lambda e: self.reset_zoom())
 
-        self.root.bind("<Control-x>", lambda e: self.manual_export())
-        self.root.bind("<Command-x>", lambda e: self.manual_export())
+        self.root.bind("<Control-p>", lambda e: self.manual_export())
+        self.root.bind("<Command-p>", lambda e: self.manual_export())
 
         self.root.bind("<Control-b>", lambda e: self.manual_reload())
         self.root.bind("<Command-b>", lambda e: self.manual_reload())
@@ -227,6 +224,12 @@ class ProjectWindow:
 
         self.root.bind("<Control-v>", self._handle_paste_shortcut)
         self.root.bind("<Command-v>", self._handle_paste_shortcut)
+        
+        self.root.bind("<Control-u>", lambda e: self.add_heading())
+        self.root.bind("<Command-u>", lambda e: self.add_heading())
+        
+        self.root.bind("<Control-n>", lambda e: self.add_source())
+        self.root.bind("<Command-n>", lambda e: self.add_source())
 
     def _handle_duplicate_shortcut(self, event):
         if self.selected_source_ids:
@@ -1282,7 +1285,7 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(
-            label="Löschen (Strg+g)", command=lambda: self.delete_item(item)
+            label="Löschen (Entf)", command=lambda: self.delete_item(item)
         )
         item_id = item["id"]
         self.context_menu.add_command(
