@@ -23,11 +23,14 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/add_source":
             content_length = int(self.headers.get("Content-Length", 0))
+            
             if content_length == 0:
                 self.send_response(400)
                 self.end_headers()
                 return
+            
             post_data = self.rfile.read(content_length).decode("utf-8")
+            
             try:
                 data = json.loads(post_data)
                 self.app.root.after(0, lambda: self.app.handle_communication(data))
@@ -35,11 +38,13 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"status": "success"}')
+                
             except json.JSONDecodeError:
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"status": "error", "message": "Invalid JSON"}')
+                
         else:
             self.send_response(404)
             self.end_headers()
