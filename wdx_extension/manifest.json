@@ -12,26 +12,26 @@
   ],
   "host_permissions": ["http://127.0.0.1:8765/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "./src/js/background.js"
   },
   "icons": {
-    "16": "icon16.png",
-    "32": "icon32.png",
-    "48": "icon48.png",
-    "64": "icon64.png",
-    "128": "icon128.png",
-    "256": "icon256.png",
-    "512": "icon512.png"
+    "16": "./src/img/icon16.png",
+    "32": "./src/img/icon32.png",
+    "48": "./src/img/icon48.png",
+    "64": "./src/img/icon64.png",
+    "128": "./src/img/icon128.png",
+    "256": "./src/img/icon256.png",
+    "512": "./src/img/icon512.png"
   },
   "action": {
     "default_icon": {
-      "16": "icon16.png",
-      "32": "icon32.png",
-      "48": "icon48.png",
-      "64": "icon64.png",
-      "128": "icon128.png",
-      "256": "icon256.png",
-      "512": "icon512.png"
+      "16": "./src/img/icon16.png",
+      "32": "./src/img/icon32.png",
+      "48": "./src/img/icon48.png",
+      "64": "./src/img/icon64.png",
+      "128": "./src/img/icon128.png",
+      "256": "./src/img/icon256.png",
+      "512": "./src/img/icon512.png"
     },
     "default_popup": "popup.html",
     "default_title": "wdx Quellen"
