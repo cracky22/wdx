@@ -52,6 +52,7 @@ async function updateConnection() {
       statusEl.textContent = "Verbunden mit wdx";
       statusEl.className = "status connected";
       connectBtn.textContent = "Verbunden ✓";
+      connectBtn.style.display = "none";
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
       saveBtn.style.opacity = "1";
