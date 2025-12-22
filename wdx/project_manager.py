@@ -5,11 +5,9 @@ from pathlib import Path
 from tkinter import messagebox, filedialog
 import pyzipper
 import datetime
-import re
 import threading
 import winreg
-import math
-from constants import WDX_DIR, PROJECTS_FILE, INVALID_CHARS, CODENAME
+from constants import WDX_DIR, PROJECTS_FILE, CODENAME
 
 class ProjectManager:
     def __init__(self):

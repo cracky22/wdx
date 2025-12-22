@@ -2,11 +2,9 @@ import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, filedialog
-import datetime
 import re
-import winreg
 import math
-from constants import APP_TITLE, CODENAME, INVALID_CHARS
+from constants import INVALID_CHARS
 
 class MainWindow:
     def __init__(self, root, app):

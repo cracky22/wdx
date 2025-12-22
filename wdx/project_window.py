@@ -10,7 +10,6 @@ import pyperclip
 import json
 import os
 from pathlib import Path
-from constants import DEFAULT_COLOR
 import requests
 from urllib.parse import urlparse, urljoin
 import threading
