@@ -1,7 +1,7 @@
 :root {
   --md-sys-color-surface: #fdfcff;
   --md-sys-color-on-surface: #1a1c1e;
-  --md-sys-color-primary: #216c92;
+  --md-sys-color-primary: #375a7f;
   --md-sys-color-surface-container: #f0f4f9;
   --md-sys-color-outline-variant: #c3c7cf;
   --md-sys-color-error: #ba1a1a;
@@ -13,7 +13,7 @@
   :root {
     --md-sys-color-surface: #1a1c1e;
     --md-sys-color-on-surface: #e2e2e6;
-    --md-sys-color-primary: #216c92;
+    --md-sys-color-primary: #375a7f;
     --md-sys-color-surface-container: #2b2d30;
     --md-sys-color-outline-variant: #43474e;
     --md-sys-color-error: #ffb4ab;
