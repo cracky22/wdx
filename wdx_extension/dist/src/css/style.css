@@ -1,7 +1,7 @@
 :root {
   --md-sys-color-surface: #fdfcff;
   --md-sys-color-on-surface: #1a1c1e;
-  --md-sys-color-primary: #0061a4;
+  --md-sys-color-primary: #216c92;
   --md-sys-color-surface-container: #f0f4f9;
   --md-sys-color-outline-variant: #c3c7cf;
   --md-sys-color-error: #ba1a1a;
@@ -13,7 +13,7 @@
   :root {
     --md-sys-color-surface: #1a1c1e;
     --md-sys-color-on-surface: #e2e2e6;
-    --md-sys-color-primary: #9ecaff;
+    --md-sys-color-primary: #216c92;
     --md-sys-color-surface-container: #2b2d30;
     --md-sys-color-outline-variant: #43474e;
     --md-sys-color-error: #ffb4ab;
@@ -138,36 +138,26 @@ md-icon-button md-icon {
   color: var(--md-sys-color-on-surface);
 }
 
-md-filled-button {
-  --md-filled-button-container-shape: 100px;
-  display: flex;
-  align-items: center;
-}
-
 md-filled-button md-icon {
   color: var(--md-sys-color-surface);
   margin-right: 8px;
 }
 
-/* Fix für das Einstellungs-Icon (Farbe) */
 #settingsBtn md-icon {
   color: var(--md-sys-color-on-surface);
 }
 
-/* Fix für den Save-Button */
 md-filled-button {
   width: 100%;
   display: flex !important;
   align-items: center;
   justify-content: center;
-  /* Verhindert, dass der Button zu flach wird */
   min-height: 56px; 
 }
 
-/* Das Icon braucht etwas Abstand zum Text */
 md-filled-button md-icon {
   margin-right: 8px;
-  color: inherit; /* Nimmt die Textfarbe des Buttons an */
+  color: inherit;
 }
 
 md-icon {

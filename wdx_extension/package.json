@@ -1,6 +1,6 @@
 {
   "name": "wdx-extension",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "scripts": {
     "dev": "vite",
     "build": "vite build"
