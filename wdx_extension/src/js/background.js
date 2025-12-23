@@ -33,23 +33,27 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     });
 
     if (response.ok) {
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "../img/icon512.png",
-        title: "wdx",
-        message: text
-          ? "Ausgewählter Text erfolgreich gespeichert!"
-          : "Quelle erfolgreich gespeichert!",
-      });
+      if (localStorage.getItem("wdx-notifications") === "true") {
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: "../img/icon512.png",
+          title: "wdx",
+          message: text
+            ? "Ausgewählter Text erfolgreich gespeichert!"
+            : "Quelle erfolgreich gespeichert!",
+        });
+      }
     } else {
       throw new Error("Server error");
     }
   } catch (err) {
-    chrome.notifications.create({
-      type: "basic",
-      iconUrl: "../img/icon512.png",
-      title: "Fehler in wdx",
-      message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?",
-    });
+    if (localStorage.getItem("wdx-notifications") === "true") {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "../img/icon512.png",
+        title: "Fehler in wdx",
+        message: "Verbindung zu wdx fehlgeschlagen – ist die App gestartet?",
+      });
+    }
   }
 });

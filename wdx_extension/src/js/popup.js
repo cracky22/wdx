@@ -1,8 +1,3 @@
-const API_BASE = "http://127.0.0.1:8765";
-const API_ADD = API_BASE + "/api/add_source";
-const API_STATUS = API_BASE + "/api/status";
-const EXTENSION_VERION = "v1.2.2 (2025-12-22)";
-
 let isConnected = false;
 
 const statusEl = document.getElementById("status");
@@ -17,8 +12,7 @@ version.innerText = EXTENSION_VERION;
 
 function applyTheme() {
   if (
-    window.matchMedia &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
+    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
   ) {
     document.body.classList.add("dark");
     document.body.classList.remove("light");
@@ -28,9 +22,7 @@ function applyTheme() {
   }
 }
 applyTheme();
-window
-  .matchMedia("(prefers-color-scheme: dark)")
-  .addEventListener("change", applyTheme);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
 function showMessage(text, type = "success") {
   saveMessageEl.textContent = text;
@@ -56,8 +48,7 @@ async function updateConnection() {
       connectBtn.classList.add("connected");
       saveBtn.disabled = false;
       saveBtn.style.opacity = "1";
-      projectNameEl.textContent =
-        data.current_project || "Kein Projekt geöffnet";
+      projectNameEl.textContent = data.current_project || "Kein Projekt geöffnet";
       projectEl.style.display = "block";
     } else {
       throw new Error();
@@ -66,7 +57,7 @@ async function updateConnection() {
     isConnected = false;
     statusEl.textContent = "Verbindung fehlgeschlagen – wdx läuft nicht?";
     statusEl.className = "status disconnected";
-    connectBtn.textContent = "Verbinden";
+    connectBtn.textContent = "Verbinden mit wdx";
     connectBtn.classList.remove("connected");
     saveBtn.disabled = true;
     saveBtn.style.opacity = "0.5";
@@ -111,4 +102,4 @@ saveBtn.addEventListener("click", async () => {
   }
 });
 
-updateConnection();
+if (localStorage.getItem("wdx-autoconnect") === "true") updateConnection();

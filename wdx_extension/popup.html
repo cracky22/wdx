@@ -4,24 +4,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" href="./src/img/icon32.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="./src/img/icon64.png" sizes="64x64">
+  <link rel="icon" type="image/png" href="./src/img/icon128.png" sizes="128x128">
   <link rel="stylesheet" href="./src/css/fonts.css">
   <link rel="stylesheet" href="./src/css/style.css">
+  <script src="./src/js/constants.js"></script>
+  <link rel="manifest" href="./manifest.json">
   <title>wdx</title>
 </head>
 
 <body class="light">
+  <a id="settingsLink" href="./options/options.html" title="Einstellungen"
+    style="float: right; margin-right: 10px;">
+    <img src="./src/img/settings.png" alt="Einstellungen" width="25" height="25">
+  </a>
+
   <h1>wdx Quellen</h1>
 
   <div id="status" class="status disconnected">
     Nicht verbunden
   </div>
-  <button id="connectBtn">Verbinden</button>
+  <button id="connectBtn">
+    Verbinden mit wdx
+  </button>
   <div id="currentProject" class="project" style="display: none;">
     Aktuelles Projekt: <strong id="projectName">—</strong>
   </div>
   <button id="saveBtn" title="Speichert diese Seite in wdx" disabled>Speichern in wdx</button>
   <div id="saveMessage"></div>
+  <br>
   <center>
     <a id="version" style="color: gray; text-decoration: none;" href="https://github.com/cracky22/wdx/releases"
       target="_blank"></a>
