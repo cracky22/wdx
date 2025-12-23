@@ -153,6 +153,8 @@ md-filled-button {
   align-items: center;
   justify-content: center;
   min-height: 56px; 
+  --md-filled-button-label-text-font: "Rubik", sans-serif;
+  --md-filled-button-label-text-weight: 500;
 }
 
 md-filled-button md-icon {
