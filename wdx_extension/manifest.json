@@ -1,37 +1,39 @@
 {
   "manifest_version": 3,
   "name": "wdx Quellen",
-  "version": "1.2.2",
-  "description": "Sendet Webseitenquellen und Texte an wdx",
+  "version": "1.2.3",
+  "description": "Smart Capture für wdx",
   "permissions": [
     "contextMenus",
     "activeTab",
     "tabs",
     "notifications",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": ["http://127.0.0.1:8765/*"],
   "background": {
-    "service_worker": "./src/js/background.js"
-  },
-  "icons": {
-    "32": "./src/img/icon32.png",
-    "48": "./src/img/icon48.png",
-    "64": "./src/img/icon64.png",
-    "128": "./src/img/icon128.png",
-    "256": "./src/img/icon256.png",
-    "512": "./src/img/icon512.png"
+    "service_worker": "src/js/background.js",
+    "type": "module"
   },
   "action": {
-    "default_icon": {
-      "32": "./src/img/icon32.png",
-      "48": "./src/img/icon48.png",
-      "64": "./src/img/icon64.png",
-      "128": "./src/img/icon128.png",
-      "256": "./src/img/icon256.png",
-      "512": "./src/img/icon512.png"
-    },
     "default_popup": "popup.html",
-    "default_title": "wdx Quellen"
+    "default_icon": {
+      "32": "src/img/icon32.png",
+      "48": "src/img/icon48.png",
+      "64": "src/img/icon64.png",
+      "128": "src/img/icon128.png",
+      "256": "src/img/icon256.png",
+      "512": "src/img/icon512.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "icons": {
+    "32": "src/img/icon32.png",
+    "48": "src/img/icon48.png",
+    "64": "src/img/icon64.png",
+    "128": "src/img/icon128.png",
+    "256": "src/img/icon256.png",
+    "512": "src/img/icon512.png"
   }
 }

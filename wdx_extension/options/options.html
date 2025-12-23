@@ -1,57 +1,51 @@
 <!DOCTYPE html>
 <html lang="de">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="../src/img/icon32.png" sizes="32x32">
-    <link rel="icon" type="image/png" href="../src/img/icon64.png" sizes="64x64">
-    <link rel="icon" type="image/png" href="../src/img/icon128.png" sizes="128x128">
-    <link rel="stylesheet" href="../src/css/fonts.css">
-    <link rel="stylesheet" href="../src/css/style.css">
-    <link rel="manifest" href="../manifest.json">
-    <script src="../src/js/constants.js"></script>
-    <title>wdx Quellen | Einstellungen</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="../src/css/fonts.css">
+  <link rel="stylesheet" href="../src/css/style.css">
+  <script type="module" src="../src/js/options.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <title>Einstellungen</title>
 </head>
-
-<body class="light">
-    <a href="../popup.html" style="float: right; margin-right: 10px;">
-        <img src="../src/img/icon128.png" alt="wdx" width="25" height="25">
-    </a>
-    <h1>Einstellungen</h1>
-    <div class="settingsContainer" id="settingsContainer">
-        <fieldset>
-            <legend>Allgemein</legend>
-            <div>
-                <input type="checkbox" id="autoconnect" />
-                <label for="autoconnect">Autom. Verbindung mit wdx</label>
-            </div>
-            <div>
-                <input type="checkbox" id="notifications" />
-                <label for="notifications">Benachrichtigungen</label>
-            </div>
-        </fieldset>
-    
-        <br>
-
-        <fieldset style="opacity: 0.5; pointer-events: none;" disabled>
-            <legend>Experimentell</legend>
-            <div>
-                <input type="checkbox" id=""/>
-                <label for=""></label>
-            </div>
-            <div>
-                <input type="checkbox" id=""/>
-                <label for=""></label>
-            </div>
-        </fieldset>
+<body>
+  <div class="container fade-in" style="max-width: 600px; margin: 0 auto;">
+    <div class="header">
+      <h1 class="headline">Einstellungen</h1>
     </div>
-    <br>
-    <center>
-        <a id="version" style="color: gray; text-decoration: none;" href="https://github.com/cracky22/wdx/releases"
-            target="_blank"></a>
-    </center>
-    <script src="../src/js/options.js"></script>
-</body>
 
+    <div class="section-title">Allgemein</div>
+    
+    <div class="setting-row">
+      <label class="body-large">Automatisch verbinden</label>
+      <md-switch id="autoconnect"></md-switch>
+    </div>
+    
+    <div class="setting-row">
+      <label class="body-large">Benachrichtigungen</label>
+      <md-switch id="notifications"></md-switch>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Experimentell</div>
+    
+    <div class="setting-row">
+      <div>
+        <div class="body-large">Offline Warteschlange</div>
+        <div class="label-small text-muted">Speichert Requests wenn wdx offline ist</div>
+      </div>
+      <md-switch id="exp-offline-queue"></md-switch>
+    </div>
+
+    <div class="setting-row">
+      <div>
+        <div class="body-large">Smart Context</div>
+        <div class="label-small text-muted">Extrahiert automatisch Hauptinhalte</div>
+      </div>
+      <md-switch id="exp-extract-context"></md-switch>
+    </div>
+  </div>
+</body>
 </html>

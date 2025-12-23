@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <title>Einstellungen</title>
+  <script type="module" crossorigin src="/assets/options.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/form-label-activation.js">
+  <link rel="stylesheet" crossorigin href="/assets/form-label-activation.css">
+</head>
+<body>
+  <div class="container fade-in" style="max-width: 600px; margin: 0 auto;">
+    <div class="header">
+      <h1 class="headline">Einstellungen</h1>
+    </div>
+
+    <div class="section-title">Allgemein</div>
+    
+    <div class="setting-row">
+      <label class="body-large">Automatisch verbinden</label>
+      <md-switch id="autoconnect"></md-switch>
+    </div>
+    
+    <div class="setting-row">
+      <label class="body-large">Benachrichtigungen</label>
+      <md-switch id="notifications"></md-switch>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Experimentell</div>
+    
+    <div class="setting-row">
+      <div>
+        <div class="body-large">Offline Warteschlange</div>
+        <div class="label-small text-muted">Speichert Requests wenn wdx offline ist</div>
+      </div>
+      <md-switch id="exp-offline-queue"></md-switch>
+    </div>
+
+    <div class="setting-row">
+      <div>
+        <div class="body-large">Smart Context</div>
+        <div class="label-small text-muted">Extrahiert automatisch Hauptinhalte</div>
+      </div>
+      <md-switch id="exp-extract-context"></md-switch>
+    </div>
+  </div>
+</body>
+</html>

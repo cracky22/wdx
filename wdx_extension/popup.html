@@ -1,44 +1,45 @@
 <!DOCTYPE html>
 <html lang="de">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="./src/img/icon32.png" sizes="32x32">
-  <link rel="icon" type="image/png" href="./src/img/icon64.png" sizes="64x64">
-  <link rel="icon" type="image/png" href="./src/img/icon128.png" sizes="128x128">
-  <link rel="stylesheet" href="./src/css/fonts.css">
-  <link rel="stylesheet" href="./src/css/style.css">
-  <script src="./src/js/constants.js"></script>
-  <link rel="manifest" href="./manifest.json">
-  <title>wdx</title>
+  <link rel="stylesheet" href="src/css/fonts.css">
+  <link rel="stylesheet" href="src/css/style.css">
+  <script type="module" src="src/js/popup.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <style>body { width: 350px; margin: 0; }</style>
 </head>
+<body>
+  <md-linear-progress id="progressBar" indeterminate style="display:none; width: 100%; position: absolute; top:0; left:0;"></md-linear-progress>
 
-<body class="light">
-  <a id="settingsLink" href="./options/options.html" title="Einstellungen"
-    style="float: right; margin-right: 10px;">
-    <img src="./src/img/settings.png" alt="Einstellungen" width="25" height="25">
-  </a>
+  <div class="container fade-in">
+    <div class="header">
+      <h1 class="headline">wdx</h1>
+      <md-icon-button id="settingsBtn">
+        <md-icon>settings</md-icon>
+      </md-icon-button>
+    </div>
 
-  <h1>wdx Quellen</h1>
+    <div class="card">
+      <div id="statusDot" class="status-dot"></div>
+      <div class="status-content">
+        <div class="label-small">Aktuelles Projekt</div>
+        <div id="statusText" class="body-large">Verbinde...</div>
+      </div>
+    </div>
 
-  <div id="status" class="status disconnected">
-    Nicht verbunden
+    <div class="spacer"></div>
+
+    <md-filled-button id="saveBtn" disabled class="full-width">
+      <md-icon slot="icon">save</md-icon>
+      Speichern
+    </md-filled-button>
+
+    <md-outlined-button id="connectBtn" class="full-width hidden">
+      Verbinden
+    </md-outlined-button>
+    
+    <div id="feedback" class="feedback-msg"></div>
   </div>
-  <button id="connectBtn">
-    Verbinden mit wdx
-  </button>
-  <div id="currentProject" class="project" style="display: none;">
-    Aktuelles Projekt: <strong id="projectName">—</strong>
-  </div>
-  <button id="saveBtn" title="Speichert diese Seite in wdx" disabled>Speichern in wdx</button>
-  <div id="saveMessage"></div>
-  <br>
-  <center>
-    <a id="version" style="color: gray; text-decoration: none;" href="https://github.com/cracky22/wdx/releases"
-      target="_blank"></a>
-  </center>
-  <script src="./src/js/popup.js"></script>
 </body>
-
 </html>

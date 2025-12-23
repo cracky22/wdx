@@ -1,0 +1,15 @@
+{
+  "name": "wdx-extension",
+  "version": "1.2.3",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@material/web": "^1.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "vite-plugin-static-copy": "^3.1.4"
+  }
+}
