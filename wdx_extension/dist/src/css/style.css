@@ -133,3 +133,44 @@ body {
   opacity: 0;
   transition: opacity 0.3s;
 }
+
+md-icon-button md-icon {
+  color: var(--md-sys-color-on-surface);
+}
+
+md-filled-button {
+  --md-filled-button-container-shape: 100px;
+  display: flex;
+  align-items: center;
+}
+
+md-filled-button md-icon {
+  color: var(--md-sys-color-surface);
+  margin-right: 8px;
+}
+
+/* Fix für das Einstellungs-Icon (Farbe) */
+#settingsBtn md-icon {
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Fix für den Save-Button */
+md-filled-button {
+  width: 100%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  /* Verhindert, dass der Button zu flach wird */
+  min-height: 56px; 
+}
+
+/* Das Icon braucht etwas Abstand zum Text */
+md-filled-button md-icon {
+  margin-right: 8px;
+  color: inherit; /* Nimmt die Textfarbe des Buttons an */
+}
+
+md-icon {
+  font-family: 'Material Symbols Outlined' !important;
+  font-display: block;
+}
