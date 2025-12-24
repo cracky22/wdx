@@ -3,7 +3,7 @@ import '@material/web/button/outlined-button.js';
 import '@material/web/icon/icon.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/progress/linear-progress.js';
-import { API_STATUS, API_ADD, VERSION } from './constants.js';
+import { API_STATUS, API_ADD, VERSION, BUILDDATE } from './constants.js';
 
 const ui = {
   statusText: document.getElementById('statusText'),
@@ -22,7 +22,7 @@ ui.settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage())
 ui.connectBtn.addEventListener('click', checkConnection);
 
 (async () => {
-  ui.versionText.innerText = `${VERSION}`;
+  ui.versionText.innerText = `v${VERSION} (${BUILDDATE})`;
   if (localStorage.getItem('wdx-autoconnect') !== 'false') {
     await checkConnection();
   } else {
