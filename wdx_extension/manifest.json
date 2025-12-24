@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "wdx Quellen",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Smart Capture für wdx",
   "permissions": [
     "contextMenus",
