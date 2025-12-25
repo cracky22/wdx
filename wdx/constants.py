@@ -1,7 +1,8 @@
 from pathlib import Path
 
-VERSION = "v1.2.5 (2025-12-24)"
-APP_TITLE = f"wdx {VERSION}"
+VERSION = "1.2.6"
+BUILDDATE = "2025-12-25"
+APP_TITLE = f"wdx v{VERSION} ({BUILDDATE})"
 CODENAME = "com.crackyOS.wdx"
 
 WDX_DIR = Path.home() / "Documents" / "wdx"
