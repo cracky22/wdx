@@ -28,6 +28,13 @@ ui.connectBtn.addEventListener('click', checkConnection);
   } else {
     setDisconnectedUI();
   }
+  if (!localStorage.getItem('wdx-setupversion')) {
+    localStorage.setItem('wdx-setupversion', VERSION);
+    localStorage.setItem('wdx-autoconnect', 'true');
+    localStorage.setItem('wdx-notifications', 'true');
+    localStorage.setItem('wdx-exp-offline-queue', 'false');
+    localStorage.setItem('wdx-exp-extract-context', 'false');
+  }
 })();
 
 async function checkConnection() {
