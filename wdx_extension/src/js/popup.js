@@ -9,7 +9,7 @@ const ui = {
   statusText: document.getElementById('statusText'),
   statusDot: document.getElementById('statusDot'),
   saveBtn: document.getElementById('saveBtn'),
-  connectBtn: document.getElementById('connectBtn'),
+  manualConnectBtn: document.getElementById('manualConnectBtn'),
   progress: document.getElementById('progressBar'),
   settingsBtn: document.getElementById('settingsBtn'),
   feedback: document.getElementById('feedback'),
@@ -19,15 +19,11 @@ const ui = {
 let isConnected = false;
 
 ui.settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
-ui.connectBtn.addEventListener('click', checkConnection);
+ui.manualConnectBtn.addEventListener('click', checkConnection);
 
 (async () => {
   ui.versionText.innerText = `v${VERSION} (${BUILDDATE})`;
-  if (localStorage.getItem('wdx-autoconnect') !== 'false') {
-    await checkConnection();
-  } else {
-    setDisconnectedUI();
-  }
+  
   if (!localStorage.getItem('wdx-setupversion')) {
     localStorage.setItem('wdx-setupversion', VERSION);
     localStorage.setItem('wdx-autoconnect', 'true');
@@ -35,10 +31,18 @@ ui.connectBtn.addEventListener('click', checkConnection);
     localStorage.setItem('wdx-exp-offline-queue', 'false');
     localStorage.setItem('wdx-exp-extract-context', 'false');
   }
+
+  if (localStorage.getItem('wdx-autoconnect') !== 'false') {
+    await checkConnection();
+  } else {
+    setDisconnectedUI();
+  }
 })();
 
 async function checkConnection() {
   ui.progress.style.display = 'block';
+  ui.manualConnectBtn.disabled = true;
+  
   try {
     const res = await fetch(API_STATUS, { signal: AbortSignal.timeout(2100) });
     if (res.ok) {
@@ -49,6 +53,7 @@ async function checkConnection() {
     setDisconnectedUI();
   } finally {
     ui.progress.style.display = 'none';
+    ui.manualConnectBtn.disabled = false;
   }
 }
 
@@ -56,22 +61,26 @@ function setConnectedUI(project) {
   isConnected = true;
   ui.statusDot.className = 'status-dot connected';
   ui.statusText.textContent = project || 'Verbunden';
+  
   ui.saveBtn.disabled = false;
-  ui.saveBtn.style.display = 'block';
-  ui.connectBtn.style.display = 'none';
+  ui.manualConnectBtn.style.display = 'none';
 }
 
 function setDisconnectedUI() {
   isConnected = false;
   ui.statusDot.className = 'status-dot error';
   ui.statusText.textContent = 'Nicht verbunden';
-  ui.saveBtn.disabled = true;
-  ui.saveBtn.style.display = 'none';
-  ui.connectBtn.style.display = 'block';
+  
+  ui.manualConnectBtn.style.display = 'block';
+
+  const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
+  ui.saveBtn.disabled = !offlineQueueActive;
 }
 
 ui.saveBtn.addEventListener('click', async () => {
-  if (!isConnected) return;
+  const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
+  if (!isConnected && !offlineQueueActive) return;
+
   ui.progress.style.display = 'block';
   ui.saveBtn.disabled = true;
 
@@ -85,6 +94,10 @@ ui.saveBtn.addEventListener('click', async () => {
       keywords: ""
     };
 
+    if (!isConnected && offlineQueueActive) {
+        throw { payload: payload, manualOffline: true };
+    }
+
     const res = await fetch(API_ADD, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,17 +108,34 @@ ui.saveBtn.addEventListener('click', async () => {
     else throw new Error();
 
   } catch (err) {
-    if (localStorage.getItem('wdx-exp-offline-queue') === 'true') {
-       chrome.runtime.sendMessage({ type: 'QUEUE_SAVE', payload: err.payload }); 
+    const payloadToQueue = err.payload || (await getCurrentTabPayload());
+
+    if (offlineQueueActive) {
+       chrome.runtime.sendMessage({ type: 'QUEUE_SAVE', payload: payloadToQueue }); 
        showFeedback("Offline gespeichert (Queue)", "warning");
     } else {
        showFeedback("Fehler beim Speichern", "error");
     }
   } finally {
-    ui.saveBtn.disabled = false;
+    const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
+    if (isConnected || offlineQueueActive) {
+        ui.saveBtn.disabled = false;
+    }
     ui.progress.style.display = 'none';
   }
 });
+
+async function getCurrentTabPayload() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        return {
+            url: tab.url,
+            title: tab.title,
+            text: "", 
+            keywords: ""
+        };
+    } catch (e) { return null; }
+}
 
 function showFeedback(msg, type) {
   ui.feedback.textContent = msg;

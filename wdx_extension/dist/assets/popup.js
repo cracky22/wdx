@@ -1,12 +1,12 @@
-import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d as Q,f as W,E as s,m as P,g as J,h as D,j as Z,k as K,l as ee,T as te}from"./form-label-activation.js";import{V as L,B as re,A as ae,a as oe}from"./constants.js";/**
+import{e as H,i as x,x as u,a as b,_ as o,t as y,b as w,r as S,n as l,c as G,d as W,f as Y,E as s,m as X,g as J,h as D,j as Z,k as K,l as ee,T as te}from"./form-label-activation.js";import{V as L,B as re,A as ae,a as oe}from"./constants.js";/**
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */function ie(t){return(e,a)=>{const{slot:r,selector:n}=t??{},c="slot"+(r?`[name=${r}]`:":not([name])");return G(e,a,{get(){var f;const d=(f=this.renderRoot)==null?void 0:f.querySelector(c),h=(d==null?void 0:d.assignedElements(t))??[];return n===void 0?h:h.filter(m=>m.matches(n))}})}}/**
+ */function ie(t){return(e,r)=>{const{slot:a,selector:n}=t??{},c="slot"+(a?`[name=${a}]`:":not([name])");return H(e,r,{get(){var f;const d=(f=this.renderRoot)==null?void 0:f.querySelector(c),h=(d==null?void 0:d.assignedElements(t))??[];return n===void 0?h:h.filter(m=>m.matches(n))}})}}/**
  * @license
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class ne extends _{connectedCallback(){super.connectedCallback(),this.setAttribute("aria-hidden","true")}render(){return p`<span class="shadow"></span>`}}/**
+ */class ne extends x{connectedCallback(){super.connectedCallback(),this.setAttribute("aria-hidden","true")}render(){return u`<span class="shadow"></span>`}}/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -15,52 +15,52 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let k=class extends ne{};k.styles=[se];k=o([y("md-elevation")],k);/**
+ */let $=class extends ne{};$.styles=[se];$=o([y("md-elevation")],$);/**
  * @license
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */function F(t){t.addInitializer(e=>{const a=e;a.addEventListener("click",async r=>{const{type:n,[x]:c}=a,{form:d}=c;if(!(!d||n==="button")&&(await new Promise(h=>{setTimeout(h)}),!r.defaultPrevented)){if(n==="reset"){d.reset();return}d.addEventListener("submit",h=>{Object.defineProperty(h,"submitter",{configurable:!0,enumerable:!0,get:()=>a})},{capture:!0,once:!0}),c.setFormValue(a.value),d.requestSubmit()}})})}/**
+ */function F(t){t.addInitializer(e=>{const r=e;r.addEventListener("click",async a=>{const{type:n,[w]:c}=r,{form:d}=c;if(!(!d||n==="button")&&(await new Promise(h=>{setTimeout(h)}),!a.defaultPrevented)){if(n==="reset"){d.reset();return}d.addEventListener("submit",h=>{Object.defineProperty(h,"submitter",{configurable:!0,enumerable:!0,get:()=>r})},{capture:!0,once:!0}),c.setFormValue(r.value),d.requestSubmit()}})})}/**
  * @license
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */const le=P(_);class u extends le{get name(){return this.getAttribute("name")??""}set name(e){this.setAttribute("name",e)}get form(){return this[x].form}constructor(){super(),this.disabled=!1,this.href="",this.target="",this.trailingIcon=!1,this.hasIcon=!1,this.type="submit",this.value="",this.handleActivationClick=e=>{!Q(e)||!this.buttonElement||(this.focus(),W(this.buttonElement))},this.addEventListener("click",this.handleActivationClick)}focus(){var e;(e=this.buttonElement)==null||e.focus()}blur(){var e;(e=this.buttonElement)==null||e.blur()}render(){var n;const e=this.disabled&&!this.href,a=this.href?this.renderLink():this.renderButton(),r=this.href?"link":"button";return p`
+ */const le=X(x);class p extends le{get name(){return this.getAttribute("name")??""}set name(e){this.setAttribute("name",e)}get form(){return this[w].form}constructor(){super(),this.disabled=!1,this.href="",this.target="",this.trailingIcon=!1,this.hasIcon=!1,this.type="submit",this.value="",this.handleActivationClick=e=>{!W(e)||!this.buttonElement||(this.focus(),Y(this.buttonElement))},this.addEventListener("click",this.handleActivationClick)}focus(){var e;(e=this.buttonElement)==null||e.focus()}blur(){var e;(e=this.buttonElement)==null||e.blur()}render(){var n;const e=this.disabled&&!this.href,r=this.href?this.renderLink():this.renderButton(),a=this.href?"link":"button";return u`
       ${(n=this.renderElevationOrOutline)==null?void 0:n.call(this)}
       <div class="background"></div>
-      <md-focus-ring part="focus-ring" for=${r}></md-focus-ring>
+      <md-focus-ring part="focus-ring" for=${a}></md-focus-ring>
       <md-ripple
         part="ripple"
-        for=${r}
+        for=${a}
         ?disabled="${e}"></md-ripple>
-      ${a}
-    `}renderButton(){const{ariaLabel:e,ariaHasPopup:a,ariaExpanded:r}=this;return p`<button
+      ${r}
+    `}renderButton(){const{ariaLabel:e,ariaHasPopup:r,ariaExpanded:a}=this;return u`<button
       id="button"
       class="button"
       ?disabled=${this.disabled}
       aria-label="${e||s}"
-      aria-haspopup="${a||s}"
-      aria-expanded="${r||s}">
+      aria-haspopup="${r||s}"
+      aria-expanded="${a||s}">
       ${this.renderContent()}
-    </button>`}renderLink(){const{ariaLabel:e,ariaHasPopup:a,ariaExpanded:r}=this;return p`<a
+    </button>`}renderLink(){const{ariaLabel:e,ariaHasPopup:r,ariaExpanded:a}=this;return u`<a
       id="link"
       class="button"
       aria-label="${e||s}"
-      aria-haspopup="${a||s}"
-      aria-expanded="${r||s}"
+      aria-haspopup="${r||s}"
+      aria-expanded="${a||s}"
       href=${this.href}
       target=${this.target||s}
       >${this.renderContent()}
-    </a>`}renderContent(){const e=p`<slot
+    </a>`}renderContent(){const e=u`<slot
       name="icon"
-      @slotchange="${this.handleSlotChange}"></slot>`;return p`
+      @slotchange="${this.handleSlotChange}"></slot>`;return u`
       <span class="touch"></span>
       ${this.trailingIcon?s:e}
       <span class="label"><slot></slot></span>
       ${this.trailingIcon?e:s}
-    `}handleSlotChange(){this.hasIcon=this.assignedIcons.length>0}}C(u),F(u);u.formAssociated=!0;u.shadowRootOptions={mode:"open",delegatesFocus:!0};o([l({type:Boolean,reflect:!0})],u.prototype,"disabled",void 0);o([l()],u.prototype,"href",void 0);o([l()],u.prototype,"target",void 0);o([l({type:Boolean,attribute:"trailing-icon",reflect:!0})],u.prototype,"trailingIcon",void 0);o([l({type:Boolean,attribute:"has-icon",reflect:!0})],u.prototype,"hasIcon",void 0);o([l()],u.prototype,"type",void 0);o([l({reflect:!0})],u.prototype,"value",void 0);o([Y(".button")],u.prototype,"buttonElement",void 0);o([ie({slot:"icon",flatten:!0})],u.prototype,"assignedIcons",void 0);/**
+    `}handleSlotChange(){this.hasIcon=this.assignedIcons.length>0}}S(p),F(p);p.formAssociated=!0;p.shadowRootOptions={mode:"open",delegatesFocus:!0};o([l({type:Boolean,reflect:!0})],p.prototype,"disabled",void 0);o([l()],p.prototype,"href",void 0);o([l()],p.prototype,"target",void 0);o([l({type:Boolean,attribute:"trailing-icon",reflect:!0})],p.prototype,"trailingIcon",void 0);o([l({type:Boolean,attribute:"has-icon",reflect:!0})],p.prototype,"hasIcon",void 0);o([l()],p.prototype,"type",void 0);o([l({reflect:!0})],p.prototype,"value",void 0);o([G(".button")],p.prototype,"buttonElement",void 0);o([ie({slot:"icon",flatten:!0})],p.prototype,"assignedIcons",void 0);/**
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class ce extends u{renderElevationOrOutline(){return p`<md-elevation part="elevation"></md-elevation>`}}/**
+ */class ce extends p{renderElevationOrOutline(){return u`<md-elevation part="elevation"></md-elevation>`}}/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -69,7 +69,7 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */const pe=b`md-elevation{transition-duration:280ms}:host([disabled]) md-elevation{transition:none}md-elevation{--md-elevation-level: var(--_container-elevation);--md-elevation-shadow-color: var(--_container-shadow-color)}:host(:focus-within) md-elevation{--md-elevation-level: var(--_focus-container-elevation)}:host(:hover) md-elevation{--md-elevation-level: var(--_hover-container-elevation)}:host(:active) md-elevation{--md-elevation-level: var(--_pressed-container-elevation)}:host([disabled]) md-elevation{--md-elevation-level: var(--_disabled-container-elevation)}
+ */const ue=b`md-elevation{transition-duration:280ms}:host([disabled]) md-elevation{transition:none}md-elevation{--md-elevation-level: var(--_container-elevation);--md-elevation-shadow-color: var(--_container-shadow-color)}:host(:focus-within) md-elevation{--md-elevation-level: var(--_focus-container-elevation)}:host(:hover) md-elevation{--md-elevation-level: var(--_hover-container-elevation)}:host(:active) md-elevation{--md-elevation-level: var(--_pressed-container-elevation)}:host([disabled]) md-elevation{--md-elevation-level: var(--_disabled-container-elevation)}
 `;/**
  * @license
  * Copyright 2024 Google LLC
@@ -79,11 +79,11 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let $=class extends ce{};$.styles=[j,pe,de];$=o([y("md-filled-button")],$);/**
+ */let I=class extends ce{};I.styles=[j,ue,de];I=o([y("md-filled-button")],I);/**
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class ue extends u{renderElevationOrOutline(){return p`<div class="outline"></div>`}}/**
+ */class pe extends p{renderElevationOrOutline(){return u`<div class="outline"></div>`}}/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -92,11 +92,11 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let I=class extends ue{};I.styles=[j,ve];I=o([y("md-outlined-button")],I);/**
+ */let z=class extends pe{};z.styles=[j,ve];z=o([y("md-outlined-button")],z);/**
  * @license
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class he extends _{render(){return p`<slot></slot>`}connectedCallback(){if(super.connectedCallback(),this.getAttribute("aria-hidden")==="false"){this.removeAttribute("aria-hidden");return}this.setAttribute("aria-hidden","true")}}/**
+ */class he extends x{render(){return u`<slot></slot>`}connectedCallback(){if(super.connectedCallback(),this.getAttribute("aria-hidden")==="false"){this.removeAttribute("aria-hidden");return}this.setAttribute("aria-hidden","true")}}/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -105,12 +105,12 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let z=class extends he{};z.styles=[me];z=o([y("md-icon")],z);/**
+ */let C=class extends he{};C.styles=[me];C=o([y("md-icon")],C);/**
  * @license
  * Copyright 2020 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const U=Symbol.for(""),be=t=>{if((t==null?void 0:t.r)===U)return t==null?void 0:t._$litStatic$},R=(t,...e)=>({_$litStatic$:e.reduce((a,r,n)=>a+(c=>{if(c._$litStatic$!==void 0)return c._$litStatic$;throw Error(`Value passed to 'literal' function must be a 'literal' result: ${c}. Use 'unsafeStatic' to pass non-literal values, but
-            take care to ensure page security.`)})(r)+t[n+1],t[0]),r:U}),O=new Map,fe=t=>(e,...a)=>{const r=a.length;let n,c;const d=[],h=[];let f,m=0,T=!1;for(;m<r;){for(f=e[m];m<r&&(c=a[m],(n=be(c))!==void 0);)f+=n+e[++m],T=!0;m!==r&&h.push(c),d.push(f),m++}if(m===r&&d.push(e[r]),T){const A=d.join("$$lit$$");(e=O.get(A))===void 0&&(d.raw=d,O.set(A,e=d)),a=h}return t(e,...a)},ye=fe(p);/**
+ */const U=Symbol.for(""),be=t=>{if((t==null?void 0:t.r)===U)return t==null?void 0:t._$litStatic$},R=(t,...e)=>({_$litStatic$:e.reduce((r,a,n)=>r+(c=>{if(c._$litStatic$!==void 0)return c._$litStatic$;throw Error(`Value passed to 'literal' function must be a 'literal' result: ${c}. Use 'unsafeStatic' to pass non-literal values, but
+            take care to ensure page security.`)})(a)+t[n+1],t[0]),r:U}),O=new Map,fe=t=>(e,...r)=>{const a=r.length;let n,c;const d=[],h=[];let f,m=0,T=!1;for(;m<a;){for(f=e[m];m<a&&(c=r[m],(n=be(c))!==void 0);)f+=n+e[++m],T=!0;m!==a&&h.push(c),d.push(f),m++}if(m===a&&d.push(e[a]),T){const A=d.join("$$lit$$");(e=O.get(A))===void 0&&(d.raw=d,O.set(A,e=d)),r=h}return t(e,...r)},ye=fe(u);/**
  * @license
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -118,11 +118,11 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */const ge=P(_);class v extends ge{constructor(){super(...arguments),this.disabled=!1,this.flipIconInRtl=!1,this.href="",this.target="",this.ariaLabelSelected="",this.toggle=!1,this.selected=!1,this.type="submit",this.value="",this.flipIcon=M(this,this.flipIconInRtl)}get name(){return this.getAttribute("name")??""}set name(e){this.setAttribute("name",e)}get form(){return this[x].form}get labels(){return this[x].labels}willUpdate(){this.href&&(this.disabled=!1)}render(){const e=this.href?R`div`:R`button`,{ariaLabel:a,ariaHasPopup:r,ariaExpanded:n}=this,c=a&&this.ariaLabelSelected,d=this.toggle?this.selected:s;let h=s;return this.href||(h=c&&this.selected?this.ariaLabelSelected:a),ye`<${e}
+ */const ge=X(x);class v extends ge{constructor(){super(...arguments),this.disabled=!1,this.flipIconInRtl=!1,this.href="",this.target="",this.ariaLabelSelected="",this.toggle=!1,this.selected=!1,this.type="submit",this.value="",this.flipIcon=M(this,this.flipIconInRtl)}get name(){return this.getAttribute("name")??""}set name(e){this.setAttribute("name",e)}get form(){return this[w].form}get labels(){return this[w].labels}willUpdate(){this.href&&(this.disabled=!1)}render(){const e=this.href?R`div`:R`button`,{ariaLabel:r,ariaHasPopup:a,ariaExpanded:n}=this,c=r&&this.ariaLabelSelected,d=this.toggle?this.selected:s;let h=s;return this.href||(h=c&&this.selected?this.ariaLabelSelected:r),ye`<${e}
         class="icon-button ${D(this.getRenderClasses())}"
         id="button"
         aria-label="${h||s}"
-        aria-haspopup="${!this.href&&r||s}"
+        aria-haspopup="${!this.href&&a||s}"
         aria-expanded="${!this.href&&n||s}"
         aria-pressed="${d}"
         ?disabled="${!this.href&&this.disabled}"
@@ -133,20 +133,20 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
         ${this.selected?this.renderSelectedIcon():s}
         ${this.renderTouchTarget()}
         ${this.href&&this.renderLink()}
-  </${e}>`}renderLink(){const{ariaLabel:e}=this;return p`
+  </${e}>`}renderLink(){const{ariaLabel:e}=this;return u`
       <a
         class="link"
         id="link"
         href="${this.href}"
         target="${this.target||s}"
         aria-label="${e||s}"></a>
-    `}getRenderClasses(){return{"flip-icon":this.flipIcon,selected:this.toggle&&this.selected}}renderIcon(){return p`<span class="icon"><slot></slot></span>`}renderSelectedIcon(){return p`<span class="icon icon--selected"
+    `}getRenderClasses(){return{"flip-icon":this.flipIcon,selected:this.toggle&&this.selected}}renderIcon(){return u`<span class="icon"><slot></slot></span>`}renderSelectedIcon(){return u`<span class="icon icon--selected"
       ><slot name="selected"><slot></slot></slot
-    ></span>`}renderTouchTarget(){return p`<span class="touch"></span>`}renderFocusRing(){return p`<md-focus-ring
+    ></span>`}renderTouchTarget(){return u`<span class="touch"></span>`}renderFocusRing(){return u`<md-focus-ring
       part="focus-ring"
-      for=${this.href?"link":"button"}></md-focus-ring>`}renderRipple(){return p`<md-ripple
+      for=${this.href?"link":"button"}></md-focus-ring>`}renderRipple(){return u`<md-ripple
       for=${this.href?"link":s}
-      ?disabled="${!this.href&&this.disabled}"></md-ripple>`}connectedCallback(){this.flipIcon=M(this,this.flipIconInRtl),super.connectedCallback()}async handleClick(e){await 0,!(!this.toggle||this.disabled||e.defaultPrevented)&&(this.selected=!this.selected,this.dispatchEvent(new InputEvent("input",{bubbles:!0,composed:!0})),this.dispatchEvent(new Event("change",{bubbles:!0})))}}C(v),F(v);v.formAssociated=!0;v.shadowRootOptions={mode:"open",delegatesFocus:!0};o([l({type:Boolean,reflect:!0})],v.prototype,"disabled",void 0);o([l({type:Boolean,attribute:"flip-icon-in-rtl"})],v.prototype,"flipIconInRtl",void 0);o([l()],v.prototype,"href",void 0);o([l()],v.prototype,"target",void 0);o([l({attribute:"aria-label-selected"})],v.prototype,"ariaLabelSelected",void 0);o([l({type:Boolean})],v.prototype,"toggle",void 0);o([l({type:Boolean,reflect:!0})],v.prototype,"selected",void 0);o([l()],v.prototype,"type",void 0);o([l({reflect:!0})],v.prototype,"value",void 0);o([J()],v.prototype,"flipIcon",void 0);/**
+      ?disabled="${!this.href&&this.disabled}"></md-ripple>`}connectedCallback(){this.flipIcon=M(this,this.flipIconInRtl),super.connectedCallback()}async handleClick(e){await 0,!(!this.toggle||this.disabled||e.defaultPrevented)&&(this.selected=!this.selected,this.dispatchEvent(new InputEvent("input",{bubbles:!0,composed:!0})),this.dispatchEvent(new Event("change",{bubbles:!0})))}}S(v),F(v);v.formAssociated=!0;v.shadowRootOptions={mode:"open",delegatesFocus:!0};o([l({type:Boolean,reflect:!0})],v.prototype,"disabled",void 0);o([l({type:Boolean,attribute:"flip-icon-in-rtl"})],v.prototype,"flipIconInRtl",void 0);o([l()],v.prototype,"href",void 0);o([l()],v.prototype,"target",void 0);o([l({attribute:"aria-label-selected"})],v.prototype,"ariaLabelSelected",void 0);o([l({type:Boolean})],v.prototype,"toggle",void 0);o([l({type:Boolean,reflect:!0})],v.prototype,"selected",void 0);o([l()],v.prototype,"type",void 0);o([l({reflect:!0})],v.prototype,"value",void 0);o([J()],v.prototype,"flipIcon",void 0);/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -164,11 +164,11 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const V="important",we=" !"+V,X=Z(class extends K{constructor(t){var e;if(super(t),t.type!==ee.ATTRIBUTE||t.name!=="style"||((e=t.strings)==null?void 0:e.length)>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,a)=>{const r=t[a];return r==null?e:e+`${a=a.includes("-")?a:a.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${r};`},"")}update(t,[e]){const{style:a}=t.element;if(this.ft===void 0)return this.ft=new Set(Object.keys(e)),this.render(e);for(const r of this.ft)e[r]==null&&(this.ft.delete(r),r.includes("-")?a.removeProperty(r):a[r]=null);for(const r in e){const n=e[r];if(n!=null){this.ft.add(r);const c=typeof n=="string"&&n.endsWith(we);r.includes("-")||c?a.setProperty(r,c?n.slice(0,-11):n,c?V:""):a[r]=n}}return te}});/**
+ */const V="important",we=" !"+V,P=Z(class extends K{constructor(t){var e;if(super(t),t.type!==ee.ATTRIBUTE||t.name!=="style"||((e=t.strings)==null?void 0:e.length)>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const a=t[r];return a==null?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${a};`},"")}update(t,[e]){const{style:r}=t.element;if(this.ft===void 0)return this.ft=new Set(Object.keys(e)),this.render(e);for(const a of this.ft)e[a]==null&&(this.ft.delete(a),a.includes("-")?r.removeProperty(a):r[a]=null);for(const a in e){const n=e[a];if(n!=null){this.ft.add(a);const c=typeof n=="string"&&n.endsWith(we);a.includes("-")||c?r.setProperty(a,c?n.slice(0,-11):n,c?V:""):r[a]=n}}return te}});/**
  * @license
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class g extends _{constructor(){super(...arguments),this.value=0,this.max=1,this.indeterminate=!1,this.fourColor=!1}render(){const{ariaLabel:e}=this;return p`
+ */class g extends x{constructor(){super(...arguments),this.value=0,this.max=1,this.indeterminate=!1,this.fourColor=!1}render(){const{ariaLabel:e}=this;return u`
       <div
         class="progress ${D(this.getRenderClasses())}"
         role="progressbar"
@@ -178,20 +178,20 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
         aria-valuenow=${this.indeterminate?s:this.value}
         >${this.renderIndicator()}</div
       >
-    `}getRenderClasses(){return{indeterminate:this.indeterminate,"four-color":this.fourColor}}}C(g);o([l({type:Number})],g.prototype,"value",void 0);o([l({type:Number})],g.prototype,"max",void 0);o([l({type:Boolean})],g.prototype,"indeterminate",void 0);o([l({type:Boolean,attribute:"four-color"})],g.prototype,"fourColor",void 0);/**
+    `}getRenderClasses(){return{indeterminate:this.indeterminate,"four-color":this.fourColor}}}S(g);o([l({type:Number})],g.prototype,"value",void 0);o([l({type:Number})],g.prototype,"max",void 0);o([l({type:Boolean})],g.prototype,"indeterminate",void 0);o([l({type:Boolean,attribute:"four-color"})],g.prototype,"fourColor",void 0);/**
  * @license
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */class N extends g{constructor(){super(...arguments),this.buffer=0}renderIndicator(){const e={transform:`scaleX(${(this.indeterminate?1:this.value/this.max)*100}%)`},a=this.buffer??0,r=a>0,c={transform:`scaleX(${(this.indeterminate||!r?1:a/this.max)*100}%)`},d=this.indeterminate||!r||a>=this.max||this.value>=this.max;return p`
+ */class q extends g{constructor(){super(...arguments),this.buffer=0}renderIndicator(){const e={transform:`scaleX(${(this.indeterminate?1:this.value/this.max)*100}%)`},r=this.buffer??0,a=r>0,c={transform:`scaleX(${(this.indeterminate||!a?1:r/this.max)*100}%)`},d=this.indeterminate||!a||r>=this.max||this.value>=this.max;return u`
       <div class="dots" ?hidden=${d}></div>
-      <div class="inactive-track" style=${X(c)}></div>
-      <div class="bar primary-bar" style=${X(e)}>
+      <div class="inactive-track" style=${P(c)}></div>
+      <div class="bar primary-bar" style=${P(e)}>
         <div class="bar-inner"></div>
       </div>
       <div class="bar secondary-bar">
         <div class="bar-inner"></div>
       </div>
-    `}}o([l({type:Number})],N.prototype,"buffer",void 0);/**
+    `}}o([l({type:Number})],q.prototype,"buffer",void 0);/**
  * @license
  * Copyright 2024 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -200,4 +200,4 @@ import{e as G,i as _,x as p,a as b,_ as o,t as y,b as x,r as C,n as l,c as Y,d a
  * @license
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let E=class extends N{};E.styles=[ke];E=o([y("md-linear-progress")],E);const i={statusText:document.getElementById("statusText"),statusDot:document.getElementById("statusDot"),saveBtn:document.getElementById("saveBtn"),connectBtn:document.getElementById("connectBtn"),progress:document.getElementById("progressBar"),settingsBtn:document.getElementById("settingsBtn"),feedback:document.getElementById("feedback"),versionText:document.getElementById("version")};let S=!1;i.settingsBtn.addEventListener("click",()=>chrome.runtime.openOptionsPage());i.connectBtn.addEventListener("click",q);(async()=>(i.versionText.innerText=`v${L} (${re})`,localStorage.getItem("wdx-autoconnect")!=="false"?await q():H(),localStorage.getItem("wdx-setupversion")||(localStorage.setItem("wdx-setupversion",L),localStorage.setItem("wdx-autoconnect","true"),localStorage.setItem("wdx-notifications","true"),localStorage.setItem("wdx-exp-offline-queue","false"),localStorage.setItem("wdx-exp-extract-context","false"))))();async function q(){i.progress.style.display="block";try{const t=await fetch(ae,{signal:AbortSignal.timeout(2100)});if(t.ok){const e=await t.json();$e(e.current_project)}else throw new Error}catch{H()}finally{i.progress.style.display="none"}}function $e(t){S=!0,i.statusDot.className="status-dot connected",i.statusText.textContent=t||"Verbunden",i.saveBtn.disabled=!1,i.saveBtn.style.display="block",i.connectBtn.style.display="none"}function H(){S=!1,i.statusDot.className="status-dot error",i.statusText.textContent="Nicht verbunden",i.saveBtn.disabled=!0,i.saveBtn.style.display="none",i.connectBtn.style.display="block"}i.saveBtn.addEventListener("click",async()=>{if(S){i.progress.style.display="block",i.saveBtn.disabled=!0;try{const[t]=await chrome.tabs.query({active:!0,currentWindow:!0}),e={url:t.url,title:t.title,text:"",keywords:""};if((await fetch(oe,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(e)})).ok)w("Gespeichert!","success");else throw new Error}catch(t){localStorage.getItem("wdx-exp-offline-queue")==="true"?(chrome.runtime.sendMessage({type:"QUEUE_SAVE",payload:t.payload}),w("Offline gespeichert (Queue)","warning")):w("Fehler beim Speichern","error")}finally{i.saveBtn.disabled=!1,i.progress.style.display="none"}}});function w(t,e){i.feedback.textContent=t,i.feedback.style.color=e==="error"?"var(--md-sys-color-error)":e==="warning"?"#e6b800":"var(--md-sys-color-success)",i.feedback.style.opacity=1,setTimeout(()=>i.feedback.style.opacity=0,2500)}
+ */let E=class extends q{};E.styles=[ke];E=o([y("md-linear-progress")],E);const i={statusText:document.getElementById("statusText"),statusDot:document.getElementById("statusDot"),saveBtn:document.getElementById("saveBtn"),manualConnectBtn:document.getElementById("manualConnectBtn"),progress:document.getElementById("progressBar"),settingsBtn:document.getElementById("settingsBtn"),feedback:document.getElementById("feedback"),versionText:document.getElementById("version")};let _=!1;i.settingsBtn.addEventListener("click",()=>chrome.runtime.openOptionsPage());i.manualConnectBtn.addEventListener("click",N);(async()=>(i.versionText.innerText=`v${L} (${re})`,localStorage.getItem("wdx-setupversion")||(localStorage.setItem("wdx-setupversion",L),localStorage.setItem("wdx-autoconnect","true"),localStorage.setItem("wdx-notifications","true"),localStorage.setItem("wdx-exp-offline-queue","false"),localStorage.setItem("wdx-exp-extract-context","false")),localStorage.getItem("wdx-autoconnect")!=="false"?await N():Q()))();async function N(){i.progress.style.display="block",i.manualConnectBtn.disabled=!0;try{const t=await fetch(ae,{signal:AbortSignal.timeout(2100)});if(t.ok){const e=await t.json();$e(e.current_project)}else throw new Error}catch{Q()}finally{i.progress.style.display="none",i.manualConnectBtn.disabled=!1}}function $e(t){_=!0,i.statusDot.className="status-dot connected",i.statusText.textContent=t||"Verbunden",i.saveBtn.disabled=!1,i.manualConnectBtn.style.display="none"}function Q(){_=!1,i.statusDot.className="status-dot error",i.statusText.textContent="Nicht verbunden",i.manualConnectBtn.style.display="block";const t=localStorage.getItem("wdx-exp-offline-queue")==="true";i.saveBtn.disabled=!t}i.saveBtn.addEventListener("click",async()=>{const t=localStorage.getItem("wdx-exp-offline-queue")==="true";if(!(!_&&!t)){i.progress.style.display="block",i.saveBtn.disabled=!0;try{const[e]=await chrome.tabs.query({active:!0,currentWindow:!0}),r={url:e.url,title:e.title,text:"",keywords:""};if(!_&&t)throw{payload:r,manualOffline:!0};if((await fetch(oe,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(r)})).ok)k("Gespeichert!","success");else throw new Error}catch(e){const r=e.payload||await Ie();t?(chrome.runtime.sendMessage({type:"QUEUE_SAVE",payload:r}),k("Offline gespeichert (Queue)","warning")):k("Fehler beim Speichern","error")}finally{const e=localStorage.getItem("wdx-exp-offline-queue")==="true";(_||e)&&(i.saveBtn.disabled=!1),i.progress.style.display="none"}}});async function Ie(){try{const[t]=await chrome.tabs.query({active:!0,currentWindow:!0});return{url:t.url,title:t.title,text:"",keywords:""}}catch{return null}}function k(t,e){i.feedback.textContent=t,i.feedback.style.color=e==="error"?"var(--md-sys-color-error)":e==="warning"?"#e6b800":"var(--md-sys-color-success)",i.feedback.style.opacity=1,setTimeout(()=>i.feedback.style.opacity=0,2500)}

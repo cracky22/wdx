@@ -7,9 +7,8 @@
   <link rel="stylesheet" href="src/css/style.css">
   <script type="module" src="src/js/popup.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-  <style>body { width: 350px; margin: 0; }</style>
 </head>
-<body>
+<body style="width: 350px; margin: 0;">
   <md-linear-progress id="progressBar" indeterminate style="display:none; width: 100%; position: absolute; top:0; left:0;"></md-linear-progress>
 
   <div class="container fade-in">
@@ -22,9 +21,16 @@
 
     <div class="card">
       <div id="statusDot" class="status-dot"></div>
-      <div class="status-content">
-        <div class="label-small">Aktuelles Projekt</div>
-        <div id="statusText" class="body-large" onclick="await checkConnection();">Verbinde...</div>
+      
+      <div class="status-row">
+        <div class="status-content">
+          <div class="label-small">Aktuelles Projekt</div>
+          <div id="statusText" class="body-large">Verbinde...</div>
+        </div>
+
+        <md-icon-button id="manualConnectBtn" class="manualConnectBtn" style="display: none;">
+          <md-icon>refresh</md-icon>
+        </md-icon-button>
       </div>
     </div>
 
@@ -34,10 +40,6 @@
       <md-icon slot="icon">save</md-icon>
       In wdx speichern
     </md-filled-button>
-
-    <md-outlined-button id="connectBtn" class="full-width hidden">
-      Verbinden
-    </md-outlined-button>
     
     <div id="feedback" class="feedback-msg"></div>
     <a id="version" class="version" href="https://github.com/cracky22/wdx/releases" target="_blank"></a>

@@ -27,6 +27,17 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.manualConnectBtn {
+  padding-top: 15px;
+}
+
 .container {
   padding: 16px;
   display: flex;
@@ -70,7 +81,7 @@ body {
 
 .status-dot {
   width: 12px;
-  height: 12px;
+  height: 10.8px;
   border-radius: 50%;
   background: #75777b;
   transition: background 0.3s;
