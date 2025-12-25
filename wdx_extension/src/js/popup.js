@@ -40,7 +40,7 @@ ui.connectBtn.addEventListener('click', checkConnection);
 async function checkConnection() {
   ui.progress.style.display = 'block';
   try {
-    const res = await fetch(API_STATUS, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(API_STATUS, { signal: AbortSignal.timeout(2100) });
     if (res.ok) {
       const data = await res.json();
       setConnectedUI(data.current_project);
