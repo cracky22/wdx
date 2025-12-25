@@ -28,12 +28,19 @@ ui.connectBtn.addEventListener('click', checkConnection);
   } else {
     setDisconnectedUI();
   }
+  if (!localStorage.getItem('wdx-setupversion')) {
+    localStorage.setItem('wdx-setupversion', VERSION);
+    localStorage.setItem('wdx-autoconnect', 'true');
+    localStorage.setItem('wdx-notifications', 'true');
+    localStorage.setItem('wdx-exp-offline-queue', 'false');
+    localStorage.setItem('wdx-exp-extract-context', 'false');
+  }
 })();
 
 async function checkConnection() {
   ui.progress.style.display = 'block';
   try {
-    const res = await fetch(API_STATUS, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(API_STATUS, { signal: AbortSignal.timeout(2100) });
     if (res.ok) {
       const data = await res.json();
       setConnectedUI(data.current_project);
