@@ -1,4 +1,4 @@
-import { API_ADD } from './constants.js';
+import { API_ADD, API_STATUS } from './constants.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({ id: "save_source", title: "In wdx speichern", contexts: ["page"] });
@@ -19,16 +19,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function addToQueue(payload) {
   if (!payload) return;
-  const q = await chrome.storage.local.get("offlineQueue");
-  const queue = q.offlineQueue || [];
+  const data = await chrome.storage.local.get("offlineQueue");
+  let queue = data.offlineQueue || [];
   
-  // const exists = queue.some(item => item.url === payload.url && item.text === payload.text);
-  // if (!exists) ...
-  
-  queue.push(payload);
-  await chrome.storage.local.set({ offlineQueue: queue });
-  
-  // processQueue(); 
+  const isDuplicate = queue.some(item => 
+    item.url === payload.url && 
+    item.text === payload.text
+  );
+
+  if (!isDuplicate) {
+    queue.push(payload);
+    await chrome.storage.local.set({ offlineQueue: queue });
+  }
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -38,8 +40,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 async function processQueue() {
-    const q = await chrome.storage.local.get("offlineQueue");
-    let queue = q.offlineQueue || [];
+    const data = await chrome.storage.local.get("offlineQueue");
+    let queue = data.offlineQueue || [];
     if (queue.length === 0) return;
 
     const newQueue = [];
@@ -85,27 +87,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     notify("Erfolg", "Gespeichert!");
     
   } catch (err) {
-    addToQueue(payload);
-    notify("Offline", "In Warteschlange gespeichert.");
+    const settings = await chrome.storage.local.get("wdx-exp-offline-queue");
+    if (settings["wdx-exp-offline-queue"] === "true") {
+      await addToQueue(payload);
+      notify("Offline", "In Warteschlange gespeichert.");
+    } else {
+      notify("Fehler", "Server nicht erreichbar.");
+    }
   }
 });
 
-function notify(title, message) {
-  try {
-      if (localStorage.getItem("wdx-notifications") === "true") {
-        chrome.notifications.create({
-          type: "basic",
-          iconUrl: "../img/icon512.png", 
-          title: `wdx: ${title}`,
-          message: message,
-        });
-      }
-  } catch(e) {
-      chrome.notifications.create({
-          type: "basic",
-          iconUrl: "../img/icon512.png", 
-          title: `wdx: ${title}`,
-          message: message,
-      });
+async function notify(title, message) {
+  const settings = await chrome.storage.local.get("wdx-notifications");
+  if (settings["wdx-notifications"] !== "false") {
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "../img/icon512.png", 
+      title: `wdx: ${title}`,
+      message: message,
+    });
   }
 }

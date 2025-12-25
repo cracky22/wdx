@@ -7,13 +7,14 @@ const settings = [
   'exp-extract-context'
 ];
 
-settings.forEach(id => {
+settings.forEach(async id => {
   const el = document.getElementById(id);
   const key = `wdx-${id}`;
   
-  el.selected = localStorage.getItem(key) === 'true';
+  const data = await chrome.storage.local.get(key);
+  el.selected = data[key] === 'true';
 
   el.addEventListener('change', (e) => {
-    localStorage.setItem(key, e.target.selected);
+    chrome.storage.local.set({ [key]: String(e.target.selected) });
   });
 });

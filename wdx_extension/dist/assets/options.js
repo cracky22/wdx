@@ -1,4 +1,4 @@
-import{b as c,_ as d,n as p,r as C,c as E,d as I,f as M,h as k,E as q,x as h,m as A,i as $,a as T,t as z}from"./form-label-activation.js";/**
+import{b as c,_ as d,n as p,r as C,c as E,d as M,f as I,h as k,E as q,x as h,m as A,i as $,a as T,t as z}from"./form-label-activation.js";/**
  * @license
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -26,7 +26,7 @@ import{b as c,_ as d,n as p,r as C,c as E,d as I,f as M,h as k,E as q,x as h,m a
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */const D=F(L(A($)));class n extends D{constructor(){super(),this.selected=!1,this.icons=!1,this.showOnlySelectedIcon=!1,this.required=!1,this.value="on",this.addEventListener("click",e=>{!I(e)||!this.input||(this.focus(),M(this.input))}),B(this,"keydown"),this.addEventListener("keydown",e=>{O(e,()=>{e.defaultPrevented||e.key!=="Enter"||this.disabled||!this.input||this.input.click()})})}render(){return h`
+ */const D=F(L(A($)));class n extends D{constructor(){super(),this.selected=!1,this.icons=!1,this.showOnlySelectedIcon=!1,this.required=!1,this.value="on",this.addEventListener("click",e=>{!M(e)||!this.input||(this.focus(),I(this.input))}),B(this,"keydown"),this.addEventListener("keydown",e=>{O(e,()=>{e.defaultPrevented||e.key!=="Enter"||this.disabled||!this.input||this.input.click()})})}render(){return h`
       <div class="switch ${k(this.getRenderClasses())}">
         <input
           id="switch"
@@ -79,4 +79,4 @@ import{b as c,_ as d,n as p,r as C,c as E,d as I,f as M,h as k,E as q,x as h,m a
  * @license
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- */let g=class extends n{};g.styles=[_];g=d([z("md-switch")],g);const P=["autoconnect","notifications","exp-offline-queue","exp-extract-context"];P.forEach(s=>{const e=document.getElementById(s),r=`wdx-${s}`;e.selected=localStorage.getItem(r)==="true",e.addEventListener("change",t=>{localStorage.setItem(r,t.target.selected)})});
+ */let g=class extends n{};g.styles=[_];g=d([z("md-switch")],g);const P=["autoconnect","notifications","exp-offline-queue","exp-extract-context"];P.forEach(async s=>{const e=document.getElementById(s),r=`wdx-${s}`,t=await chrome.storage.local.get(r);e.selected=t[r]==="true",e.addEventListener("change",a=>{chrome.storage.local.set({[r]:String(a.target.selected)})})});

@@ -23,16 +23,22 @@ ui.manualConnectBtn.addEventListener('click', checkConnection);
 
 (async () => {
   ui.versionText.innerText = `v${VERSION} (${BUILDDATE})`;
-  localStorage.setItem('wdx-version', VERSION);
-  if (!localStorage.getItem('wdx-setupversion')) {
-    localStorage.setItem('wdx-setupversion', VERSION);
-    localStorage.setItem('wdx-autoconnect', 'true');
-    localStorage.setItem('wdx-notifications', 'true');
-    localStorage.setItem('wdx-exp-offline-queue', 'false');
-    localStorage.setItem('wdx-exp-extract-context', 'false');
+  
+  const keys = ['wdx-autoconnect', 'wdx-notifications', 'wdx-exp-offline-queue'];
+  const prefs = await chrome.storage.local.get(keys);
+  
+  if (prefs['wdx-autoconnect'] === undefined) {
+    await chrome.storage.local.set({
+      'wdx-autoconnect': 'true',
+      'wdx-notifications': 'true',
+      'wdx-exp-offline-queue': 'false'
+    });
   }
 
-  if (localStorage.getItem('wdx-autoconnect') !== 'false') {
+  const sessionActive = sessionStorage.getItem('wdx-session-active') === 'true';
+  const autoConnect = prefs['wdx-autoconnect'] !== 'false';
+
+  if (autoConnect || sessionActive) {
     await checkConnection();
   } else {
     setDisconnectedUI();
@@ -59,9 +65,9 @@ async function checkConnection() {
 
 function setConnectedUI(project) {
   isConnected = true;
+  sessionStorage.setItem('wdx-session-active', 'true');
   ui.statusDot.className = 'status-dot connected';
   ui.statusText.textContent = project || 'Verbunden';
-  
   ui.saveBtn.disabled = false;
   ui.manualConnectBtn.style.display = 'none';
 }
@@ -70,15 +76,17 @@ function setDisconnectedUI() {
   isConnected = false;
   ui.statusDot.className = 'status-dot error';
   ui.statusText.textContent = 'Nicht verbunden';
-  
   ui.manualConnectBtn.style.display = 'block';
 
-  const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
-  ui.saveBtn.disabled = !offlineQueueActive;
+  chrome.storage.local.get('wdx-exp-offline-queue').then(data => {
+    ui.saveBtn.disabled = data['wdx-exp-offline-queue'] !== 'true';
+  });
 }
 
 ui.saveBtn.addEventListener('click', async () => {
-  const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
+  const data = await chrome.storage.local.get('wdx-exp-offline-queue');
+  const offlineQueueActive = data['wdx-exp-offline-queue'] === 'true';
+  
   if (!isConnected && !offlineQueueActive) return;
 
   ui.progress.style.display = 'block';
@@ -86,13 +94,7 @@ ui.saveBtn.addEventListener('click', async () => {
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    const payload = {
-      url: tab.url,
-      title: tab.title,
-      text: "", 
-      keywords: ""
-    };
+    const payload = { url: tab.url, title: tab.title, text: "", keywords: "" };
 
     if (!isConnected && offlineQueueActive) {
         throw { payload: payload, manualOffline: true };
@@ -109,31 +111,25 @@ ui.saveBtn.addEventListener('click', async () => {
 
   } catch (err) {
     const payloadToQueue = err.payload || (await getCurrentTabPayload());
-
     if (offlineQueueActive) {
        chrome.runtime.sendMessage({ type: 'QUEUE_SAVE', payload: payloadToQueue }); 
-       showFeedback("Offline gespeichert (Queue)", "warning");
+       showFeedback("Offline gespeichert", "warning");
     } else {
        showFeedback("Fehler beim Speichern", "error");
     }
   } finally {
-    const offlineQueueActive = localStorage.getItem('wdx-exp-offline-queue') === 'true';
-    if (isConnected || offlineQueueActive) {
+    ui.progress.style.display = 'none';
+    const updatedData = await chrome.storage.local.get('wdx-exp-offline-queue');
+    if (isConnected || updatedData['wdx-exp-offline-queue'] === 'true') {
         ui.saveBtn.disabled = false;
     }
-    ui.progress.style.display = 'none';
   }
 });
 
 async function getCurrentTabPayload() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        return {
-            url: tab.url,
-            title: tab.title,
-            text: "", 
-            keywords: ""
-        };
+        return { url: tab.url, title: tab.title, text: "", keywords: "" };
     } catch (e) { return null; }
 }
 
