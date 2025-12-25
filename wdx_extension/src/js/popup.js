@@ -23,7 +23,7 @@ ui.manualConnectBtn.addEventListener('click', checkConnection);
 
 (async () => {
   ui.versionText.innerText = `v${VERSION} (${BUILDDATE})`;
-  
+  localStorage.setItem('wdx-version', VERSION);
   if (!localStorage.getItem('wdx-setupversion')) {
     localStorage.setItem('wdx-setupversion', VERSION);
     localStorage.setItem('wdx-autoconnect', 'true');
