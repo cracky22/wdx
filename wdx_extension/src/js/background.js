@@ -64,7 +64,7 @@ async function processQueue() {
     await chrome.storage.local.set({ offlineQueue: newQueue });
     
     if (processedCount > 0) {
-        notify("Sync", `${processedCount} Elemente nachsynchronisiert.`);
+        notify("Offline-Warteschlange", `${processedCount} Elemente nachsynchronisiert.`);
     }
 }
 
