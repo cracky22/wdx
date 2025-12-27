@@ -1216,7 +1216,7 @@ class ProjectWindow:
         #             google.de     , zuletzt aufgerufen am 31.12.2025
         #citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
         # NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. Abrufdatum, URL.
-        citation = f"NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. {source['added']}, {source['url']}"
+        citation = f"NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. {source['added']}, {source['url']}."
         pyperclip.copy(citation)
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
         
