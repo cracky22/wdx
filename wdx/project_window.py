@@ -120,7 +120,7 @@ class ProjectWindow:
         self.canvas.bind("<ButtonPress-1>", self.on_canvas_press)
         self.canvas.bind("<B1-Motion>", self.on_canvas_motion)
         self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
-        self._bind_zoom_events()
+        #self._bind_zoom_events()
         self._bind_shortcuts()
         self.start_auto_refresh()
 
