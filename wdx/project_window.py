@@ -252,10 +252,10 @@ class ProjectWindow:
     def _get_default_border_width(self, item):
         return 2 if item["type"] == "source" else 0
 
-    def _bind_zoom_events(self):
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True))
-        self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False))
+    #def _bind_zoom_events(self):
+    #    self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+    #    self.canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, up=True))
+    #    self.canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, up=False))
 
     def _on_mousewheel(self, event, up=None):
         if self.dragging_canvas or self.dragging_card:
