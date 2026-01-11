@@ -151,51 +151,75 @@ class WdxApp:
             "favicon": "",
             "saved_pages": [],
         }
+        
         project_dir = project["path"]
         images_dir = project_dir / "images"
         sites_dir = project_dir / "sites"
         images_dir.mkdir(exist_ok=True)
         sites_dir.mkdir(exist_ok=True)
 
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
         try:
-            response = requests.get(data["url"], timeout=15)
-            if response.status_code == 200:
-                html_content = response.text
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                html_filename = f"page_{source_id}_{timestamp}.html"
+            response = requests.get(data["url"], headers=headers, timeout=15)
+            html_content = response.text
+            
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            html_filename = f"page_{source_id}_{timestamp}.html"
+            with open(sites_dir / html_filename, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            
+            new_source["saved_pages"].append({
+                "file": html_filename,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
 
-                with open(sites_dir / html_filename, "w", encoding="utf-8") as f:
-                    f.write(html_content)
+            icon_url = None
+            base_url = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(response.url)) # Nimm die finale URL nach Redirects
 
-                new_source["saved_pages"].append(
-                    {
-                        "file": html_filename,
-                        "timestamp": datetime.datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-                    }
-                )
+            try:
+                soup = BeautifulSoup(html_content, "html.parser")
+                icon_link = soup.find("link", rel=lambda x: x and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"])
+                if icon_link and icon_link.get("href"):
+                    icon_url = urljoin(base_url, icon_link.get("href"))
+            except Exception:
+                pass
 
+            if not icon_url:
+                icon_url = urljoin(base_url, "/favicon.ico")
+
+            fav_content = None
+            try:
+                fav_resp = requests.get(icon_url, headers=headers, timeout=5)
+                if fav_resp.status_code == 200 and len(fav_resp.content) > 0:
+                    fav_content = fav_resp.content
+            except:
+                pass
+
+            if not fav_content:
                 try:
-                    parsed_uri = urlparse(data["url"])
-                    base_url = "{uri.scheme}://{uri.netloc}".format(uri=parsed_uri)
-                    favicon_url = urljoin(base_url, "/favicon.ico")
+                    google_url = f"https://www.google.com/s2/favicons?domain={base_url}&sz=64"
+                    g_resp = requests.get(google_url, headers=headers, timeout=5)
+                    if g_resp.status_code == 200:
+                        fav_content = g_resp.content
+                except:
+                    pass
 
-                    fav_resp = requests.get(favicon_url, timeout=5)
-                    if fav_resp.status_code == 200 and fav_resp.content:
-                        if len(fav_resp.content) > 0:
-                            fav_name = f"favicon_{source_id}.ico"
-                            if b"PNG" in fav_resp.content[:8]:
-                                fav_name = f"favicon_{source_id}.png"
-
-                            with open(images_dir / fav_name, "wb") as f:
-                                f.write(fav_resp.content)
-                            new_source["favicon"] = fav_name
-                except Exception as e:
-                    print(f"Favicon Fehler: {e}")
+            if fav_content:
+                fav_name = f"favicon_{source_id}.ico"
+                if b"PNG" in fav_content[:8]:
+                    fav_name = f"favicon_{source_id}.png"
+                elif b"JFIF" in fav_content[:10] or b"Exif" in fav_content[:10]:
+                    fav_name = f"favicon_{source_id}.jpg"
+                
+                with open(images_dir / fav_name, "wb") as f:
+                    f.write(fav_content)
+                new_source["favicon"] = fav_name
 
         except Exception as e:
-            print(f"Download Fehler: {e}")
+            print(f"Download Worker Fehler: {e}")
 
         self.root.after(0, lambda: self._finalize_source_add_safe(project, new_source))
 
