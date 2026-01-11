@@ -930,63 +930,64 @@ class ProjectWindow:
         sites_dir.mkdir(exist_ok=True)
         images_dir.mkdir(exist_ok=True)
         new_favicon_name = None
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
         try:
-            response = requests.get(source["url"], timeout=15)
+            response = requests.get(source["url"], headers=headers, timeout=15)
             response.raise_for_status()
+            html_content = response.text
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"page_{source['id']}_{timestamp}.html"
 
             with open(sites_dir / filename, "w", encoding="utf-8") as f:
-                f.write(response.text)
+                f.write(html_content)
 
-            parsed = urlparse(source["url"])
-            favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
-            favicon_response = requests.get(favicon_url, timeout=5)
-            if (
-                favicon_response.status_code == 200
-                and "image" in favicon_response.headers.get("Content-Type", "")
-            ):
-                favicon_filename = f"favicon_{source['id']}_{timestamp}.ico"
-                favicon_path = images_dir / favicon_filename
-                with open(favicon_path, "wb") as f:
-                    f.write(favicon_response.content)
+            icon_url = None
+            base_url = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(response.url))
+
+            try:
+                soup = BeautifulSoup(html_content, "html.parser")
+                icon_link = soup.find("link", rel=lambda x: x and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"])
+                if icon_link and icon_link.get("href"):
+                    icon_url = urljoin(base_url, icon_link.get("href"))
+            except: pass
+
+            if not icon_url:
+                icon_url = urljoin(base_url, "/favicon.ico")
+
+            fav_content = None
+            try:
+                fr = requests.get(icon_url, headers=headers, timeout=5)
+                if fr.status_code == 200 and len(fr.content) > 0:
+                    fav_content = fr.content
+            except: pass
+
+            if not fav_content:
+                try:
+                    gr = requests.get(f"https://www.google.com/s2/favicons?domain={base_url}&sz=64", headers=headers, timeout=5)
+                    if gr.status_code == 200:
+                        fav_content = gr.content
+                except: pass
+
+            if fav_content:
+                ext = ".ico"
+                if b"PNG" in fav_content[:8]: ext = ".png"
+                elif b"JFIF" in fav_content[:10]: ext = ".jpg"
+                
+                favicon_filename = f"favicon_{source['id']}_{timestamp}{ext}"
+                with open(images_dir / favicon_filename, "wb") as f:
+                    f.write(fav_content)
                 new_favicon_name = favicon_filename
 
-            self.root.after(
-                0,
-                self._finalize_reload,
-                source["id"],
-                filename,
-                timestamp,
-                new_favicon_name,
-            )
+            self.root.after(0, self._finalize_reload, source["id"], filename, timestamp, new_favicon_name)
 
-        except requests.exceptions.Timeout:
-            self.root.after(
-                0,
-                lambda: messagebox.showerror(
-                    "Error 408",
-                    "Download Timeout-Fehler",
-                    parent=self.root,
-                ),
-            )
-        except requests.exceptions.RequestException as e:
-            self.root.after(
-                0,
-                lambda: messagebox.showerror(
-                    "Fehler", f"Download-Fehler: {e}", parent=self.root
-                ),
-            )
         except Exception as e:
-            self.root.after(
-                0,
-                lambda: messagebox.showerror(
-                    "Fehler",
-                    f"Ein unerwarteter Fehler ist aufgetreten: {e}",
-                    parent=self.root,
-                ),
-            )
+            print(f"Reload Fehler: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Fehler", f"Fehler beim Neuladen: {e}", parent=self.root))
 
     def _finalize_reload(self, source_id, filename, timestamp, new_favicon_name):
         source = next(
