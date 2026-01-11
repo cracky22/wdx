@@ -1095,7 +1095,7 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(
-            label="Löschen (Entf)", command=lambda: self.delete_item(item)
+            label="Löschen (Entf)", command=lambda: self.delete_selected_items(item)
         )
         item_id = item["id"]
         self.context_menu.add_command(
@@ -1187,27 +1187,111 @@ class ProjectWindow:
                 self.reset_zoom()
                 self._update_minimap()
 
-    def delete_item(self, item):
-        if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
-            item_id = item["id"]
-            self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
-            frame, item_id_canvas = self.source_frames[item_id]
-            self.canvas.delete(item_id_canvas)
+    def delete_shortcut(self, event=None):
+        """Wird durch die Entf-Taste ausgelöst."""
+        if not self.selected_source_ids:
+            return
+        
+        if len(self.selected_source_ids) > 1:
+            self.delete_selected_items()
+        else:
+            item_id = next(iter(self.selected_source_ids))
+            self.delete_item(item_id)
+
+    def delete_item(self, item_id):
+        """Löscht ein einzelnes Element (Karte oder Überschrift)."""
+        item_to_delete = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
+        if not item_to_delete:
+            return
+
+        # 1. Aus Datenstruktur entfernen
+        self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
+        
+        # 2. Garbage Collection (überspringt Überschriften intern)
+        self._garbage_collect_files([item_to_delete])
+        
+        # 3. GUI Bereinigung
+        if item_id in self.source_frames:
+            frame, canvas_id = self.source_frames[item_id]
+            self.canvas.delete(canvas_id)
             frame.destroy()
             del self.source_frames[item_id]
+        
+        if item_id in self.card_widgets:
             del self.card_widgets[item_id]
-            if item_id in self.selected_source_ids:
-                self.selected_source_ids.remove(item_id)
-            self.save_project()
-            self.update_last_mtime()
-            self.update_scrollregion()
-            self.reset_zoom()
-            self._update_minimap()
+        
+        if item_id in self.selected_source_ids:
+            self.selected_source_ids.remove(item_id)
             
-    def delete_shortcut(self):
-        item_id = next(iter(self.selected_source_ids))
-        item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        self.delete_item(item)
+        self.manual_save()
+        self._update_minimap()
+
+    def delete_selected_items(self):
+        if not self.selected_source_ids:
+            return
+
+        if not messagebox.askyesno("Löschen", f"{len(self.selected_source_ids)} Element(e) wirklich löschen?"):
+            return
+
+        items_to_remove = [item for item in self.project["data"]["items"] if item["id"] in self.selected_source_ids]
+        
+        self.project["data"]["items"] = [
+            item for item in self.project["data"]["items"] if item["id"] not in self.selected_source_ids
+        ]
+
+        self._garbage_collect_files(items_to_remove)
+
+        for item_id in list(self.selected_source_ids):
+            if item_id in self.source_frames:
+                frame, canvas_id = self.source_frames[item_id]
+                self.canvas.delete(canvas_id)
+                frame.destroy()
+                del self.source_frames[item_id]
+            if item_id in self.card_widgets:
+                del self.card_widgets[item_id]
+
+        self.selected_source_ids.clear()
+        self.manual_save()
+        self._update_minimap()
+
+    def _garbage_collect_files(self, removed_items):
+        project_path = Path(self.project["path"])
+        remaining_items = self.project.get("data", {}).get("items", [])
+        sites_dir = project_path / "sites"
+        
+        for item in removed_items:
+            if item.get("type") == "heading":
+                continue
+
+            item_id = item.get("id")
+            if not item_id:
+                continue
+
+            if sites_dir.exists():
+                pattern = f"page_{item_id}_*.html"
+                found_files = list(sites_dir.glob(pattern))
+                
+                if not found_files:
+                    print(f"GC Info: Keine Dateien für Muster {pattern} gefunden.")
+                
+                for html_file in found_files:
+                    try:
+                        html_file.unlink()
+                        print(f"GC: HTML gelöscht: {html_file.name}")
+                    except Exception as e:
+                        print(f"GC Fehler beim Löschen von {html_file.name}: {e}")
+
+            favicon_name = item.get("favicon")
+            if favicon_name:
+                still_used = any(i.get("favicon") == favicon_name for i in remaining_items)
+                if not still_used:
+                    fav_path = project_path / "images" / favicon_name
+                    if fav_path.exists():
+                        try:
+                            fav_path.unlink()
+                            print(f"GC: Favicon gelöscht: {favicon_name}")
+                        except Exception as e:
+                            print(f"GC Fehler Favicon: {e}")
 
     def add_heading(self):
         text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
