@@ -1257,6 +1257,7 @@ class ProjectWindow:
     def _garbage_collect_files(self, removed_items):
         project_path = Path(self.project["path"])
         remaining_items = self.project.get("data", {}).get("items", [])
+        sites_dir = project_path / "sites"
         
         for item in removed_items:
             if item.get("type") == "heading":
@@ -1266,16 +1267,19 @@ class ProjectWindow:
             if not item_id:
                 continue
 
-            html_file = project_path / "sites" / f"{item_id}.html"
-            
-            if html_file.exists():
-                try:
-                    html_file.unlink()
-                    print(f"GC: HTML gelöscht: {html_file.name}")
-                except Exception as e:
-                    print(f"GC Fehler beim Löschen der HTML {item_id}: {e}")
-            else:
-                print(f"GC Info: HTML Datei nicht gefunden unter {html_file}")
+            if sites_dir.exists():
+                pattern = f"page_{item_id}_*.html"
+                found_files = list(sites_dir.glob(pattern))
+                
+                if not found_files:
+                    print(f"GC Info: Keine Dateien für Muster {pattern} gefunden.")
+                
+                for html_file in found_files:
+                    try:
+                        html_file.unlink()
+                        print(f"GC: HTML gelöscht: {html_file.name}")
+                    except Exception as e:
+                        print(f"GC Fehler beim Löschen von {html_file.name}: {e}")
 
             favicon_name = item.get("favicon")
             if favicon_name:
