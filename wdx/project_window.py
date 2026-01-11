@@ -10,6 +10,7 @@ import pyperclip
 import json
 import os
 from pathlib import Path
+from PIL import Image, ImageTk
 import requests
 from urllib.parse import urlparse, urljoin
 import threading
@@ -301,6 +302,7 @@ class ProjectWindow:
         heading_size = max(int(self.base_font_heading[1] * self.zoom_level), 8)
         default_size = max(int(self.base_font_default[1] * self.zoom_level), 5)
         icon_size = max(int(self.base_icon_size * self.zoom_level), 10)
+        
         for item_id, refs in self.card_widgets.items():
             if "title_label" in refs:
                 refs["title_label"].config(font=("Helvetica", title_size, "bold"))
@@ -317,15 +319,17 @@ class ProjectWindow:
                 refs["heading_label"].config(font=("Helvetica", heading_size, "bold"))
 
             if "icon_label" in refs:
-                if ("original_icon_data" in refs and refs["original_icon_data"]["is_favicon"]):
-                    original_img = refs["original_icon_data"]["original_img"]
-                    new_subsample = max(1, int(self.base_favicon_subsample / self.zoom_level))
+                if ("original_icon_data" in refs and refs["original_icon_data"].get("is_favicon")):
+                    pil_img = refs["original_icon_data"]["pil_img"]
+                    target_size = max(1, int(16 * self.zoom_level)) #16px Zielgröße
                     try:
-                        new_img = original_img.subsample(new_subsample, new_subsample)
-                        refs["icon_label"].config(image=new_img)
-                        refs["icon_label"].image = new_img
-                    except tk.TclError:
-                        pass
+                        resized_pil = pil_img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                        new_tk_img = ImageTk.PhotoImage(resized_pil)
+                        
+                        refs["icon_label"].config(image=new_tk_img)
+                        refs["icon_label"].image = new_tk_img
+                    except Exception as e:
+                        print(f"Zoom Error: {e}")
                 else:
                     refs["icon_label"].config(font=("Helvetica", icon_size))
 
@@ -357,14 +361,18 @@ class ProjectWindow:
 
         if favicon_path:
             try:
-                original_img = tk.PhotoImage(file=favicon_path)
-                self.card_widgets[item_id]["original_icon_data"] = {"original_img": original_img, "is_favicon": True}
-                favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                favicon_label = tk.Label(frame, image=favicon_img, bg=color)
-                favicon_label.image = favicon_img
+                pil_img = Image.open(favicon_path)
+                self.card_widgets[item_id]["original_icon_data"] = {"pil_img": pil_img, "is_favicon": True}
+                target_size = max(10, int(16 * self.zoom_level)) # 16px Zielgröße
+                resized_pil = pil_img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                tk_img = ImageTk.PhotoImage(resized_pil)
+                
+                favicon_label = tk.Label(frame, image=tk_img, bg=color)
+                favicon_label.image = tk_img
                 favicon_label.pack(anchor="w")
                 self.card_widgets[item_id]["icon_label"] = favicon_label
-            except Exception:
+            except Exception as e:
+                print(f"Icon Load Error: {e}") # debugging
                 globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
                 globe_label.pack(anchor="w")
                 self.card_widgets[item_id]["icon_label"] = globe_label

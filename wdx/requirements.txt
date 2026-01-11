@@ -3,3 +3,4 @@ pyzipper
 pyperclip
 ttkbootstrap
 beautifulsoup4
+Pillow
