@@ -9,6 +9,7 @@ import webbrowser
 import pyperclip
 import json
 import os
+from bs4 import BeautifulSoup
 from pathlib import Path
 from PIL import Image, ImageTk
 import requests
