@@ -508,6 +508,17 @@ class ProjectWindow:
 
         self.minimap_canvas.delete("all")
         bbox_all = self.canvas.bbox("all")
+        
+        self._minimap_params = {
+            "minimap_scale": 1.0,
+            "offset_x": 0,
+            "offset_y": 0,
+            "x1_main": 0,
+            "y1_main": 0,
+            "total_width": 0,
+            "total_height": 0
+        }
+
         if not bbox_all:
             self.viewport_rect_id = None
             self._update_minimap_viewport()
@@ -524,6 +535,7 @@ class ProjectWindow:
         content_height = y2_main - y1_main
         map_w = self.minimap_canvas.winfo_width()
         map_h = self.minimap_canvas.winfo_height()
+
         if content_width > 0 and content_height > 0:
             scale_x = map_w / content_width
             scale_y = map_h / content_height
@@ -536,24 +548,59 @@ class ProjectWindow:
         offset_x = center_x_map - (x1_main + content_width / 2) * minimap_scale
         offset_y = center_y_map - (y1_main + content_height / 2) * minimap_scale
 
+        self._minimap_params.update({
+            "minimap_scale": minimap_scale,
+            "offset_x": offset_x,
+            "offset_y": offset_y,
+            "x1_main": x1_main,
+            "y1_main": y1_main,
+            "total_width": content_width,
+            "total_height": content_height
+        })
+
         for item_id, (frame, window_id) in self.source_frames.items():
-            item = frame.item_data
-
             coords = self.canvas.coords(window_id)
-            if not coords:
-                continue
-            frame_width = frame.winfo_reqwidth()
-            frame_height = frame.winfo_reqheight()
-            x_map_start = coords[0] * minimap_scale + offset_x
-            y_map_start = coords[1] * minimap_scale + offset_y
-            x_map_end = x_map_start + frame_width * minimap_scale
-            y_map_end = y_map_start + frame_height * minimap_scale
-            color = item.get("effective_color", "#cccccc")
-            outline_color = "#333333" if item["type"] == "source" else ""
-            self.minimap_canvas.create_rectangle(x_map_start, y_map_start, x_map_end, y_map_end, fill=color, outline=outline_color, width=1, tags=("card_rect", item_id))
+            if not coords: continue
+            
+            color = frame.item_data.get("effective_color", "#ffffff")
+            
+            mx = coords[0] * minimap_scale + offset_x
+            my = coords[1] * minimap_scale + offset_y
+            mw = frame.winfo_width() * minimap_scale
+            mh = frame.winfo_height() * minimap_scale
+            
+            self.minimap_canvas.create_rectangle(
+                mx, my, mx + mw, my + mh, 
+                fill=color, outline="#aaaaaa", width=1
+            )
 
-        self._minimap_params = {"x1_main": x1_main, "y1_main": y1_main, "x2_main": x2_main, "y2_main": y2_main, "minimap_scale": minimap_scale, "offset_x": offset_x, "offset_y": offset_y}
         self._update_minimap_viewport()
+
+    def _update_minimap_viewport(self):
+        if not self.minimap_canvas or not self.minimap_canvas.winfo_exists():
+            return
+
+        p = self._minimap_params
+        scale = p["minimap_scale"]
+        off_x = p["offset_x"]
+        off_y = p["offset_y"]
+
+        vx1 = self.canvas.canvasx(0)
+        vy1 = self.canvas.canvasy(0)
+        vx2 = vx1 + self.canvas.winfo_width()
+        vy2 = vy1 + self.canvas.winfo_height()
+
+        mx1 = vx1 * scale + off_x
+        my1 = vy1 * scale + off_y
+        mx2 = vx2 * scale + off_x
+        my2 = vy2 * scale + off_y
+
+        if self.viewport_rect_id:
+            self.minimap_canvas.delete(self.viewport_rect_id)
+
+        self.viewport_rect_id = self.minimap_canvas.create_rectangle(
+            mx1, my1, mx2, my2, outline="red", width=2
+        )
 
     def _update_minimap_viewport(self):
         if (not self.minimap_canvas or not self.minimap_canvas.winfo_exists() or not hasattr(self, "_minimap_params")):
