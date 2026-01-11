@@ -119,13 +119,11 @@ class WdxApp:
                 )
                 return
 
-            project_name = simpledialog.askstring(
-                "Projekt wählen",
-                "In welches Projekt speichern?\n" + ", ".join(project_names),
-                parent=self.root,
-            )
+            project_name = self._ask_project_selection(project_names)
+            
             if not project_name or project_name not in project_names:
                 return
+            
             project = next(
                 p for p in self.project_manager.projects if p["name"] == project_name
             )
@@ -136,6 +134,34 @@ class WdxApp:
             threading.Thread(
                 target=self._download_worker, args=(data, project), daemon=True
             ).start()
+            
+    def _ask_project_selection(self, project_names):
+        selection = {"name": None}
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Projekt wählen")
+        dialog.geometry("300x400")
+        dialog.grab_set()
+        ttk.Label(dialog, text="In welches Projekt speichern?", padding=10).pack()
+        frame = ttk.Frame(dialog, padding=10)
+        frame.pack(fill="both", expand=True)
+
+        def select(name):
+            selection["name"] = name
+            dialog.destroy()
+
+        for name in project_names:
+            btn = ttk.Button(
+                frame, 
+                text=name, 
+                bootstyle="outline-primary",
+                command=lambda n=name: select(n)
+            )
+            btn.pack(fill="x", pady=2)
+
+        ttk.Separator(dialog).pack(fill="x", pady=5)
+        ttk.Button(dialog, text="Abbrechen", bootstyle="danger", command=dialog.destroy).pack(pady=10)
+        self.root.wait_window(dialog)
+        return selection["name"]
 
     def _download_worker(self, data, project):
         source_id = str(uuid.uuid4())
