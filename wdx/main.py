@@ -6,6 +6,7 @@ import json
 import uuid
 import threading
 import requests
+from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from constants import APP_TITLE
 from server import start_server
