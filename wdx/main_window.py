@@ -34,6 +34,15 @@ class MainWindow:
         self.main_frame.rowconfigure(1, weight=1)
         
         self.update_project_tiles()
+        
+    def set_browser_connected(self, connected=True):
+        if connected:
+            self.status_label.config(text="Browser verbunden", bootstyle="success")
+            if hasattr(self, '_status_timer'):
+                self.root.after_cancel(self._status_timer)
+            self._status_timer = self.root.after(10000, lambda: self.set_browser_connected(False))
+        else:
+            self.status_label.config(text="Keine Browser-Verbindung", bootstyle="danger")
 
     def format_size(self, size_bytes):
         if size_bytes <= 0: return "0 B"

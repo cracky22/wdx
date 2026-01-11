@@ -21,6 +21,9 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if hasattr(self.app, "main_window"):
+            self.app.root.after(0, self.app.main_window.set_browser_connected, True)
+            
         if self.path == "/api/add_source":
             content_length = int(self.headers.get("Content-Length", 0))
             
@@ -50,6 +53,9 @@ class WdxHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def do_GET(self):
+        if hasattr(self.app, "main_window"):
+            self.app.root.after(0, self.app.main_window.set_browser_connected, True)
+            
         if self.path == "/api/status":
             current_project = getattr(self.app, "current_project_name", None)
             response = {"connected": True, "current_project": current_project}

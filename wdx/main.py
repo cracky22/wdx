@@ -43,6 +43,10 @@ class WdxApp:
             if hasattr(self.project_window, "main_frame") and self.project_window.main_frame.winfo_exists():
                 self.project_window.main_frame.destroy()
             del self.project_window
+            
+            if hasattr(self, "current_project_name"):
+                self.root.after(0, self.main_window.set_browser_connected, True)
+            
         self.current_project_name = None
         self.main_window.refresh_and_update()
         self.main_window.show()

@@ -16,13 +16,11 @@ class ProjectManager:
         self.load_projects()
 
     def _get_dir_size(self, path):
-        """Berechnet die Gesamtgröße eines Verzeichnisses in Bytes."""
         total_size = 0
         try:
             path_obj = Path(path)
             if not path_obj.exists():
                 return 0
-            # Scandir ist effizienter als os.listdir
             with os.scandir(path_obj) as it:
                 for entry in it:
                     try:
