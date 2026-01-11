@@ -515,6 +515,8 @@ class ProjectWindow:
             "offset_y": 0,
             "x1_main": 0,
             "y1_main": 0,
+            "x2_main": 0,
+            "y2_main": 0,
             "total_width": 0,
             "total_height": 0
         }
@@ -549,13 +551,13 @@ class ProjectWindow:
         offset_y = center_y_map - (y1_main + content_height / 2) * minimap_scale
 
         self._minimap_params.update({
-            "minimap_scale": minimap_scale,
-            "offset_x": offset_x,
-            "offset_y": offset_y,
             "x1_main": x1_main,
             "y1_main": y1_main,
-            "total_width": content_width,
-            "total_height": content_height
+            "x2_main": x2_main,
+            "y2_main": y2_main,
+            "minimap_scale": minimap_scale,
+            "offset_x": offset_x,
+            "offset_y": offset_y
         })
 
         for item_id, (frame, window_id) in self.source_frames.items():
