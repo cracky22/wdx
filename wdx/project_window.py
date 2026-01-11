@@ -1203,6 +1203,61 @@ class ProjectWindow:
             self.update_scrollregion()
             self.reset_zoom()
             self._update_minimap()
+
+    def delete_selected_items(self):
+        if not self.selected_source_ids:
+            return
+
+        if not messagebox.askyesno("Löschen", f"{len(self.selected_source_ids)} Element(e) wirklich löschen?"):
+            return
+
+        items_to_remove = [item for item in self.project["data"]["items"] if item["id"] in self.selected_source_ids]
+        
+        self.project["data"]["items"] = [
+            item for item in self.project["data"]["items"] if item["id"] not in self.selected_source_ids
+        ]
+
+        self._garbage_collect_files(items_to_remove)
+
+        for item_id in self.selected_source_ids:
+            if item_id in self.source_frames:
+                frame, canvas_id = self.source_frames[item_id]
+                self.canvas.delete(canvas_id)
+                frame.destroy()
+                del self.source_frames[item_id]
+            if item_id in self.card_widgets:
+                del self.card_widgets[item_id]
+
+        self.selected_source_ids.clear()
+        self.manual_save()
+        self._update_minimap()
+
+    def _garbage_collect_files(self, removed_items):
+        remaining_items = self.project["data"]["items"]
+        project_path = Path(self.project["path"])
+        
+        for item in removed_items:
+            if item.get("type") == "heading":
+                continue
+
+            html_file = project_path / f"{item['id']}.html"
+            if html_file.exists():
+                try:
+                    html_file.unlink()
+                except Exception as e:
+                    print(f"Fehler beim Löschen der HTML-Datei: {e}")
+
+            favicon_name = item.get("favicon")
+            if favicon_name:
+                still_used = any(i.get("favicon") == favicon_name for i in remaining_items)
+                
+                if not still_used:
+                    fav_path = project_path / "images" / favicon_name
+                    if fav_path.exists():
+                        try:
+                            fav_path.unlink()
+                        except Exception as e:
+                            print(f"Fehler beim Löschen des Favicons: {e}")
             
     def delete_shortcut(self):
         item_id = next(iter(self.selected_source_ids))
