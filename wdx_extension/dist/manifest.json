@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "wdx Quellen",
-  "version": "1.2.7",
+  "version": "1.2.9",
   "description": "Smart Capture für wdx",
   "permissions": [
     "contextMenus",
@@ -11,7 +11,9 @@
     "storage",
     "alarms"
   ],
-  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "host_permissions": [
+    "http://127.0.0.1:8765/*"
+  ],
   "background": {
     "service_worker": "src/js/background.js",
     "type": "module"
