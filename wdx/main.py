@@ -44,6 +44,7 @@ class WdxApp:
                 self.project_window.main_frame.destroy()
             del self.project_window
         self.current_project_name = None
+        self.main_window.refresh_and_update()
         self.main_window.show()
 
     def load_dark_mode_setting(self):
