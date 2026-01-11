@@ -232,6 +232,10 @@ class WdxApp:
             data["items"].append(source)
             
         self.project_manager.update_project_file_safe(project, update_logic)
+        
+        if self.current_project_name is None:
+            self.main_window.refresh_and_update()
+            
         messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
 
 
