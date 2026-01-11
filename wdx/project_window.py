@@ -358,14 +358,18 @@ class ProjectWindow:
 
         if favicon_path:
             try:
-                original_img = tk.PhotoImage(file=favicon_path)
-                self.card_widgets[item_id]["original_icon_data"] = {"original_img": original_img, "is_favicon": True}
-                favicon_img = original_img.subsample(self.base_favicon_subsample, self.base_favicon_subsample)
-                favicon_label = tk.Label(frame, image=favicon_img, bg=color)
-                favicon_label.image = favicon_img
+                pil_img = Image.open(favicon_path)
+                self.card_widgets[item_id]["original_icon_data"] = {"pil_img": pil_img, "is_favicon": True}
+                target_size = max(10, int(16 * self.zoom_level)) # 16px Zielgröße
+                resized_pil = pil_img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                tk_img = ImageTk.PhotoImage(resized_pil)
+                
+                favicon_label = tk.Label(frame, image=tk_img, bg=color)
+                favicon_label.image = tk_img
                 favicon_label.pack(anchor="w")
                 self.card_widgets[item_id]["icon_label"] = favicon_label
-            except Exception:
+            except Exception as e:
+                print(f"Icon Load Error: {e}") # debugging
                 globe_label = tk.Label(frame, text="🌐", font=("Helvetica", self.base_icon_size), bg=color, fg=text_color)
                 globe_label.pack(anchor="w")
                 self.card_widgets[item_id]["icon_label"] = globe_label
