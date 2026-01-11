@@ -1255,19 +1255,27 @@ class ProjectWindow:
         self._update_minimap()
 
     def _garbage_collect_files(self, removed_items):
-        remaining_items = self.project["data"]["items"]
         project_path = Path(self.project["path"])
+        remaining_items = self.project.get("data", {}).get("items", [])
         
         for item in removed_items:
             if item.get("type") == "heading":
                 continue
 
-            html_file = project_path / f"{item['id']}.html"
+            item_id = item.get("id")
+            if not item_id:
+                continue
+
+            html_file = project_path / f"{item_id}.html"
+            
             if html_file.exists():
                 try:
                     html_file.unlink()
+                    print(f"GC: HTML gelöscht: {html_file.name}")
                 except Exception as e:
-                    print(f"GC Fehler HTML: {e}")
+                    print(f"GC Fehler beim Löschen der HTML {item_id}: {e}")
+            else:
+                print(f"GC Info: HTML Datei nicht gefunden unter {html_file}")
 
             favicon_name = item.get("favicon")
             if favicon_name:
@@ -1277,6 +1285,7 @@ class ProjectWindow:
                     if fav_path.exists():
                         try:
                             fav_path.unlink()
+                            print(f"GC: Favicon gelöscht: {favicon_name}")
                         except Exception as e:
                             print(f"GC Fehler Favicon: {e}")
 
