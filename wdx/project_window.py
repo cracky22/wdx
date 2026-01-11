@@ -1187,22 +1187,46 @@ class ProjectWindow:
                 self.reset_zoom()
                 self._update_minimap()
 
-    def delete_item(self, item):
-        if messagebox.askyesno("Bestätigen", f"{'Überschrift' if item['type'] == 'heading' else 'Quelle'} löschen?", parent=self.root):
-            item_id = item["id"]
+    def delete_item(self, item_id):
+        item_to_delete = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
+        if item_to_delete:
+            favicon = item_to_delete.get("favicon")
             self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
-            frame, item_id_canvas = self.source_frames[item_id]
-            self.canvas.delete(item_id_canvas)
-            frame.destroy()
-            del self.source_frames[item_id]
-            del self.card_widgets[item_id]
-            if item_id in self.selected_source_ids:
-                self.selected_source_ids.remove(item_id)
-            self.save_project()
-            self.update_last_mtime()
-            self.update_scrollregion()
-            self.reset_zoom()
+            self._delete_card_files(item_id, favicon)
+            
+            if item_id in self.source_frames:
+                frame, canvas_id = self.source_frames[item_id]
+                self.canvas.delete(canvas_id)
+                frame.destroy()
+                del self.source_frames[item_id]
+            
+            self.manual_save()
             self._update_minimap()
+            
+    def _delete_card_files(self, item_id, favicon_name):
+        project_path = Path(self.project["path"])
+        
+        html_file = project_path / f"{item_id}.html"
+        if html_file.exists():
+            try:
+                html_file.unlink()
+            except Exception as e:
+                print(f"GC: Fehler beim Löschen der HTML {item_id}: {e}")
+
+        if favicon_name:
+            still_used = any(
+                i.get("favicon") == favicon_name 
+                for i in self.project["data"]["items"] 
+                if i.get("id") != item_id
+            )
+            
+            if not still_used:
+                fav_path = project_path / "images" / favicon_name
+                if fav_path.exists():
+                    try:
+                        fav_path.unlink()
+                    except Exception as e:
+                        print(f"GC: Fehler beim Löschen des Favicons {favicon_name}: {e}")
 
     def delete_selected_items(self):
         if not self.selected_source_ids:
