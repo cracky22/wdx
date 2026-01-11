@@ -1266,7 +1266,7 @@ class ProjectWindow:
             if not item_id:
                 continue
 
-            html_file = project_path / f"{item_id}.html"
+            html_file = project_path / "sites" / f"{item_id}.html"
             
             if html_file.exists():
                 try:
