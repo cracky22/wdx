@@ -44,6 +44,7 @@ class WdxApp:
                 self.project_window.main_frame.destroy()
             del self.project_window
         self.current_project_name = None
+        self.main_window.refresh_and_update()
         self.main_window.show()
 
     def load_dark_mode_setting(self):
@@ -231,6 +232,10 @@ class WdxApp:
             data["items"].append(source)
             
         self.project_manager.update_project_file_safe(project, update_logic)
+        
+        if self.current_project_name is None:
+            self.main_window.refresh_and_update()
+            
         messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
 
 

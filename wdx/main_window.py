@@ -41,6 +41,11 @@ class MainWindow:
         i = int(math.floor(math.log(size_bytes, 1024)))
         s = round(size_bytes / math.pow(1024, i), 2)
         return f"{s} {units[i]}"
+    
+    def refresh_and_update(self):
+        for project in self.project_manager.projects:
+            project["size"] = self.project_manager._get_dir_size(project["path"])
+        self.update_project_tiles()
 
     def update_project_tiles(self):
         for widget in self.projects_frame.winfo_children():
