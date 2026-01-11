@@ -1095,7 +1095,7 @@ class ProjectWindow:
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
         self.context_menu.add_command(
-            label="Löschen (Entf)", command=lambda: self.delete_item(item)
+            label="Löschen (Entf)", command=lambda: self.delete_selected_items(item)
         )
         item_id = item["id"]
         self.context_menu.add_command(
@@ -1187,46 +1187,44 @@ class ProjectWindow:
                 self.reset_zoom()
                 self._update_minimap()
 
-    def delete_item(self, item_id):
-        item_to_delete = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        if item_to_delete:
-            favicon = item_to_delete.get("favicon")
-            self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
-            self._delete_card_files(item_id, favicon)
-            
-            if item_id in self.source_frames:
-                frame, canvas_id = self.source_frames[item_id]
-                self.canvas.delete(canvas_id)
-                frame.destroy()
-                del self.source_frames[item_id]
-            
-            self.manual_save()
-            self._update_minimap()
-            
-    def _delete_card_files(self, item_id, favicon_name):
-        project_path = Path(self.project["path"])
+    def delete_shortcut(self, event=None):
+        """Wird durch die Entf-Taste ausgelöst."""
+        if not self.selected_source_ids:
+            return
         
-        html_file = project_path / f"{item_id}.html"
-        if html_file.exists():
-            try:
-                html_file.unlink()
-            except Exception as e:
-                print(f"GC: Fehler beim Löschen der HTML {item_id}: {e}")
+        if len(self.selected_source_ids) > 1:
+            self.delete_selected_items()
+        else:
+            item_id = next(iter(self.selected_source_ids))
+            self.delete_item(item_id)
 
-        if favicon_name:
-            still_used = any(
-                i.get("favicon") == favicon_name 
-                for i in self.project["data"]["items"] 
-                if i.get("id") != item_id
-            )
+    def delete_item(self, item_id):
+        """Löscht ein einzelnes Element (Karte oder Überschrift)."""
+        item_to_delete = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
+        if not item_to_delete:
+            return
+
+        # 1. Aus Datenstruktur entfernen
+        self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
+        
+        # 2. Garbage Collection (überspringt Überschriften intern)
+        self._garbage_collect_files([item_to_delete])
+        
+        # 3. GUI Bereinigung
+        if item_id in self.source_frames:
+            frame, canvas_id = self.source_frames[item_id]
+            self.canvas.delete(canvas_id)
+            frame.destroy()
+            del self.source_frames[item_id]
+        
+        if item_id in self.card_widgets:
+            del self.card_widgets[item_id]
+        
+        if item_id in self.selected_source_ids:
+            self.selected_source_ids.remove(item_id)
             
-            if not still_used:
-                fav_path = project_path / "images" / favicon_name
-                if fav_path.exists():
-                    try:
-                        fav_path.unlink()
-                    except Exception as e:
-                        print(f"GC: Fehler beim Löschen des Favicons {favicon_name}: {e}")
+        self.manual_save()
+        self._update_minimap()
 
     def delete_selected_items(self):
         if not self.selected_source_ids:
@@ -1243,7 +1241,7 @@ class ProjectWindow:
 
         self._garbage_collect_files(items_to_remove)
 
-        for item_id in self.selected_source_ids:
+        for item_id in list(self.selected_source_ids):
             if item_id in self.source_frames:
                 frame, canvas_id = self.source_frames[item_id]
                 self.canvas.delete(canvas_id)
@@ -1269,24 +1267,18 @@ class ProjectWindow:
                 try:
                     html_file.unlink()
                 except Exception as e:
-                    print(f"Fehler beim Löschen der HTML-Datei: {e}")
+                    print(f"GC Fehler HTML: {e}")
 
             favicon_name = item.get("favicon")
             if favicon_name:
                 still_used = any(i.get("favicon") == favicon_name for i in remaining_items)
-                
                 if not still_used:
                     fav_path = project_path / "images" / favicon_name
                     if fav_path.exists():
                         try:
                             fav_path.unlink()
                         except Exception as e:
-                            print(f"Fehler beim Löschen des Favicons: {e}")
-            
-    def delete_shortcut(self):
-        item_id = next(iter(self.selected_source_ids))
-        item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        self.delete_item(item)
+                            print(f"GC Fehler Favicon: {e}")
 
     def add_heading(self):
         text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
