@@ -527,7 +527,8 @@ class ProjectWindow:
             return
 
         x1_main, y1_main, x2_main, y2_main = bbox_all
-        buffer = 50 * self.zoom_level
+        
+        buffer = 100 
         x1_main -= buffer
         y1_main -= buffer
         x2_main += buffer
@@ -568,8 +569,9 @@ class ProjectWindow:
             
             mx = coords[0] * minimap_scale + offset_x
             my = coords[1] * minimap_scale + offset_y
-            mw = frame.winfo_width() * minimap_scale
-            mh = frame.winfo_height() * minimap_scale
+            
+            mw = max(15, frame.winfo_width() * minimap_scale)
+            mh = max(15, frame.winfo_height() * minimap_scale)
             
             self.minimap_canvas.create_rectangle(
                 mx, my, mx + mw, my + mh, 
