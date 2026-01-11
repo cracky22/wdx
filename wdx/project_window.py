@@ -10,6 +10,7 @@ import pyperclip
 import json
 import os
 from pathlib import Path
+from PIL import Image, ImageTk
 import requests
 from urllib.parse import urlparse, urljoin
 import threading
