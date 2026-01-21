@@ -6,6 +6,7 @@ import json
 import uuid
 import threading
 import requests
+import winreg
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from constants import APP_TITLE
@@ -52,24 +53,30 @@ class WdxApp:
         self.main_window.show()
 
     def load_dark_mode_setting(self):
-        settings_file = Path.home() / "Documents" / "wdx" / "settings.json"
-        if settings_file.exists():
-            try:
-                with open(settings_file, "r", encoding="utf-8") as f:
-                    settings = json.load(f)
-                return settings.get("dark_mode", False)
-            except:
-                return False
-        return False
+        REG_PATH = r"Software\crackyOS\wdx"
+        REG_VALUE = "dark_mode"
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ) as key:
+                value, reg_type = winreg.QueryValueEx(key, REG_VALUE)
+                return bool(value)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
 
     def save_dark_mode_setting(self, enabled):
-        settings_dir = Path.home() / "Documents" / "wdx"
-        settings_dir.mkdir(parents=True, exist_ok=True)
-        settings_file = settings_dir / "settings.json"
+        REG_PATH = r"Software\crackyOS\wdx"
+        REG_VALUE = "dark_mode"
         try:
-            with open(settings_file, "w", encoding="utf-8") as f:
-                json.dump({"dark_mode": enabled}, f)
-        except:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH) as key:
+                winreg.SetValueEx(
+                    key,
+                    REG_VALUE,
+                    0,
+                    winreg.REG_DWORD,
+                    1 if enabled else 0
+                )
+        except OSError:
             pass
 
     def toggle_theme(self):
