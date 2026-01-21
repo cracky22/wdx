@@ -37,7 +37,7 @@ class ProjectManager:
 
     def get_registry_password(self):
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\wdx", 0, winreg.KEY_READ)
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\crackyOS\wdx", 0, winreg.KEY_READ)
             value, _ = winreg.QueryValueEx(key, "ExportPassword")
             winreg.CloseKey(key)
             return value if value else CODENAME
