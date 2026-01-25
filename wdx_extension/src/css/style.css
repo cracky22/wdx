@@ -26,6 +26,7 @@ body {
   background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
   transition: background-color 0.3s, color 0.3s;
+  font-family: "Rubik", sans-serif!important;
 }
 
 .status-row {
