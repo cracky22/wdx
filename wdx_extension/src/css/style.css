@@ -70,6 +70,7 @@ body {
   margin: 0;
   font-size: 22px;
   font-weight: 500;
+  user-select: none;
 }
 
 .card {
@@ -97,6 +98,7 @@ body {
 
 .full-width {
   width: 100%;
+  user-select: none;
 }
 .hidden {
   display: none !important;
@@ -124,6 +126,7 @@ body {
   margin-top: 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  user-select: none;
 }
 .text-muted {
   opacity: 0.7;
@@ -132,9 +135,11 @@ body {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.5px;
+  user-select: none;
 }
 .body-large {
   font-size: 16px;
+  user-select: none;
 }
 
 .feedback-msg {
@@ -187,4 +192,5 @@ md-icon {
   opacity: 0.6;
   margin-top: 12px;
   text-decoration: none;
+  user-select: none;
 }
