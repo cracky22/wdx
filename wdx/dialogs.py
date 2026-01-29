@@ -126,6 +126,9 @@ class SourceDialog(tk.Toplevel):
         
         
     def setup_bindings(self):
+        self.bind("<Control-Return>", lambda e: self.save())
+        self.bind("<Escape>", lambda e: self.destroy())
+        
         widgets = [self.url_entry, self.title_entry, self.text_text, self.keywords_entry]
         for w in widgets:
             # Strg + Entf (Wort rechts löschen)
