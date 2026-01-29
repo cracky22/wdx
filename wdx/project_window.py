@@ -914,40 +914,118 @@ class ProjectWindow:
         else:
             self.last_file_mtime = 0
 
-    def show_saved_pages_popup(self, source):
-        if not source.get("saved_pages"):
-            messagebox.showinfo("Keine Versionen", "Es gibt keine gespeicherten Versionen dieser Seite.")
-            return
-
+    def show_saved_pages_popup(self, item=None):
         popup = tk.Toplevel(self.root)
-        popup.title("Gespeicherte Versionen")
+        popup.title("Gespeicherte Seiten")
+        popup.geometry("700x500")
         popup.iconbitmap("icon128.ico")
-        popup.geometry("500x400")
         popup.transient(self.root)
         popup.grab_set()
 
-        ttk.Label(popup, text=f"Gespeicherte Versionen von:\n{source['url']}", font=("Helvetica", 12, "bold")).pack(pady=10)
+        popup.bind("<Escape>", lambda e: popup.destroy())
+        popup.bind("<Control-w>", lambda e: popup.destroy())
+        
 
-        listbox = tk.Listbox(popup, height=15)
-        listbox.pack(fill="both", expand=True, padx=20, pady=10)
+        main_frame = ttk.Frame(popup, padding=15)
+        main_frame.pack(fill="both", expand=True)
+
+        ttk.Label(main_frame, text="Gespeicherte Versionen verwalten", font=("Helvetica", 12, "bold")).pack(pady=(0, 15))
 
         sites_dir = Path(self.project["path"]) / "sites"
-        self.current_source_for_popup = source
-        self.current_listbox = listbox
-        self.current_sites_dir = sites_dir
 
-        for saved in source["saved_pages"]:
-            timestamp = saved["timestamp"]
-            filename = saved["file"]
-            listbox.insert(tk.END, f"{timestamp} – {filename}")
+        list_container = ttk.Frame(main_frame)
+        list_container.pack(fill="both", expand=True)
+        canvas = tk.Canvas(list_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+        scroll_frame = ttk.Frame(canvas)
 
-        listbox.bind("<Double-Button-1>", lambda e: self.open_selected_version_from_popup())
+        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_window = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
-        def open_selected():
-            self.open_selected_version_from_popup()
+        def get_saved_pages():
+            if item and isinstance(item, dict):
+                return item.get("saved_pages", [])
+            return self.project.get("data", {}).get("saved_pages", [])
 
-        ttk.Button(popup, text="Ausgewählte öffnen", command=self.open_selected_version_from_popup, bootstyle="primary").pack(pady=10)
-        ttk.Button(popup, text="Schließen", command=popup.destroy, bootstyle="secondary").pack(pady=5)
+        def open_saved_page(page_data):
+            filename = page_data.get("file")
+            if not filename:
+                messagebox.showwarning("Fehler", "Kein Dateiname in den Daten gefunden.")
+                return
+
+            full_path = sites_dir / filename
+            
+            if full_path.exists():
+                webbrowser.open(full_path.absolute().as_uri())
+            else:
+                messagebox.showerror("Fehler", f"Datei nicht gefunden:\n{full_path}")
+
+        def refresh_list():
+            for widget in scroll_frame.winfo_children():
+                widget.destroy()
+
+            pages = get_saved_pages()
+            if not pages:
+                ttk.Label(scroll_frame, text="Keine gespeicherten Seiten vorhanden.", font=("Helvetica", 10, "italic")).pack(pady=20)
+                return
+
+            for index, page in enumerate(pages):
+                row = ttk.Frame(scroll_frame, padding=5)
+                row.pack(fill="x", pady=2)
+                
+                timestamp = page.get("timestamp", "Unbekannt")
+                filename = page.get("file", "Unbekannte_Datei.html")
+                
+                display_title = page.get("title")
+                full_path = sites_dir / filename
+                if (not display_title or display_title == "Unbekannter Titel") and full_path.exists():
+                    try:
+                        with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                            soup = BeautifulSoup(f.read(), "html.parser")
+                            display_title = soup.title.string.strip() if soup.title else filename
+                    except:
+                        display_title = filename
+
+                final_text = f"{timestamp} – {display_title or filename}"
+
+                lbl = ttk.Label(row, text=f"• {final_text}", wraplength=500, cursor="hand2")
+                lbl.pack(side="left", padx=5, fill="x", expand=True)
+                lbl.bind("<Button-1>", lambda e, p=page: open_saved_page(p))
+
+                btn_frame = ttk.Frame(row)
+                btn_frame.pack(side="right")
+
+                ttk.Button(btn_frame, text="🌐", width=3, bootstyle="link",
+                           command=lambda p=page: open_saved_page(p)).pack(side="left", padx=2)
+
+                ttk.Button(btn_frame, text="🗑", width=3, bootstyle="danger-link",
+                           command=lambda i=index: delete_entry(i)).pack(side="left", padx=2)
+
+        def delete_entry(index=None):
+            pages = get_saved_pages()
+            if not pages: return
+            idx = index if index is not None else (len(pages) - 1)
+            
+            if messagebox.askyesno("Löschen", "Diese Version wirklich unwiderruflich löschen?", parent=popup):
+                page_to_del = pages[idx]
+                file_to_del = sites_dir / page_to_del.get("file", "")
+                if file_to_del.exists():
+                    try: os.remove(file_to_del)
+                    except: pass
+
+                pages.pop(idx)
+                self.app.project_manager.save_projects()
+                refresh_list()
+
+        # Mit Entf-Taste löschen
+        popup.bind("<Delete>", lambda e: delete_entry())
+
+        refresh_list()
         
     def show_saved_shortcut(self):
         item_id = next(iter(self.selected_source_ids))
