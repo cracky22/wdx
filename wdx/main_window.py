@@ -100,7 +100,7 @@ class MainWindow:
             else: messagebox.showerror("Fehler", res)
 
     def import_project(self):
-        path = filedialog.askopenfilename(filetypes=[("wdx Files", "*.wdx")])
+        path = filedialog.askopenfilename(filetypes=[("wdx Projektdatei", "*.wdx")])
         if path and self.project_manager.import_project(path):
             self.update_project_tiles()
 
