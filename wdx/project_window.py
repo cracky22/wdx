@@ -921,18 +921,18 @@ class ProjectWindow:
         popup.iconbitmap("icon128.ico")
         popup.transient(self.root)
         popup.grab_set()
+        popup.focus_set()
 
         popup.bind("<Escape>", lambda e: popup.destroy())
         popup.bind("<Control-w>", lambda e: popup.destroy())
         
-
         main_frame = ttk.Frame(popup, padding=15)
         main_frame.pack(fill="both", expand=True)
 
         ttk.Label(main_frame, text="Gespeicherte Versionen verwalten", font=("Helvetica", 12, "bold")).pack(pady=(0, 15))
 
         sites_dir = Path(self.project["path"]) / "sites"
-
+        
         list_container = ttk.Frame(main_frame)
         list_container.pack(fill="both", expand=True)
         canvas = tk.Canvas(list_container, highlightthickness=0)
@@ -942,10 +942,24 @@ class ProjectWindow:
         scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas_window = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
-        
         canvas.configure(yscrollcommand=scrollbar.set)
+        
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+        # --- Mausrad-Scroll Logik ---
+        def _on_mousewheel(event):
+            # Windows/macOS nutzt event.delta, Linux nutzt Button-4/5
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+            else:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        popup.bind("<MouseWheel>", _on_mousewheel)
+        popup.bind("<Button-4>", _on_mousewheel)
+        popup.bind("<Button-5>", _on_mousewheel)
 
         def get_saved_pages():
             if item and isinstance(item, dict):
