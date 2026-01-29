@@ -148,7 +148,9 @@ class ProjectManager:
 
     def export_project(self, project):
         file_path = filedialog.asksaveasfilename(
-            defaultextension=".wdx", initialfile=f"{project['name']}.wdx"
+            defaultextension=".wdx", 
+            filetypes=[("wdx Projektdatei", "*.wdx")],
+            initialfile=f"{project['name']}.wdx"
         )
         if not file_path:
             return False, None
