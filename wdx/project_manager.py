@@ -230,6 +230,7 @@ class ProjectManager:
             return False
 
     def delete_project(self, project):
+        gc.collect()
         try:
             shutil.rmtree(project["path"])
             self.projects.remove(project)
