@@ -129,6 +129,22 @@ class ProjectManager:
             return True, new_project
         except Exception as e:
             return False, str(e)
+        
+    def rename_project(self, project, new_name):
+        new_path = WDX_DIR / new_name
+        if new_path.exists(): return False, "Existiert bereits!"
+        try:
+            project["path"].rename(new_path)
+            project["name"] = new_name
+            project["path"] = new_path
+            project["data_file"] = new_path / "project.json"
+            project["data"]["name"] = new_name
+            with open(project["data_file"], "w", encoding="utf-8") as f:
+                json.dump(project["data"], f, indent=4)
+            self.save_projects()
+            return True, None
+        except Exception as e:
+            return False, str(e)
 
     def export_project(self, project):
         file_path = filedialog.asksaveasfilename(
