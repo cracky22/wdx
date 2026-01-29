@@ -1,6 +1,6 @@
 import json
 import shutil
-import os
+import os, gc
 from pathlib import Path
 from tkinter import messagebox, filedialog
 import pyzipper
@@ -133,16 +133,24 @@ class ProjectManager:
     def rename_project(self, project, new_name):
         new_path = WDX_DIR / new_name
         if new_path.exists(): return False, "Existiert bereits!"
+        # force gc to close any open file handles
+        gc.collect()
+
         try:
-            project["path"].rename(new_path)
-            project["name"] = new_name
+            os.rename(str(project["path"]), str(new_path))
+            
             project["path"] = new_path
+            project["name"] = new_name
             project["data_file"] = new_path / "project.json"
             project["data"]["name"] = new_name
+            
             with open(project["data_file"], "w", encoding="utf-8") as f:
                 json.dump(project["data"], f, indent=4)
+                
             self.save_projects()
             return True, None
+        except PermissionError:
+            return False, "Datei wird noch verwendet"
         except Exception as e:
             return False, str(e)
 
