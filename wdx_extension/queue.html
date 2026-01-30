@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="src/css/fonts.css">
+  <link rel="stylesheet" href="src/css/style.css">
+  <script type="module" src="src/js/queue.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <title>Warteschlange</title>
+</head>
+<body style="width: 350px; margin: 0;">
+  <div class="container fade-in">
+    <div class="header">
+      <md-icon-button id="backBtn">
+        <md-icon>arrow_back</md-icon>
+      </md-icon-button>
+      <h1 class="headline" style="flex: 1; margin-left: 8px;">Warteschlange</h1>
+      <md-icon-button id="syncAllBtn">
+        <md-icon>sync</md-icon>
+      </md-icon-button>
+    </div>
+
+    <div id="queueListContainer">
+       <md-list id="queueList"></md-list>
+    </div>
+  </div>
+</body>
+</html>

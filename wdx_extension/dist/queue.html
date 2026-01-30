@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <title>Warteschlange</title>
+  <script type="module" crossorigin src="/assets/modulepreload-polyfill.js"></script>
+  <script type="module" crossorigin src="/assets/element-internals.js"></script>
+  <script type="module" crossorigin src="/assets/icon-button.js"></script>
+  <script type="module" crossorigin src="/assets/src_js_queue.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/src_fonts_css.css">
+  <link rel="stylesheet" crossorigin href="/assets/src_style.css">
+</head>
+<body style="width: 350px; margin: 0;">
+  <div class="container fade-in">
+    <div class="header">
+      <md-icon-button id="backBtn">
+        <md-icon>arrow_back</md-icon>
+      </md-icon-button>
+      <h1 class="headline" style="flex: 1; margin-left: 8px;">Warteschlange</h1>
+      <md-icon-button id="syncAllBtn">
+        <md-icon>sync</md-icon>
+      </md-icon-button>
+    </div>
+
+    <div id="queueListContainer">
+       <md-list id="queueList"></md-list>
+    </div>
+  </div>
+</body>
+</html>
