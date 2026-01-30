@@ -12,18 +12,15 @@ from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
+from utils import get_smart_color_for_source
 
 class WdxApp:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE)
-        
-        # Initialisierung ProjectManager (lädt Config & Projekte)
         self.project_manager = ProjectManager()
-        
         self.style = ttk.Style()
         
-        # Theme aus Config laden
         self.dark_mode = self.project_manager.get_setting("dark_mode", False)
         self.apply_theme()
         
@@ -58,7 +55,7 @@ class WdxApp:
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
         self.apply_theme()
-        # Speichern über ProjectManager (Feature 1)
+        
         self.project_manager.set_setting("dark_mode", self.dark_mode)
 
     def apply_theme(self):
@@ -101,8 +98,7 @@ class WdxApp:
         else:
             project_names = [p["name"] for p in self.project_manager.projects]
             if not project_names:
-                # Feature 2 Check: Error Messages werden meist dennoch gezeigt, 
-                # oder können auch unterdrückt werden, hier zeigen wir Fehler an.
+                
                 messagebox.showerror(
                     "Fehler",
                     "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.",
@@ -155,6 +151,7 @@ class WdxApp:
 
     def _download_worker(self, data, project):
         source_id = str(uuid.uuid4())
+        
         new_source = {
             "id": source_id,
             "type": "source",
@@ -179,6 +176,8 @@ class WdxApp:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
+        
+        html_content = ""
 
         try:
             response = requests.get(data["url"], headers=headers, timeout=15)
@@ -193,30 +192,40 @@ class WdxApp:
                 "file": html_filename,
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
+        except Exception as e:
+            print(f"HTML Download Fehler: {e}")
 
+        fav_path = None
+        try:
             icon_url = None
-            base_url = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(response.url))
-
             try:
-                soup = BeautifulSoup(html_content, "html.parser")
-                icon_link = soup.find("link", rel=lambda x: x and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"])
-                if icon_link and icon_link.get("href"):
-                    icon_url = urljoin(base_url, icon_link.get("href"))
-            except Exception:
-                pass
+                parsed_uri = urlparse(data["url"])
+                base_url = "{uri.scheme}://{uri.netloc}".format(uri=parsed_uri)
+            except:
+                base_url = ""
 
-            if not icon_url:
+            if html_content and base_url:
+                try:
+                    soup = BeautifulSoup(html_content, "html.parser")
+                    icon_link = soup.find("link", rel=lambda x: x and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"])
+                    if icon_link and icon_link.get("href"):
+                        icon_url = urljoin(base_url, icon_link.get("href"))
+                except Exception:
+                    pass
+
+            if not icon_url and base_url:
                 icon_url = urljoin(base_url, "/favicon.ico")
 
             fav_content = None
-            try:
-                fav_resp = requests.get(icon_url, headers=headers, timeout=5)
-                if fav_resp.status_code == 200 and len(fav_resp.content) > 0:
-                    fav_content = fav_resp.content
-            except:
-                pass
+            if icon_url:
+                try:
+                    fav_resp = requests.get(icon_url, headers=headers, timeout=5)
+                    if fav_resp.status_code == 200 and len(fav_resp.content) > 0:
+                        fav_content = fav_resp.content
+                except:
+                    pass
 
-            if not fav_content:
+            if not fav_content and base_url:
                 try:
                     google_url = f"https://www.google.com/s2/favicons?domain={base_url}&sz=64"
                     g_resp = requests.get(google_url, headers=headers, timeout=5)
@@ -232,12 +241,29 @@ class WdxApp:
                 elif b"JFIF" in fav_content[:10] or b"Exif" in fav_content[:10]:
                     fav_name = f"favicon_{source_id}.jpg"
                 
-                with open(images_dir / fav_name, "wb") as f:
+                fav_full_path = images_dir / fav_name
+                with open(fav_full_path, "wb") as f:
                     f.write(fav_content)
+                
                 new_source["favicon"] = fav_name
+                fav_path = fav_full_path
 
         except Exception as e:
-            print(f"Download Worker Fehler: {e}")
+            print(f"Favicon Worker Fehler: {e}")
+
+        if fav_path:
+            try:
+                existing_colors = set()
+                if "items" in project["data"]:
+                    for item in project["data"]["items"]:
+                        if "color" in item:
+                            existing_colors.add(item["color"])
+                
+                smart_color = get_smart_color_for_source(str(fav_path), existing_colors)
+                new_source["color"] = smart_color
+                
+            except Exception as e:
+                print(f"Farbanalyse Fehler: {e}")
 
         self.root.after(0, lambda: self._finalize_source_add_safe(project, new_source))
 
@@ -252,7 +278,6 @@ class WdxApp:
         if self.current_project_name is None:
             self.main_window.refresh_and_update()
         
-        # Feature 2: Zeige Meldung nur wenn Prompts aktiviert sind
         if self.project_manager.get_setting("show_prompts", True):
             messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
 

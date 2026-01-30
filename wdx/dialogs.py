@@ -19,7 +19,6 @@ class SourceDialog(tk.Toplevel):
         main = ttk.Frame(self, padding="20")
         main.pack(fill="both", expand=True)
 
-        # --- URL ---
         url_frame = ttk.Frame(main)
         url_frame.pack(fill="x", pady=(0, 10))
         ttk.Label(url_frame, text="URL:", font=("Helvetica", 10, "bold")).pack(anchor="w")
@@ -33,13 +32,11 @@ class SourceDialog(tk.Toplevel):
         paste_btn = ttk.Button(url_entry_frame, text="📋", width=3, command=self.paste_clipboard)
         paste_btn.pack(side="right", padx=(5, 0))
 
-        # --- Titel ---
         ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(10, 0))
         self.title_var = tk.StringVar(value=self.source.get("title", ""))
         self.title_entry = ttk.Entry(main, textvariable=self.title_var)
         self.title_entry.pack(fill="x", pady=(0, 10))
 
-        # --- Text ---
         ttk.Label(main, text="Text:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         text_frame = ttk.Frame(main)
         text_frame.pack(fill="both", expand=True, pady=(0, 10))
@@ -47,13 +44,11 @@ class SourceDialog(tk.Toplevel):
         self.text_text.pack(fill="both", expand=True)
         self.text_text.insert("1.0", self.source.get("text", ""))
 
-        # --- Schlagworte ---
         ttk.Label(main, text="Schlagworte:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         self.keywords_var = tk.StringVar(value=self.source.get("keywords", ""))
         self.keywords_entry = ttk.Entry(main, textvariable=self.keywords_var)
         self.keywords_entry.pack(fill="x", pady=(0, 10))
 
-        # --- Farbe ---
         ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
         color_frame = ttk.Frame(main)
         color_frame.pack(fill="x", pady=(0, 15))
@@ -64,7 +59,6 @@ class SourceDialog(tk.Toplevel):
         ttk.Button(color_frame, text="Farbwähler", command=self.choose_color).pack(side="left", padx=(5, 0))
         self.color_var.trace_add("write", self.update_color_swatch)
 
-        # --- Palette (bestehende Farben) ---
         all_items = project_window.project["data"].get("items", [])
         used_colors = list({item.get("color").strip() for item in all_items if item.get("color") and item.get("color").strip()})
 
@@ -78,7 +72,6 @@ class SourceDialog(tk.Toplevel):
                 lbl.bind("<Button-1>", lambda e, c=col: self.color_var.set(c))
                 lbl.pack(side="left", padx=2)
 
-        # --- Bindings & Buttons ---
         self.setup_bindings()
 
         btn_frame = ttk.Frame(main)
@@ -132,21 +125,18 @@ class SourceDialog(tk.Toplevel):
         
         widgets = [self.url_entry, self.title_entry, self.text_text, self.keywords_entry]
         for w in widgets:
-            # Strg + Entf (Wort rechts löschen)
             w.bind("<Control-Delete>", self.delete_word_forward)
             w.bind("<Control-KP_Delete>", self.delete_word_forward)
-            # Strg + Rücktaste (Wort links löschen)
             w.bind("<Control-BackSpace>", self.delete_word_backward)
             w.bind("<Control-Key-BackSpace>", self.delete_word_backward)
 
     def delete_word_forward(self, event):
         widget = event.widget
-        # "insert wordend" findet das Ende des aktuellen Wortes ab Cursor
         widget.delete("insert", "insert wordend")
         return "break"
 
     def delete_word_backward(self, event):
         widget = event.widget
-        # "insert-1c wordstart" findet den Anfang des Wortes vor dem Cursor
         widget.delete("insert wordstart", "insert")
         return "break"
+    

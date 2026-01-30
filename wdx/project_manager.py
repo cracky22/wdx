@@ -11,7 +11,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from constants import WDX_DIR, PROJECTS_FILE, CODENAME, CONFIG_FILE
 
-# Windows Registry Imports nur laden, wenn nötig
 if sys.platform == "win32":
     import winreg
 
@@ -20,7 +19,6 @@ class ProjectManager:
         self.lock = threading.Lock()
         self.projects = []
         
-        # Standard-Konfiguration
         self.config = {
             "dark_mode": False,
             "show_prompts": True,
@@ -49,17 +47,14 @@ class ProjectManager:
             print(f"Fehler bei Größenberechnung: {e}")
         return total_size
 
-    # --- Feature 1: Differenziertes Speichersystem & Feature 3: Passwort Management ---
     
     def load_settings(self):
-        """Lädt Einstellungen basierend auf dem Betriebssystem."""
         if sys.platform == "win32":
             self._load_settings_win_registry()
         else:
             self._load_settings_json()
 
     def save_settings(self):
-        """Speichert Einstellungen basierend auf dem Betriebssystem."""
         if sys.platform == "win32":
             self._save_settings_win_registry()
         else:
@@ -72,31 +67,27 @@ class ProjectManager:
         self.config[key] = value
         self.save_settings()
 
-    # --- Windows Registry Logik ---
     def _load_settings_win_registry(self):
         REG_PATH = r"Software\crackyOS\wdx"
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ) as key:
-                # Dark Mode
                 try:
                     dm, _ = winreg.QueryValueEx(key, "dark_mode")
                     self.config["dark_mode"] = bool(dm)
                 except FileNotFoundError: pass
 
-                # Feature 2: Show Prompts
                 try:
                     sp, _ = winreg.QueryValueEx(key, "show_prompts")
                     self.config["show_prompts"] = bool(sp)
                 except FileNotFoundError: pass
 
-                # Feature 3: Passwort
                 try:
                     pwd, _ = winreg.QueryValueEx(key, "encryption_password")
                     if pwd: self.config["encryption_password"] = str(pwd)
                 except FileNotFoundError: pass
                 
         except (FileNotFoundError, OSError):
-            pass # Standardwerte bleiben erhalten
+            pass
 
     def _save_settings_win_registry(self):
         REG_PATH = r"Software\crackyOS\wdx"
@@ -108,7 +99,6 @@ class ProjectManager:
         except OSError as e:
             print(f"Registry Fehler: {e}")
 
-    # --- JSON File Logik (Mac/Linux) ---
     def _load_settings_json(self):
         if CONFIG_FILE.exists():
             try:
@@ -125,8 +115,7 @@ class ProjectManager:
                 json.dump(self.config, f, indent=4)
         except Exception as e:
             print(f"Fehler beim Speichern der Config (JSON): {e}")
-
-    # --- Projekt Logik ---
+            
 
     def load_projects(self):
         self.projects = []
@@ -247,7 +236,6 @@ class ProjectManager:
         if not file_path:
             return False, None
 
-        # Feature 3: Benutze konfiguriertes Passwort
         pwd = self.config.get("encryption_password", CODENAME)
         
         try:
@@ -274,8 +262,6 @@ class ProjectManager:
 
     def import_project(self, file_path):
         try:
-            # Feature 3: Versuche Import mit konfiguriertem Passwort
-            # Hinweis: Wenn das Passwort falsch ist, wirft pyzipper eine Exception (RuntimeError oder BadZipFile)
             pwd = self.config.get("encryption_password", CODENAME)
             
             with pyzipper.AESZipFile(file_path, "r") as zip_ref:
