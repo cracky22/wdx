@@ -85,6 +85,8 @@ class MainWindow:
         win.geometry("500x500")
         win.iconbitmap("icon128.ico")
         win.grab_set()
+        win.focus_set()
+        win.bind("<Escape>", lambda e: win.destroy())
         
         # --- Dark Mode ---
         ttk.Label(win, text="Design", font=("Helvetica", 12, "bold")).pack(pady=(20, 5))
