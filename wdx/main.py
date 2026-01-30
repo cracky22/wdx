@@ -1,12 +1,10 @@
 import tkinter as tk
 import ttkbootstrap as ttk
-from tkinter import simpledialog, messagebox
+from tkinter import messagebox
 import datetime
-import json
 import uuid
 import threading
 import requests
-import winreg
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from constants import APP_TITLE
@@ -14,22 +12,27 @@ from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
-from pathlib import Path
-
 
 class WdxApp:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE)
+        
+        # Initialisierung ProjectManager (lädt Config & Projekte)
         self.project_manager = ProjectManager()
+        
         self.style = ttk.Style()
+        
+        # Theme aus Config laden
+        self.dark_mode = self.project_manager.get_setting("dark_mode", False)
+        self.apply_theme()
+        
         self.main_window = MainWindow(root, self)
         start_server(self)
         self.last_connection = None
         self.connection_count = 0
         self.current_project_name = None
-        self.dark_mode = self.load_dark_mode_setting()
-        self.apply_theme()
+        
         self.update_connection_status()
 
     def open_project(self, project):
@@ -52,37 +55,11 @@ class WdxApp:
         self.main_window.refresh_and_update()
         self.main_window.show()
 
-    def load_dark_mode_setting(self):
-        REG_PATH = r"Software\crackyOS\wdx"
-        REG_VALUE = "dark_mode"
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ) as key:
-                value, reg_type = winreg.QueryValueEx(key, REG_VALUE)
-                return bool(value)
-        except FileNotFoundError:
-            return False
-        except OSError:
-            return False
-
-    def save_dark_mode_setting(self, enabled):
-        REG_PATH = r"Software\crackyOS\wdx"
-        REG_VALUE = "dark_mode"
-        try:
-            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH) as key:
-                winreg.SetValueEx(
-                    key,
-                    REG_VALUE,
-                    0,
-                    winreg.REG_DWORD,
-                    1 if enabled else 0
-                )
-        except OSError:
-            pass
-
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
         self.apply_theme()
-        self.save_dark_mode_setting(self.dark_mode)
+        # Speichern über ProjectManager (Feature 1)
+        self.project_manager.set_setting("dark_mode", self.dark_mode)
 
     def apply_theme(self):
         if self.dark_mode:
@@ -124,6 +101,8 @@ class WdxApp:
         else:
             project_names = [p["name"] for p in self.project_manager.projects]
             if not project_names:
+                # Feature 2 Check: Error Messages werden meist dennoch gezeigt, 
+                # oder können auch unterdrückt werden, hier zeigen wir Fehler an.
                 messagebox.showerror(
                     "Fehler",
                     "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.",
@@ -216,7 +195,7 @@ class WdxApp:
             })
 
             icon_url = None
-            base_url = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(response.url)) # Nimm die finale URL nach Redirects
+            base_url = "{uri.scheme}://{uri.netloc}".format(uri=urlparse(response.url))
 
             try:
                 soup = BeautifulSoup(html_content, "html.parser")
@@ -272,8 +251,10 @@ class WdxApp:
         
         if self.current_project_name is None:
             self.main_window.refresh_and_update()
-            
-        messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
+        
+        # Feature 2: Zeige Meldung nur wenn Prompts aktiviert sind
+        if self.project_manager.get_setting("show_prompts", True):
+            messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
 
 
 if __name__ == "__main__":

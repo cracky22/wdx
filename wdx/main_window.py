@@ -82,14 +82,64 @@ class MainWindow:
     def show_settings(self):
         win = ttk.Toplevel(self.root)
         win.title("Einstellungen")
-        win.geometry("400x300")
+        win.geometry("500x450")
         win.grab_set()
         
-        ttk.Label(win, text="Dark Mode", font=("Helvetica", 12)).pack(pady=(20, 5))
+        # --- Dark Mode ---
+        ttk.Label(win, text="Design", font=("Helvetica", 12, "bold")).pack(pady=(20, 5))
         var_dark = tk.BooleanVar(value=self.app.dark_mode)
-        ttk.Checkbutton(win, text="Aktiviert", variable=var_dark, bootstyle="round-toggle", 
+        ttk.Checkbutton(win, text="Dark Mode", variable=var_dark, bootstyle="round-toggle", 
                         command=lambda: self.app.toggle_theme()).pack(pady=5)
-        ttk.Button(win, text="Schließen", command=win.destroy, bootstyle="secondary").pack(pady=30)
+        
+        ttk.Separator(win).pack(fill="x", pady=15, padx=20)
+
+        # --- Feature 2: Prompts Checkbox ---
+        ttk.Label(win, text="Verhalten", font=("Helvetica", 12, "bold")).pack(pady=5)
+        current_prompts = self.app.project_manager.get_setting("show_prompts", True)
+        var_prompts = tk.BooleanVar(value=current_prompts)
+        
+        def toggle_prompts():
+            self.app.project_manager.set_setting("show_prompts", var_prompts.get())
+
+        ttk.Checkbutton(win, text="Meldungen & Bestätigungen anzeigen", variable=var_prompts, bootstyle="round-toggle",
+                        command=toggle_prompts).pack(pady=5)
+
+        ttk.Separator(win).pack(fill="x", pady=15, padx=20)
+
+        # --- Feature 3: Passwort Feld ---
+        ttk.Label(win, text="Verschlüsselungs-Passwort", font=("Helvetica", 12, "bold")).pack(pady=5)
+        ttk.Label(win, text="Für den Export von .wdx Dateien:", font=("Helvetica", 9)).pack()
+        
+        pwd_frame = ttk.Frame(win)
+        pwd_frame.pack(pady=10)
+        
+        current_pwd = self.app.project_manager.get_setting("encryption_password", "")
+        pwd_var = tk.StringVar(value=current_pwd)
+        
+        entry_pwd = ttk.Entry(pwd_frame, textvariable=pwd_var, show="*", width=30)
+        entry_pwd.pack(side="left", padx=5)
+        
+        # Toggle Sichtbarkeit Button
+        self.pwd_visible = False
+        def toggle_pwd_viz():
+            self.pwd_visible = not self.pwd_visible
+            entry_pwd.config(show="" if self.pwd_visible else "*")
+            
+        ttk.Button(pwd_frame, text="👁", width=3, bootstyle="secondary-outline", command=toggle_pwd_viz).pack(side="left")
+
+        def save_settings_manual():
+            self.app.project_manager.set_setting("encryption_password", pwd_var.get())
+            # Prompts und Theme werden direkt in ihren Handlern gespeichert, aber wir speichern hier sicherheitshalber alles
+            self.app.project_manager.set_setting("show_prompts", var_prompts.get())
+            self.app.project_manager.save_settings()
+            win.destroy()
+
+        ttk.Separator(win).pack(fill="x", pady=20, padx=20)
+        ttk.Button(win, text="Speichern & Schließen", command=save_settings_manual, bootstyle="primary").pack(pady=10)
+
+    # --- Wrapper Methoden für Feature 2 ---
+    def _should_show_prompts(self):
+        return self.app.project_manager.get_setting("show_prompts", True)
 
     def create_project(self):
         name = simpledialog.askstring("Neu", "Projektname:", parent=self.root)
@@ -112,13 +162,22 @@ class MainWindow:
             else: messagebox.showerror("Fehler", err)
 
     def delete_project(self, project):
-        if messagebox.askyesno("Löschen", f"'{project['name']}' wirklich löschen?"):
+        # Feature 2 Logic: Wenn show_prompts False ist, löschen wir ohne Bestätigung (Vorsicht)
+        # Oder besser: Wir setzen confirm = True implizit, wenn User Prompts deaktiviert hat.
+        confirm = True
+        if self._should_show_prompts():
+            confirm = messagebox.askyesno("Löschen", f"'{project['name']}' wirklich löschen?")
+        
+        if confirm:
             self.project_manager.delete_project(project)
             self.update_project_tiles()
 
     def export_project(self, project):
         success, path = self.project_manager.export_project(project)
-        if success: messagebox.showinfo("Erfolg", f"Exportiert nach: {path}")
+        # Feature 2: Erfolgsmeldung unterdrücken, falls eingestellt
+        if success: 
+            if self._should_show_prompts():
+                messagebox.showinfo("Erfolg", f"Exportiert nach: {path}")
 
     def show(self): self.main_frame.grid()
     def hide(self): self.main_frame.grid_remove()
