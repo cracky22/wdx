@@ -88,15 +88,11 @@ class MainWindow:
         win.focus_set()
         win.bind("<Escape>", lambda e: win.destroy())
         
-        # --- Dark Mode ---
         ttk.Label(win, text="Design", font=("Helvetica", 12, "bold")).pack(pady=(20, 5))
         var_dark = tk.BooleanVar(value=self.app.dark_mode)
-        ttk.Checkbutton(win, text="Dark Mode", variable=var_dark, bootstyle="round-toggle", 
-                        command=lambda: self.app.toggle_theme()).pack(pady=5)
-        
+        ttk.Checkbutton(win, text="Dark Mode", variable=var_dark, bootstyle="round-toggle", command=lambda: self.app.toggle_theme()).pack(pady=5)
         ttk.Separator(win).pack(fill="x", pady=15, padx=20)
 
-        # --- Feature 2: Prompts Checkbox ---
         ttk.Label(win, text="Verhalten", font=("Helvetica", 12, "bold")).pack(pady=5)
         current_prompts = self.app.project_manager.get_setting("show_prompts", True)
         var_prompts = tk.BooleanVar(value=current_prompts)
@@ -104,25 +100,18 @@ class MainWindow:
         def toggle_prompts():
             self.app.project_manager.set_setting("show_prompts", var_prompts.get())
 
-        ttk.Checkbutton(win, text="Meldungen & Bestätigungen anzeigen", variable=var_prompts, bootstyle="round-toggle",
-                        command=toggle_prompts).pack(pady=5)
-
+        ttk.Checkbutton(win, text="Meldungen & Bestätigungen anzeigen", variable=var_prompts, bootstyle="round-toggle", command=toggle_prompts).pack(pady=5)
         ttk.Separator(win).pack(fill="x", pady=15, padx=20)
 
-        # --- Feature 3: Passwort Feld ---
         ttk.Label(win, text="Verschlüsselungs-Passwort", font=("Helvetica", 12, "bold")).pack(pady=5)
         ttk.Label(win, text="Für den Export von .wdx Dateien:", font=("Helvetica", 9)).pack()
-        
         pwd_frame = ttk.Frame(win)
         pwd_frame.pack(pady=10)
-        
         current_pwd = self.app.project_manager.get_setting("encryption_password", "")
         pwd_var = tk.StringVar(value=current_pwd)
-        
         entry_pwd = ttk.Entry(pwd_frame, textvariable=pwd_var, show="*", width=30)
         entry_pwd.pack(side="left", padx=5)
         
-        # Toggle Sichtbarkeit Button
         self.pwd_visible = False
         def toggle_pwd_viz():
             self.pwd_visible = not self.pwd_visible
@@ -132,7 +121,6 @@ class MainWindow:
 
         def save_settings_manual():
             self.app.project_manager.set_setting("encryption_password", pwd_var.get())
-            # Prompts und Theme werden direkt in ihren Handlern gespeichert, aber wir speichern hier sicherheitshalber alles
             self.app.project_manager.set_setting("show_prompts", var_prompts.get())
             self.app.project_manager.save_settings()
             win.destroy()
@@ -140,7 +128,6 @@ class MainWindow:
         ttk.Separator(win).pack(fill="x", pady=20, padx=20)
         ttk.Button(win, text="Speichern & Schließen", command=save_settings_manual, bootstyle="primary").pack(pady=10)
 
-    # --- Wrapper Methoden für Feature 2 ---
     def _should_show_prompts(self):
         return self.app.project_manager.get_setting("show_prompts", True)
 
@@ -165,8 +152,6 @@ class MainWindow:
             else: messagebox.showerror("Fehler", err)
 
     def delete_project(self, project):
-        # Feature 2 Logic: Wenn show_prompts False ist, löschen wir ohne Bestätigung (Vorsicht)
-        # Oder besser: Wir setzen confirm = True implizit, wenn User Prompts deaktiviert hat.
         confirm = True
         if self._should_show_prompts():
             confirm = messagebox.askyesno("Löschen", f"'{project['name']}' wirklich löschen?")
@@ -177,7 +162,6 @@ class MainWindow:
 
     def export_project(self, project):
         success, path = self.project_manager.export_project(project)
-        # Feature 2: Erfolgsmeldung unterdrücken, falls eingestellt
         if success: 
             if self._should_show_prompts():
                 messagebox.showinfo("Erfolg", f"Exportiert nach: {path}")

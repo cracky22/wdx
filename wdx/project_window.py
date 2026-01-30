@@ -947,7 +947,6 @@ class ProjectWindow:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # --- Mausrad-Scroll Logik ---
         def _on_mousewheel(event):
             # Windows/macOS nutzt event.delta, Linux nutzt Button-4/5
             if event.num == 4:
@@ -1036,7 +1035,6 @@ class ProjectWindow:
                 self.app.project_manager.save_projects()
                 refresh_list()
 
-        # Mit Entf-Taste löschen
         popup.bind("<Delete>", lambda e: delete_entry())
 
         refresh_list()
@@ -1284,7 +1282,6 @@ class ProjectWindow:
                 self._update_minimap()
 
     def delete_shortcut(self, event=None):
-        """Wird durch die Entf-Taste ausgelöst."""
         if not self.selected_source_ids:
             return
         
@@ -1295,18 +1292,13 @@ class ProjectWindow:
             self.delete_item(item_id)
 
     def delete_item(self, item_id):
-        """Löscht ein einzelnes Element (Karte oder Überschrift)."""
         item_to_delete = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
         if not item_to_delete:
             return
 
-        # 1. Aus Datenstruktur entfernen
         self.project["data"]["items"] = [i for i in self.project["data"]["items"] if i["id"] != item_id]
-        
-        # 2. Garbage Collection (überspringt Überschriften intern)
         self._garbage_collect_files([item_to_delete])
         
-        # 3. GUI Bereinigung
         if item_id in self.source_frames:
             frame, canvas_id = self.source_frames[item_id]
             self.canvas.delete(canvas_id)
@@ -1452,9 +1444,9 @@ class ProjectWindow:
     def create_citation(self, source):
         #             google.de     , zul. aufgerufen am 31.12.2025
         #             google.de     , zuletzt aufgerufen am 31.12.2025
-        #citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+        citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
         # NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. Abrufdatum, URL.
-        citation = f"NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. {source['added']}, {source['url']}."
+        #citation = f"NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. {source['added']}, {source['url']}."
         pyperclip.copy(citation)
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
         
