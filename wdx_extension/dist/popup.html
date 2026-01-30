@@ -4,10 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/popup.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/form-label-activation.js">
-  <link rel="modulepreload" crossorigin href="/assets/constants.js">
-  <link rel="stylesheet" crossorigin href="/assets/form-label-activation.css">
+  <script type="module" crossorigin src="/assets/modulepreload-polyfill.js"></script>
+  <script type="module" crossorigin src="/assets/element-internals.js"></script>
+  <script type="module" crossorigin src="/assets/icon-button.js"></script>
+  <script type="module" crossorigin src="/assets/form-label-activation.js"></script>
+  <script type="module" crossorigin src="/assets/src_js_constants.js"></script>
+  <script type="module" crossorigin src="/assets/src_js_popup.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/src_fonts_css.css">
+  <link rel="stylesheet" crossorigin href="/assets/src_style.css">
 </head>
 <body style="width: 350px; margin: 0;">
   <md-linear-progress id="progressBar" indeterminate style="display:none; width: 100%; position: absolute; top:0; left:0;"></md-linear-progress>
@@ -15,9 +19,14 @@
   <div class="container fade-in">
     <div class="header">
       <h1 class="headline">wdx</h1>
-      <md-icon-button id="settingsBtn">
-        <md-icon>settings</md-icon>
-      </md-icon-button>
+      <div class="header-actions">
+        <md-icon-button id="historyBtn">
+          <md-icon>history</md-icon>
+        </md-icon-button>
+        <md-icon-button id="settingsBtn">
+          <md-icon>settings</md-icon>
+        </md-icon-button>
+      </div>
     </div>
 
     <div class="card">
