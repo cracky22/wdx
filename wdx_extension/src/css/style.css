@@ -150,6 +150,7 @@ body {
   font-weight: 500;
   opacity: 0;
   transition: opacity 0.3s;
+  user-select: none;
 }
 
 md-icon-button md-icon {
