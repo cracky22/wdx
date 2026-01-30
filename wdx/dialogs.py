@@ -61,7 +61,7 @@ class SourceDialog(tk.Toplevel):
         self.selected_color_swatch = tk.Label(color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1)
         self.selected_color_swatch.pack(side="left", padx=(0, 5))
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
-        ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5, 0))
+        ttk.Button(color_frame, text="Farbwähler", command=self.choose_color).pack(side="left", padx=(5, 0))
         self.color_var.trace_add("write", self.update_color_swatch)
 
         # --- Palette (bestehende Farben) ---
