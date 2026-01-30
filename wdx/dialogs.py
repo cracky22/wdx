@@ -10,7 +10,7 @@ class SourceDialog(tk.Toplevel):
         self.source = source or {}
         self.result = None
         self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
-        self.geometry("550x850")
+        self.geometry("550x890")
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
