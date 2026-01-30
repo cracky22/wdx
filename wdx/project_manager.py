@@ -1,19 +1,33 @@
 import json
 import shutil
-import os, gc
+import os
+import sys
+import gc
 from pathlib import Path
 from tkinter import messagebox, filedialog
 import pyzipper
 import datetime
 import threading
-import winreg
 from concurrent.futures import ThreadPoolExecutor
-from constants import WDX_DIR, PROJECTS_FILE, CODENAME
+from constants import WDX_DIR, PROJECTS_FILE, CODENAME, CONFIG_FILE
+
+# Windows Registry Imports nur laden, wenn nötig
+if sys.platform == "win32":
+    import winreg
 
 class ProjectManager:
     def __init__(self):
         self.lock = threading.Lock()
         self.projects = []
+        
+        # Standard-Konfiguration
+        self.config = {
+            "dark_mode": False,
+            "show_prompts": True,
+            "encryption_password": CODENAME
+        }
+        
+        self.load_settings()
         self.load_projects()
 
     def _get_dir_size(self, path):
@@ -35,14 +49,84 @@ class ProjectManager:
             print(f"Fehler bei Größenberechnung: {e}")
         return total_size
 
-    def get_registry_password(self):
+    # --- Feature 1: Differenziertes Speichersystem & Feature 3: Passwort Management ---
+    
+    def load_settings(self):
+        """Lädt Einstellungen basierend auf dem Betriebssystem."""
+        if sys.platform == "win32":
+            self._load_settings_win_registry()
+        else:
+            self._load_settings_json()
+
+    def save_settings(self):
+        """Speichert Einstellungen basierend auf dem Betriebssystem."""
+        if sys.platform == "win32":
+            self._save_settings_win_registry()
+        else:
+            self._save_settings_json()
+
+    def get_setting(self, key, default=None):
+        return self.config.get(key, default)
+
+    def set_setting(self, key, value):
+        self.config[key] = value
+        self.save_settings()
+
+    # --- Windows Registry Logik ---
+    def _load_settings_win_registry(self):
+        REG_PATH = r"Software\crackyOS\wdx"
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\crackyOS\wdx", 0, winreg.KEY_READ)
-            value, _ = winreg.QueryValueEx(key, "ExportPassword")
-            winreg.CloseKey(key)
-            return value if value else CODENAME
-        except (FileNotFoundError, Exception):
-            return CODENAME
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ) as key:
+                # Dark Mode
+                try:
+                    dm, _ = winreg.QueryValueEx(key, "dark_mode")
+                    self.config["dark_mode"] = bool(dm)
+                except FileNotFoundError: pass
+
+                # Feature 2: Show Prompts
+                try:
+                    sp, _ = winreg.QueryValueEx(key, "show_prompts")
+                    self.config["show_prompts"] = bool(sp)
+                except FileNotFoundError: pass
+
+                # Feature 3: Passwort
+                try:
+                    pwd, _ = winreg.QueryValueEx(key, "encryption_password")
+                    if pwd: self.config["encryption_password"] = str(pwd)
+                except FileNotFoundError: pass
+                
+        except (FileNotFoundError, OSError):
+            pass # Standardwerte bleiben erhalten
+
+    def _save_settings_win_registry(self):
+        REG_PATH = r"Software\crackyOS\wdx"
+        try:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH) as key:
+                winreg.SetValueEx(key, "dark_mode", 0, winreg.REG_DWORD, 1 if self.config["dark_mode"] else 0)
+                winreg.SetValueEx(key, "show_prompts", 0, winreg.REG_DWORD, 1 if self.config["show_prompts"] else 0)
+                winreg.SetValueEx(key, "encryption_password", 0, winreg.REG_SZ, self.config["encryption_password"])
+        except OSError as e:
+            print(f"Registry Fehler: {e}")
+
+    # --- JSON File Logik (Mac/Linux) ---
+    def _load_settings_json(self):
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.config.update(data)
+            except Exception as e:
+                print(f"Fehler beim Laden der Config (JSON): {e}")
+
+    def _save_settings_json(self):
+        try:
+            WDX_DIR.mkdir(parents=True, exist_ok=True)
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=4)
+        except Exception as e:
+            print(f"Fehler beim Speichern der Config (JSON): {e}")
+
+    # --- Projekt Logik ---
 
     def load_projects(self):
         self.projects = []
@@ -88,6 +172,7 @@ class ProjectManager:
                 "data_file": str(p["data_file"]),
             } for p in self.projects]
             try:
+                WDX_DIR.mkdir(parents=True, exist_ok=True)
                 with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
                     json.dump(projects_data, f, indent=4)
             except Exception as e:
@@ -133,7 +218,6 @@ class ProjectManager:
     def rename_project(self, project, new_name):
         new_path = WDX_DIR / new_name
         if new_path.exists(): return False, "Existiert bereits!"
-        # force gc to close any open file handles
         gc.collect()
 
         try:
@@ -163,7 +247,8 @@ class ProjectManager:
         if not file_path:
             return False, None
 
-        pwd = self.get_registry_password()
+        # Feature 3: Benutze konfiguriertes Passwort
+        pwd = self.config.get("encryption_password", CODENAME)
         
         try:
             files_to_add = []
@@ -189,7 +274,10 @@ class ProjectManager:
 
     def import_project(self, file_path):
         try:
-            pwd = self.get_registry_password()
+            # Feature 3: Versuche Import mit konfiguriertem Passwort
+            # Hinweis: Wenn das Passwort falsch ist, wirft pyzipper eine Exception (RuntimeError oder BadZipFile)
+            pwd = self.config.get("encryption_password", CODENAME)
+            
             with pyzipper.AESZipFile(file_path, "r") as zip_ref:
                 if pwd:
                     zip_ref.setpassword(pwd.encode('utf-8'))
@@ -225,6 +313,9 @@ class ProjectManager:
                 self.projects.append(new_proj)
                 self.save_projects()
                 return True
+        except RuntimeError: 
+            messagebox.showerror("Import Fehler", "Falsches Passwort oder beschädigte Datei.")
+            return False
         except Exception as e:
             messagebox.showerror("Import Fehler", str(e))
             return False

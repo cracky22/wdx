@@ -10,7 +10,7 @@ class SourceDialog(tk.Toplevel):
         self.source = source or {}
         self.result = None
         self.title("Quelle bearbeiten" if source else "Neue Quelle hinzufügen")
-        self.geometry("540x800")
+        self.geometry("550x890")
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
@@ -61,7 +61,7 @@ class SourceDialog(tk.Toplevel):
         self.selected_color_swatch = tk.Label(color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1)
         self.selected_color_swatch.pack(side="left", padx=(0, 5))
         ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
-        ttk.Button(color_frame, text="Wählen", command=self.choose_color).pack(side="left", padx=(5, 0))
+        ttk.Button(color_frame, text="Farbwähler", command=self.choose_color).pack(side="left", padx=(5, 0))
         self.color_var.trace_add("write", self.update_color_swatch)
 
         # --- Palette (bestehende Farben) ---
@@ -86,7 +86,8 @@ class SourceDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)
         ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle="primary", width=15).pack(side="right")
         
-        self.url_entry.focus_set()
+        #self.url_entry.focus_set()
+        self.text_text.focus_set()
         self.wait_window()
 
     def update_color_swatch(self, *args):
