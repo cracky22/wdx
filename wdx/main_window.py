@@ -82,7 +82,8 @@ class MainWindow:
     def show_settings(self):
         win = ttk.Toplevel(self.root)
         win.title("Einstellungen")
-        win.geometry("500x450")
+        win.geometry("500x500")
+        win.iconbitmap("icon128.ico")
         win.grab_set()
         
         # --- Dark Mode ---
