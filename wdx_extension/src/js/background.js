@@ -14,6 +14,8 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'QUEUE_SAVE') {
     addToQueue(request.payload);
+  } else if (request.type === 'PROCESS_QUEUE') {
+    processQueue();
   }
 });
 

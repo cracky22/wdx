@@ -12,6 +12,7 @@ const ui = {
   manualConnectBtn: document.getElementById('manualConnectBtn'),
   progress: document.getElementById('progressBar'),
   settingsBtn: document.getElementById('settingsBtn'),
+  historyBtn: document.getElementById('historyBtn'),
   feedback: document.getElementById('feedback'),
   versionText: document.getElementById('version')
 };
@@ -83,6 +84,8 @@ function setDisconnectedUI() {
   });
 }
 
+ui.historyBtn.addEventListener('click', () => window.location.href = 'queue.html');
+
 ui.saveBtn.addEventListener('click', async () => {
   const data = await chrome.storage.local.get('wdx-exp-offline-queue');
   const offlineQueueActive = data['wdx-exp-offline-queue'] === 'true';
@@ -129,8 +132,44 @@ ui.saveBtn.addEventListener('click', async () => {
 async function getCurrentTabPayload() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        return { url: tab.url, title: tab.title, text: "", keywords: "" };
-    } catch (e) { return null; }
+        const fallbackTitle = tab.title || tab.url || "Unbenannte Quelle";
+        
+        const prefs = await chrome.storage.local.get('wdx-exp-extract-context');
+        let meta = { author: "", date: "" };
+        
+        if (prefs['wdx-exp-extract-context'] === 'true') {
+            try {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    func: () => {
+                        const getMeta = (names) => {
+                            for (let name of names) {
+                                const el = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
+                                if (el) return el.content;
+                            }
+                            return "";
+                        };
+                        return {
+                            author: getMeta(['author', 'article:author', 'twitter:creator']),
+                            date: getMeta(['published_date', 'article:published_time', 'date']) || document.lastModified
+                        };
+                    }
+                });
+                if (results && results[0]) meta = results[0].result;
+            } catch (e) { console.error("Smart Context failed", e); }
+        }
+
+        return { 
+            url: tab.url, 
+            title: fallbackTitle,
+            text: "", 
+            keywords: "",
+            author: meta.author,
+            date: meta.date
+        };
+    } catch (e) { 
+        return { url: "Unknown", title: "Fehler beim Abrufen", text: "" }; 
+    }
 }
 
 function showFeedback(msg, type) {
