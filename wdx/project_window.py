@@ -1442,9 +1442,12 @@ class ProjectWindow:
         self.edit_source(item)
 
     def create_citation(self, source):
+        # Präsentation
         #             google.de     , zul. aufgerufen am 31.12.2025
         #             google.de     , zuletzt aufgerufen am 31.12.2025
         citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+        
+        # Fachreferat
         # NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. Abrufdatum, URL.
         #citation = f"NACHNAME, V. (YYYY, DD.MM): TITLE. WSNAME. {source['added']}, {source['url']}."
         pyperclip.copy(citation)
