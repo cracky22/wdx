@@ -10,6 +10,7 @@ WDX_DIR = Path.home() / "Documents" / "wdx"
 PROJECTS_FILE = WDX_DIR / "projects.json"
 CONFIG_FILE = WDX_DIR / "config.json"
 REG_PATH = r"Software\crackyOS\wdx"
+REG_Default = ['Software\\crackyOS\\wdx', 'Default']
 
 INVALID_CHARS = r'[<>:"/\\|?*]'
 DEFAULT_COLOR = "#ffffff"
