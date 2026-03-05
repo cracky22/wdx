@@ -60,12 +60,7 @@ class SourceDialog(tk.Toplevel):
         self.color_var.trace_add("write", self.update_color_swatch)
 
         all_items = project_window.project["data"].get("items", [])
-        import re as _re
-        used_colors = list({
-            c for item in all_items
-            if (c := (item.get("color") or "").strip())
-            and _re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", c)
-        })
+        used_colors = list({item.get("color").strip() for item in all_items if item.get("color") and item.get("color").strip()})
 
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
@@ -137,10 +132,30 @@ class SourceDialog(tk.Toplevel):
 
     def delete_word_forward(self, event):
         widget = event.widget
-        widget.delete("insert", "insert wordend")
+        if isinstance(widget, tk.Text):
+            widget.delete("insert", "insert wordend")
+        else:
+            pos = widget.index(tk.INSERT)
+            text = widget.get()
+            end = pos
+            while end < len(text) and text[end] == " ":
+                end += 1
+            while end < len(text) and text[end] != " ":
+                end += 1
+            widget.delete(pos, end)
         return "break"
 
     def delete_word_backward(self, event):
         widget = event.widget
-        widget.delete("insert wordstart", "insert")
+        if isinstance(widget, tk.Text):
+            widget.delete("insert -1c wordstart", "insert")
+        else:
+            pos = widget.index(tk.INSERT)
+            text = widget.get()
+            start = pos
+            while start > 0 and text[start - 1] == " ":
+                start -= 1
+            while start > 0 and text[start - 1] != " ":
+                start -= 1
+            widget.delete(start, pos)
         return "break"

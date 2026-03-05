@@ -335,22 +335,22 @@ class ProjectWindow:
                     refs["icon_label"].config(font=("Helvetica", icon_size))
 
     def _wrap_keywords(self, keywords: str, max_line_len: int = 31) -> str:
-        """Bricht Schlagworte so um, dass keine Zeile länger als max_line_len Zeichen ist.
-        Wörter werden nicht getrennt; ein Komma zählt als natürlicher Umbruchpunkt."""
-        words = keywords.split()
-        lines = []
-        current = ""
-        for word in words:
-            candidate = (current + " " + word).strip() if current else word
-            if len(candidate) <= max_line_len:
-                current = candidate
-            else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
-        return "\n".join(lines)
+            """Bricht Schlagworte so um, dass keine Zeile länger als max_line_len Zeichen ist.
+            Wörter werden nicht getrennt; ein Komma zählt als natürlicher Umbruchpunkt."""
+            words = keywords.split()
+            lines = []
+            current = ""
+            for word in words:
+                candidate = (current + " " + word).strip() if current else word
+                if len(candidate) <= max_line_len:
+                    current = candidate
+                else:
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
+            return "\n".join(lines)
 
     def _create_source_card_gui(self, source, favicon_path):
         color = self._get_effective_bg_color(source)
@@ -1058,9 +1058,12 @@ class ProjectWindow:
         refresh_list()
         
     def show_saved_shortcut(self):
+        if not self.selected_source_ids:
+            return
         item_id = next(iter(self.selected_source_ids))
         item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        self.show_saved_pages_popup(item)
+        if item:
+            self.show_saved_pages_popup(item)
 
     def open_selected_version_from_popup(self):
         selection = self.current_listbox.curselection()
