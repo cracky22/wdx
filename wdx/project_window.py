@@ -814,32 +814,6 @@ class ProjectWindow:
         self._update_minimap_viewport()
 
     def _update_minimap_viewport(self):
-        if not self.minimap_canvas or not self.minimap_canvas.winfo_exists():
-            return
-
-        p = self._minimap_params
-        scale = p["minimap_scale"]
-        off_x = p["offset_x"]
-        off_y = p["offset_y"]
-
-        vx1 = self.canvas.canvasx(0)
-        vy1 = self.canvas.canvasy(0)
-        vx2 = vx1 + self.canvas.winfo_width()
-        vy2 = vy1 + self.canvas.winfo_height()
-
-        mx1 = vx1 * scale + off_x
-        my1 = vy1 * scale + off_y
-        mx2 = vx2 * scale + off_x
-        my2 = vy2 * scale + off_y
-
-        if self.viewport_rect_id:
-            self.minimap_canvas.delete(self.viewport_rect_id)
-
-        self.viewport_rect_id = self.minimap_canvas.create_rectangle(
-            mx1, my1, mx2, my2, outline="red", width=2
-        )
-
-    def _update_minimap_viewport(self):
         if (not self.minimap_canvas or not self.minimap_canvas.winfo_exists() or not hasattr(self, "_minimap_params")):
             return
 
@@ -1265,7 +1239,7 @@ class ProjectWindow:
                     except: pass
 
                 pages.pop(idx)
-                self.app.project_manager.save_projects()
+                self.app.project_manager.save_specific_project_data(self.project)
                 refresh_list()
 
         popup.bind("<Delete>", lambda e: delete_entry())
@@ -1296,11 +1270,14 @@ class ProjectWindow:
         ).start()
         
     def reload_current_page_shortcut(self):
+        if not self.selected_source_ids:
+            return
         item_id = next(iter(self.selected_source_ids))
         item = next(
             (i for i in self.project["data"]["items"] if i["id"] == item_id), None
         )
-        self.reload_current_page(item)
+        if item:
+            self.reload_current_page(item)
 
     def _reload_worker(self, source):
         sites_dir = Path(self.project["path"]) / "sites"
@@ -1683,6 +1660,8 @@ class ProjectWindow:
             self._update_minimap()
             
     def edit_shortcut(self):
+        if not self.selected_source_ids:
+            return
         item_id = next(iter(self.selected_source_ids))
         item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
         if item is None:
@@ -1705,9 +1684,12 @@ class ProjectWindow:
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
         
     def shortcut_citation(self):
+        if not self.selected_source_ids:
+            return
         item_id = next(iter(self.selected_source_ids))
         item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        self.create_citation(item)
+        if item:
+            self.create_citation(item)
 
     def update_scrollregion(self):
         self.canvas.update_idletasks()
