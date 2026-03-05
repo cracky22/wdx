@@ -168,7 +168,6 @@ class ProjectManager:
                 print(f"Save Error: {e}")
 
     def update_project_file_safe(self, project, update_fn):
-        """Apply update_fn(data) to project data and save atomically."""
         with self.lock:
             try:
                 update_fn(project["data"])

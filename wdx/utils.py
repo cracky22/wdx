@@ -52,11 +52,6 @@ def extract_dominant_color(image_path, default="#ffffff"):
         return default
 
 def get_smart_color_for_source(image_path, existing_colors, threshold=40):
-    """
-    Analysiert das Bild und gibt eine Farbe zurück.
-    Wenn die Farbe einer existierenden Farbe im Projekt sehr ähnlich ist (threshold),
-    wird die existierende Farbe verwendet (verhindert 10x Gelb).
-    """
     new_hex = extract_dominant_color(image_path)
     new_rgb = hex_to_rgb(new_hex)
     

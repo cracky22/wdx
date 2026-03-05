@@ -220,7 +220,7 @@ class ProjectWindow:
         if self.clipboard:
             self.paste_card()
 
-    # ── Search ────────────────────────────────────────────────────────────────
+    
 
     def _focus_search(self):
         self.search_entry.focus_set()
@@ -243,7 +243,7 @@ class ProjectWindow:
     def _item_matches(self, item, query_lower, only_keywords):
         if only_keywords:
             return query_lower in item.get("keywords", "").lower()
-        # search title, text, keywords (and heading text)
+        
         if item.get("type") == "heading":
             return query_lower in item.get("text", "").lower()
         return (
@@ -275,30 +275,27 @@ class ProjectWindow:
             self.search_status_label.config(text="Kein Treffer")
 
     def _apply_search_highlights(self):
-        """Highlight all matching cards; the current result gets a distinct 'active' highlight."""
         self.search_highlighted_ids = set(self.search_results)
         for i, item_id in enumerate(self.search_results):
             is_active = (i == self.search_result_index)
             self._highlight_card(active=is_active, item_id=item_id)
 
     def _highlight_card(self, active=False, item_id=None):
-        """Draw a glow rectangle directly around the card using canvas window bbox."""
         if item_id not in self.source_frames:
             return
         frame, canvas_id = self.source_frames[item_id]
 
-        # Force geometry update so winfo_width/height are correct
         self.canvas.update_idletasks()
 
         coords = self.canvas.coords(canvas_id)
         if not coords:
             return
-        # anchor="nw" → coords are top-left corner
+        
         x1, y1 = coords[0], coords[1]
         fw = frame.winfo_width()
         fh = frame.winfo_height()
         if fw <= 1 or fh <= 1:
-            # Fallback: use requested size
+            
             fw = frame.winfo_reqwidth()
             fh = frame.winfo_reqheight()
 
@@ -324,7 +321,7 @@ class ProjectWindow:
             outline=color, width=width, dash=dash,
             tags=(tag, "search_glow"),
         )
-        # Make sure glow is just below the frame but visible
+        
         self.canvas.tag_raise(tag)
         self.canvas.tag_raise(canvas_id)
 
@@ -355,7 +352,7 @@ class ProjectWindow:
         x1, y1 = coords[0], coords[1]
         fw = frame.winfo_width() or frame.winfo_reqwidth()
         fh = frame.winfo_height() or frame.winfo_reqheight()
-        # center of the card
+        
         cx = x1 + fw / 2
         cy = y1 + fh / 2
 
@@ -399,7 +396,7 @@ class ProjectWindow:
         self._jump_to_search_result(self.search_result_index)
         self._update_search_status()
 
-    # ── End Search ────────────────────────────────────────────────────────────
+    
 
     def _process_item_data(self, item):
         if item.get("type") == "heading":
@@ -550,8 +547,6 @@ class ProjectWindow:
                     refs["icon_label"].config(font=("Helvetica", icon_size))
 
     def _wrap_keywords(self, keywords: str, max_line_len: int = 31) -> str:
-            """Bricht Schlagworte so um, dass keine Zeile länger als max_line_len Zeichen ist.
-            Wörter werden nicht getrennt; ein Komma zählt als natürlicher Umbruchpunkt."""
             words = keywords.split()
             lines = []
             current = ""
