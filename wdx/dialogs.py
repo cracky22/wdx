@@ -60,7 +60,12 @@ class SourceDialog(tk.Toplevel):
         self.color_var.trace_add("write", self.update_color_swatch)
 
         all_items = project_window.project["data"].get("items", [])
-        used_colors = list({item.get("color").strip() for item in all_items if item.get("color") and item.get("color").strip()})
+        import re as _re
+        used_colors = list({
+            c for item in all_items
+            if (c := (item.get("color") or "").strip())
+            and _re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", c)
+        })
 
         if used_colors:
             ttk.Label(main, text="Bereits verwendete Farben:", font=("Helvetica", 9)).pack(anchor="w")
@@ -139,4 +144,3 @@ class SourceDialog(tk.Toplevel):
         widget = event.widget
         widget.delete("insert wordstart", "insert")
         return "break"
-    
