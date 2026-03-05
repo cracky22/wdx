@@ -159,3 +159,74 @@ class SourceDialog(tk.Toplevel):
                 start -= 1
             widget.delete(start, pos)
         return "break"
+
+
+class HeadingDialog(tk.Toplevel):
+    DEFAULT_HEADING_BG = "#e9ecef"
+
+    def __init__(self, parent, heading=None):
+        super().__init__(parent)
+        self.heading = heading or {}
+        self.result = None
+        self.title("Überschrift bearbeiten" if heading else "Überschrift hinzufügen")
+        self.geometry("400x250")
+        self.resizable(False, False)
+        self.grab_set()
+        self.transient(parent)
+        try:
+            self.iconbitmap("icon128.ico")
+        except Exception:
+            pass
+
+        main = ttk.Frame(self, padding="20")
+        main.pack(fill="both", expand=True)
+
+        ttk.Label(main, text="Titel:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        self.text_var = tk.StringVar(value=self.heading.get("text", ""))
+        self.text_entry = ttk.Entry(main, textvariable=self.text_var, width=45)
+        self.text_entry.pack(fill="x", pady=(0, 15))
+
+        ttk.Label(main, text="Farbe:", font=("Helvetica", 10, "bold")).pack(anchor="w")
+        color_frame = ttk.Frame(main)
+        color_frame.pack(fill="x", pady=(0, 20))
+        self.color_var = tk.StringVar(value=self.heading.get("color") or self.DEFAULT_HEADING_BG)
+        self.color_swatch = tk.Label(color_frame, bg=self.color_var.get(), width=3, relief="solid", borderwidth=1)
+        self.color_swatch.pack(side="left", padx=(0, 5))
+        ttk.Entry(color_frame, textvariable=self.color_var, width=15).pack(side="left")
+        ttk.Button(color_frame, text="Farbwähler", command=self.choose_color).pack(side="left", padx=(5, 0))
+        self.color_var.trace_add("write", self.update_swatch)
+
+        btn_frame = ttk.Frame(main)
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame, text="Abbrechen", command=self.destroy, bootstyle="secondary-outline").pack(side="right", padx=10)
+        ttk.Button(btn_frame, text="Speichern", command=self.save, bootstyle="primary", width=15).pack(side="right")
+
+        self.bind("<Return>", lambda e: self.save())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.text_entry.focus_set()
+        self.wait_window()
+
+    def update_swatch(self, *args):
+        color = self.color_var.get().strip()
+        if color:
+            try:
+                self.color_swatch.config(bg=color)
+            except tk.TclError:
+                pass
+
+    def choose_color(self):
+        result = colorchooser.askcolor(initialcolor=self.color_var.get())
+        if result and result[1]:
+            self.color_var.set(result[1])
+
+    def save(self):
+        text = self.text_var.get().strip()
+        if not text:
+            messagebox.showerror("Fehler", "Titel ist erforderlich!")
+            return
+        color = self.color_var.get().strip() or self.DEFAULT_HEADING_BG
+        self.result = {
+            "text": text,
+            "color": "" if color == self.DEFAULT_HEADING_BG else color,
+        }
+        self.destroy()

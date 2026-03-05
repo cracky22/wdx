@@ -2,7 +2,7 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import tkinter as tk
 from tkinter import messagebox, simpledialog, colorchooser
-from dialogs import SourceDialog
+from dialogs import SourceDialog, HeadingDialog
 import datetime
 import uuid
 import webbrowser
@@ -1219,10 +1219,7 @@ class ProjectWindow:
         self.context_menu.add_separator()
         if item["type"] == "heading":
             self.context_menu.add_command(
-                label="Umbenennen", command=lambda: self.rename_heading(item)
-            )
-            self.context_menu.add_command(
-                label="Farbe ändern", command=lambda: self.change_heading_color(item)
+                label="Bearbeiten (Strg+e)", command=lambda: self.edit_heading(item)
             )
         else:
             if item.get("saved_pages") and len(item["saved_pages"]) > 0:
@@ -1268,6 +1265,23 @@ class ProjectWindow:
             )
 
         self.context_menu.post(event.x_root, event.y_root)
+
+    def edit_heading(self, heading):
+        dialog = HeadingDialog(self.root, heading)
+        if not dialog.result:
+            return
+        heading["text"] = dialog.result["text"]
+        heading["color"] = dialog.result["color"]
+        frame, item_id = self.source_frames[heading["id"]]
+        self.canvas.delete(item_id)
+        frame.destroy()
+        del self.source_frames[heading["id"]]
+        del self.card_widgets[heading["id"]]
+        self._create_heading_card_gui(heading)
+        self.save_project()
+        self.update_last_mtime()
+        self.reset_zoom()
+        self._update_minimap()
 
     def rename_heading(self, heading):
         new_text = simpledialog.askstring("Umbenennen", "Neuer Text:", initialvalue=heading["text"], parent=self.root)
@@ -1403,15 +1417,11 @@ class ProjectWindow:
                             print(f"GC Fehler Favicon: {e}")
 
     def add_heading(self):
-        text = simpledialog.askstring("Überschrift hinzufügen", "Text der Überschrift:", parent=self.root)
-        if not text:
+        dialog = HeadingDialog(self.root)
+        if not dialog.result:
             return
 
-        color_result = colorchooser.askcolor(title="Farbe wählen", initialcolor=self.DEFAULT_HEADING_BG)
-        color = color_result[1] if color_result else None
-        
-        color_to_save = "" if not color or color == self.DEFAULT_HEADING_BG else color
-        new_heading = {"id": str(uuid.uuid4()), "type": "heading", "text": text, "color": color_to_save, "pos_x": 300, "pos_y": 300}
+        new_heading = {"id": str(uuid.uuid4()), "type": "heading", "text": dialog.result["text"], "color": dialog.result["color"], "pos_x": 300, "pos_y": 300}
         self.project["data"]["items"].append(new_heading)
         self.deselect_all_cards()
         self._create_heading_card_gui(new_heading)
@@ -1460,7 +1470,12 @@ class ProjectWindow:
     def edit_shortcut(self):
         item_id = next(iter(self.selected_source_ids))
         item = next((i for i in self.project["data"]["items"] if i["id"] == item_id), None)
-        self.edit_source(item)
+        if item is None:
+            return
+        if item["type"] == "heading":
+            self.edit_heading(item)
+        else:
+            self.edit_source(item)
 
     def create_citation(self, source):
         # Präsentation
