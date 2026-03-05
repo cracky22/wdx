@@ -334,6 +334,24 @@ class ProjectWindow:
                 else:
                     refs["icon_label"].config(font=("Helvetica", icon_size))
 
+    def _wrap_keywords(self, keywords: str, max_line_len: int = 31) -> str:
+        """Bricht Schlagworte so um, dass keine Zeile länger als max_line_len Zeichen ist.
+        Wörter werden nicht getrennt; ein Komma zählt als natürlicher Umbruchpunkt."""
+        words = keywords.split()
+        lines = []
+        current = ""
+        for word in words:
+            candidate = (current + " " + word).strip() if current else word
+            if len(candidate) <= max_line_len:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return "\n".join(lines)
+
     def _create_source_card_gui(self, source, favicon_path):
         color = self._get_effective_bg_color(source)
         text_color = get_contrast_color(color)
@@ -399,7 +417,7 @@ class ProjectWindow:
             self.card_widgets[item_id]["text_label"] = text_label
 
         if source["keywords"]:
-            keywords_label = ttk.Label(frame, text=f"🏷 {source['keywords']}", font=self.base_font_default, bootstyle="info", foreground=text_color)
+            keywords_label = ttk.Label(frame, text=f"🏷 {self._wrap_keywords(source['keywords'])}", font=self.base_font_default, bootstyle="info", foreground=text_color, justify="left")
             keywords_label.pack(anchor="w", pady=(4, 0))
             self.card_widgets[item_id]["keywords_label"] = keywords_label
 
