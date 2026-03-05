@@ -73,6 +73,9 @@ class ProjectWindow:
         self.minimap_canvas = None
         self.viewport_rect_id = None
         self._minimap_params = {}
+        self.search_results = []
+        self.search_result_index = 0
+        self.search_highlighted_ids = set()
 
         if "items" not in self.project["data"]:
             if "sources" in self.project["data"]:
@@ -98,6 +101,31 @@ class ProjectWindow:
         ttk.Button(btn_frame, text="🔄", width=3, bootstyle="info-outline", command=self.manual_reload).pack(side="left", padx=2)
         ttk.Label(header_frame, text=f"Mindmap: {project['name']}", font=("Helvetica", 18, "bold"), bootstyle="inverse-primary").grid(row=0, column=1, sticky=tk.W, padx=20)
         ttk.Label(header_frame, text=f"📋 {project['description']}", font=("Helvetica", 11)).grid(row=1, column=1, sticky=tk.W, padx=20, columnspan=2)
+
+        # Search bar row
+        search_frame = ttk.Frame(header_frame)
+        search_frame.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, padx=10, pady=(6, 2))
+        search_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(search_frame, text="🔎", font=("Helvetica", 12)).grid(row=0, column=0, padx=(0, 6))
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=35, font=("Helvetica", 10))
+        self.search_entry.grid(row=0, column=1, sticky=tk.W+tk.E, padx=(0, 8))
+        self.search_var.trace_add("write", lambda *_: self._on_search_change())
+
+        self.search_only_keywords_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(search_frame, text="Nur Schlagwörter", variable=self.search_only_keywords_var,
+                        bootstyle="round-toggle", command=self._on_search_change).grid(row=0, column=2, padx=(0, 12))
+
+        self.search_prev_btn = ttk.Button(search_frame, text="◀", width=3, bootstyle="secondary-outline",
+                                          command=self._search_prev)
+        self.search_prev_btn.grid(row=0, column=3, padx=1)
+        self.search_next_btn = ttk.Button(search_frame, text="▶", width=3, bootstyle="secondary-outline",
+                                          command=self._search_next)
+        self.search_next_btn.grid(row=0, column=4, padx=1)
+        self.search_status_label = ttk.Label(search_frame, text="", font=("Helvetica", 9), width=14)
+        self.search_status_label.grid(row=0, column=5, padx=(6, 0))
+
         self.canvas = tk.Canvas(self.main_frame, bg="#f5f7fa", highlightthickness=0)
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.main_frame.rowconfigure(1, weight=1)
@@ -170,6 +198,10 @@ class ProjectWindow:
         
         self.root.bind("<Control-n>", lambda e: self.add_source())
         self.root.bind("<Command-n>", lambda e: self.add_source())
+        self.root.bind("<Control-f>", lambda e: self._focus_search())
+        self.root.bind("<Command-f>", lambda e: self._focus_search())
+        self.search_entry.bind("<Return>", lambda e: self._search_next())
+        self.search_entry.bind("<Escape>", lambda e: self._clear_search())
 
     def _handle_duplicate_shortcut(self, event):
         if self.selected_source_ids:
@@ -187,6 +219,187 @@ class ProjectWindow:
     def _handle_paste_shortcut(self, event):
         if self.clipboard:
             self.paste_card()
+
+    # ── Search ────────────────────────────────────────────────────────────────
+
+    def _focus_search(self):
+        self.search_entry.focus_set()
+        self.search_entry.select_range(0, tk.END)
+
+    def _clear_search(self):
+        self.search_var.set("")
+        self._remove_search_highlights()
+        self.search_results = []
+        self.search_result_index = 0
+        self.search_status_label.config(text="")
+
+    def _on_search_change(self):
+        query = self.search_var.get().strip()
+        if not query:
+            self._clear_search()
+            return
+        self._run_search(query)
+
+    def _item_matches(self, item, query_lower, only_keywords):
+        if only_keywords:
+            return query_lower in item.get("keywords", "").lower()
+        # search title, text, keywords (and heading text)
+        if item.get("type") == "heading":
+            return query_lower in item.get("text", "").lower()
+        return (
+            query_lower in item.get("title", "").lower()
+            or query_lower in item.get("text", "").lower()
+            or query_lower in item.get("keywords", "").lower()
+        )
+
+    def _run_search(self, query=None):
+        if query is None:
+            query = self.search_var.get().strip()
+        query_lower = query.lower()
+        only_kw = self.search_only_keywords_var.get()
+
+        self._remove_search_highlights()
+        self.search_results = []
+
+        for item in self.project["data"]["items"]:
+            if self._item_matches(item, query_lower, only_kw):
+                self.search_results.append(item["id"])
+
+        if self.search_results:
+            self.search_result_index = 0
+            self.canvas.update_idletasks()
+            self._apply_search_highlights()
+            self._jump_to_search_result(self.search_result_index)
+            self._update_search_status()
+        else:
+            self.search_status_label.config(text="Kein Treffer")
+
+    def _apply_search_highlights(self):
+        """Highlight all matching cards; the current result gets a distinct 'active' highlight."""
+        self.search_highlighted_ids = set(self.search_results)
+        for i, item_id in enumerate(self.search_results):
+            is_active = (i == self.search_result_index)
+            self._highlight_card(active=is_active, item_id=item_id)
+
+    def _highlight_card(self, active=False, item_id=None):
+        """Draw a glow rectangle directly around the card using canvas window bbox."""
+        if item_id not in self.source_frames:
+            return
+        frame, canvas_id = self.source_frames[item_id]
+
+        # Force geometry update so winfo_width/height are correct
+        self.canvas.update_idletasks()
+
+        coords = self.canvas.coords(canvas_id)
+        if not coords:
+            return
+        # anchor="nw" → coords are top-left corner
+        x1, y1 = coords[0], coords[1]
+        fw = frame.winfo_width()
+        fh = frame.winfo_height()
+        if fw <= 1 or fh <= 1:
+            # Fallback: use requested size
+            fw = frame.winfo_reqwidth()
+            fh = frame.winfo_reqheight()
+
+        x2 = x1 + fw
+        y2 = y1 + fh
+
+        tag = f"search_glow_{item_id}"
+        self.canvas.delete(tag)
+
+        if active:
+            pad = 6
+            color = "#f4a12b"
+            width = 4
+            dash = (8, 3)
+        else:
+            pad = 4
+            color = "#6cb4f5"
+            width = 2
+            dash = (5, 4)
+
+        self.canvas.create_rectangle(
+            x1 - pad, y1 - pad, x2 + pad, y2 + pad,
+            outline=color, width=width, dash=dash,
+            tags=(tag, "search_glow"),
+        )
+        # Make sure glow is just below the frame but visible
+        self.canvas.tag_raise(tag)
+        self.canvas.tag_raise(canvas_id)
+
+    def _remove_search_highlights(self):
+        self.canvas.delete("search_glow")
+        for item_id in self.search_highlighted_ids:
+            if item_id in self.source_frames:
+                frame, _ = self.source_frames[item_id]
+                try:
+                    default_bw = 2 if frame.item_data.get("type") == "source" else 0
+                    frame.config(relief="raised", borderwidth=default_bw)
+                except Exception:
+                    pass
+        self.search_highlighted_ids = set()
+
+    def _jump_to_search_result(self, index):
+        if not self.search_results:
+            return
+        item_id = self.search_results[index]
+        if item_id not in self.source_frames:
+            return
+        frame, canvas_id = self.source_frames[item_id]
+
+        self.canvas.update_idletasks()
+        coords = self.canvas.coords(canvas_id)
+        if not coords:
+            return
+        x1, y1 = coords[0], coords[1]
+        fw = frame.winfo_width() or frame.winfo_reqwidth()
+        fh = frame.winfo_height() or frame.winfo_reqheight()
+        # center of the card
+        cx = x1 + fw / 2
+        cy = y1 + fh / 2
+
+        bbox = self.canvas.bbox("all")
+        if not bbox:
+            return
+        bx1, by1, bx2, by2 = bbox
+        w = bx2 - bx1
+        h = by2 - by1
+        if w <= 0 or h <= 0:
+            return
+
+        view_w = self.canvas.winfo_width()
+        view_h = self.canvas.winfo_height()
+        target_x = cx - bx1 - view_w / 2
+        target_y = cy - by1 - view_h / 2
+        self.canvas.xview_moveto(max(0.0, min(1.0, target_x / w)))
+        self.canvas.yview_moveto(max(0.0, min(1.0, target_y / h)))
+
+    def _update_search_status(self):
+        total = len(self.search_results)
+        if total == 0:
+            self.search_status_label.config(text="Kein Treffer")
+        else:
+            self.search_status_label.config(text=f"{self.search_result_index + 1} / {total}")
+
+    def _search_next(self):
+        if not self.search_results:
+            self._run_search()
+            return
+        self.search_result_index = (self.search_result_index + 1) % len(self.search_results)
+        self._apply_search_highlights()
+        self._jump_to_search_result(self.search_result_index)
+        self._update_search_status()
+
+    def _search_prev(self):
+        if not self.search_results:
+            return
+        self.search_result_index = (self.search_result_index - 1) % len(self.search_results)
+        self._apply_search_highlights()
+        self._jump_to_search_result(self.search_result_index)
+        self._update_search_status()
+
+    # ── End Search ────────────────────────────────────────────────────────────
 
     def _process_item_data(self, item):
         if item.get("type") == "heading":
@@ -227,6 +440,8 @@ class ProjectWindow:
             frame.destroy()
         self.source_frames.clear()
         self.card_widgets.clear()
+        self.canvas.delete("search_glow")
+        self.search_highlighted_ids = set()
 
         for result in processed_results:
             item = result["item"]
