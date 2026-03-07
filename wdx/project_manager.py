@@ -167,8 +167,19 @@ class ProjectManager:
             except Exception as e:
                 print(f"Save Error: {e}")
 
-    def save_specific_project_data(self, project):
+    def update_project_file_safe(self, project, update_fn):
         with self.lock:
+            try:
+                update_fn(project["data"])
+                project["last_modified"] = datetime.datetime.now().isoformat()
+                with open(project["data_file"], "w", encoding="utf-8") as f:
+                    json.dump(project["data"], f, indent=4)
+                project["size"] = self._get_dir_size(project["path"])
+            except Exception as e:
+                print(f"Fehler in update_project_file_safe für {project['name']}: {e}")
+        self.save_projects()
+
+    def save_specific_project_data(self, project):
             try:
                 project["last_modified"] = datetime.datetime.now().isoformat()
                 with open(project["data_file"], "w", encoding="utf-8") as f:
@@ -176,7 +187,8 @@ class ProjectManager:
                 project["size"] = self._get_dir_size(project["path"])
             except Exception as e:
                 print(f"Fehler beim Speichern von {project['name']}: {e}")
-        self.save_projects()
+            
+            self.save_projects()
 
     def create_project(self, name, description):
         project_dir = WDX_DIR / name
