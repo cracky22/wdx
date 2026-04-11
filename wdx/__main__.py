@@ -7,12 +7,18 @@ import threading
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+
 from constants import APP_TITLE
 from server import start_server
 from project_manager import ProjectManager
 from main_window import MainWindow
 from project_window import ProjectWindow
 from utils import get_smart_color_for_source
+from wdx_logger import setup_logging, get_logger
+
+setup_logging()
+logger = get_logger(__name__)
+
 
 class WdxApp:
     def __init__(self, root):
@@ -20,34 +26,40 @@ class WdxApp:
         self.root.title(APP_TITLE)
         self.project_manager = ProjectManager()
         self.style = ttk.Style()
-        
+
         self.dark_mode = self.project_manager.get_setting("dark_mode", False)
         self.apply_theme()
-        
+
         self.main_window = MainWindow(root, self)
         start_server(self)
         self.last_connection = None
         self.connection_count = 0
         self.current_project_name = None
-        
+
         self.update_connection_status()
+        logger.info("WdxApp gestartet")
 
     def open_project(self, project):
+        logger.info("Öffne Projekt: %s", project["name"])
         self.main_window.hide()
         self.project_window = ProjectWindow(self.root, project, self)
         self.current_project_name = project["name"]
 
     def close_project(self):
         if hasattr(self, "project_window"):
+            logger.info("Schließe Projekt: %s", self.current_project_name)
             if hasattr(self.project_window, "executor"):
                 self.project_window.executor.shutdown(wait=False)
-            if hasattr(self.project_window, "main_frame") and self.project_window.main_frame.winfo_exists():
+            if (
+                hasattr(self.project_window, "main_frame")
+                and self.project_window.main_frame.winfo_exists()
+            ):
                 self.project_window.main_frame.destroy()
             del self.project_window
-            
+
             if hasattr(self, "current_project_name"):
                 self.root.after(0, self.main_window.set_browser_connected, True)
-            
+
         self.current_project_name = None
         self.main_window.refresh_and_update()
         self.main_window.show()
@@ -55,14 +67,13 @@ class WdxApp:
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
         self.apply_theme()
-        
         self.project_manager.set_setting("dark_mode", self.dark_mode)
+        logger.debug("Theme gewechselt — dark_mode=%s", self.dark_mode)
 
     def apply_theme(self):
-        if self.dark_mode:
-            self.style.theme_use("darkly")
-        else:
-            self.style.theme_use("litera")
+        theme = "darkly" if self.dark_mode else "litera"
+        self.style.theme_use(theme)
+        logger.debug("Theme angewendet: %s", theme)
 
     def update_connection_status(self):
         if self.last_connection:
@@ -77,12 +88,17 @@ class WdxApp:
     def handle_communication(self, data):
         self.last_connection = datetime.datetime.now()
         self.connection_count += 1
-        
+        logger.debug(
+            "Browser-Kommunikation empfangen — url=%s, gesamt=%d",
+            data.get("url", "?"),
+            self.connection_count,
+        )
+
         try:
             self.root.deiconify()
             self.root.lift()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Fenster konnte nicht in Vordergrund gebracht werden: %s", exc)
 
         project = None
         if self.current_project_name:
@@ -93,34 +109,40 @@ class WdxApp:
                     if p["name"] == self.current_project_name
                 )
             except StopIteration:
+                logger.warning(
+                    "Aktuelles Projekt '%s' nicht mehr in der Liste",
+                    self.current_project_name,
+                )
                 self.current_project_name = None
                 return
         else:
             project_names = [p["name"] for p in self.project_manager.projects]
             if not project_names:
-                
                 messagebox.showerror(
                     "Fehler",
                     "Keine Projekte vorhanden. Bitte erst ein Projekt erstellen.",
                 )
+                logger.warning("Keine Projekte vorhanden — Kommunikation abgebrochen")
                 return
 
             project_name = self._ask_project_selection(project_names)
-            
             if not project_name or project_name not in project_names:
+                logger.debug("Projektauswahl abgebrochen oder ungültig")
                 return
-            
+
             project = next(
                 p for p in self.project_manager.projects if p["name"] == project_name
             )
 
-        if self.current_project_name == project["name"] and hasattr(self, 'project_window'):
+        if self.current_project_name == project["name"] and hasattr(
+            self, "project_window"
+        ):
             self.project_window.handle_external_data(data)
         else:
             threading.Thread(
                 target=self._download_worker, args=(data, project), daemon=True
             ).start()
-            
+
     def _ask_project_selection(self, project_names):
         selection = {"name": None}
         dialog = tk.Toplevel(self.root)
@@ -137,26 +159,30 @@ class WdxApp:
 
         for name in project_names:
             btn = ttk.Button(
-                frame, 
-                text=name, 
+                frame,
+                text=name,
                 bootstyle="outline-primary",
-                command=lambda n=name: select(n)
+                command=lambda n=name: select(n),
             )
             btn.pack(fill="x", pady=2)
 
         ttk.Separator(dialog).pack(fill="x", pady=5)
-        ttk.Button(dialog, text="Abbrechen", bootstyle="danger", command=dialog.destroy).pack(pady=10)
+        ttk.Button(
+            dialog, text="Abbrechen", bootstyle="danger", command=dialog.destroy
+        ).pack(pady=10)
         self.root.wait_window(dialog)
         return selection["name"]
 
     def _download_worker(self, data, project):
         source_id = str(uuid.uuid4())
-        
+        url = data["url"]
+        logger.info("Download-Worker gestartet — url=%s, projekt=%s", url, project["name"])
+
         new_source = {
             "id": source_id,
             "type": "source",
-            "url": data["url"],
-            "title": data.get("title", data["url"]),
+            "url": url,
+            "title": data.get("title", url),
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
             "color": "#ffffff",
@@ -166,7 +192,7 @@ class WdxApp:
             "favicon": "",
             "saved_pages": [],
         }
-        
+
         project_dir = project["path"]
         images_dir = project_dir / "images"
         sites_dir = project_dir / "sites"
@@ -174,44 +200,63 @@ class WdxApp:
         sites_dir.mkdir(exist_ok=True)
 
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/91.0.4472.124 Safari/537.36"
+            )
         }
-        
-        html_content = ""
 
+        html_content = ""
         try:
-            response = requests.get(data["url"], headers=headers, timeout=15)
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
             html_content = response.text
-            
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             html_filename = f"page_{source_id}_{timestamp}.html"
             with open(sites_dir / html_filename, "w", encoding="utf-8") as f:
                 f.write(html_content)
-            
-            new_source["saved_pages"].append({
-                "file": html_filename,
-                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-        except Exception as e:
-            print(f"HTML Download Fehler: {e}")
 
+            new_source["saved_pages"].append(
+                {
+                    "file": html_filename,
+                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+            logger.debug("HTML gespeichert: %s", html_filename)
+        except requests.exceptions.Timeout:
+            logger.warning("HTML-Download Timeout — url=%s", url)
+        except requests.exceptions.HTTPError as exc:
+            logger.warning("HTML-Download HTTP-Fehler — url=%s status=%s", url, exc.response.status_code if exc.response else "?")
+        except requests.exceptions.RequestException as exc:
+            logger.error("HTML-Download fehlgeschlagen — url=%s fehler=%s", url, exc)
+        except OSError as exc:
+            logger.error("HTML-Datei konnte nicht geschrieben werden: %s", exc)
+
+        # --- favicon ------------------------------------------------------
         fav_path = None
         try:
             icon_url = None
+            base_url = ""
             try:
-                parsed_uri = urlparse(data["url"])
-                base_url = "{uri.scheme}://{uri.netloc}".format(uri=parsed_uri)
-            except:
-                base_url = ""
+                parsed_uri = urlparse(url)
+                base_url = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+            except Exception as exc:
+                logger.debug("Base-URL konnte nicht ermittelt werden: %s", exc)
 
             if html_content and base_url:
                 try:
                     soup = BeautifulSoup(html_content, "html.parser")
-                    icon_link = soup.find("link", rel=lambda x: x and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"])
+                    icon_link = soup.find(
+                        "link",
+                        rel=lambda x: x
+                        and x.lower() in ["icon", "shortcut icon", "apple-touch-icon"],
+                    )
                     if icon_link and icon_link.get("href"):
                         icon_url = urljoin(base_url, icon_link.get("href"))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Favicon-Link im HTML nicht gefunden: %s", exc)
 
             if not icon_url and base_url:
                 icon_url = urljoin(base_url, "/favicon.ico")
@@ -222,17 +267,21 @@ class WdxApp:
                     fav_resp = requests.get(icon_url, headers=headers, timeout=5)
                     if fav_resp.status_code == 200 and len(fav_resp.content) > 0:
                         fav_content = fav_resp.content
-                except:
-                    pass
+                        logger.debug("Favicon von %s geladen", icon_url)
+                except requests.exceptions.RequestException as exc:
+                    logger.debug("Favicon-Download fehlgeschlagen (%s): %s", icon_url, exc)
 
             if not fav_content and base_url:
                 try:
-                    google_url = f"https://www.google.com/s2/favicons?domain={base_url}&sz=64"
+                    google_url = (
+                        f"https://www.google.com/s2/favicons?domain={base_url}&sz=64"
+                    )
                     g_resp = requests.get(google_url, headers=headers, timeout=5)
                     if g_resp.status_code == 200:
                         fav_content = g_resp.content
-                except:
-                    pass
+                        logger.debug("Favicon via Google Fallback geladen")
+                except requests.exceptions.RequestException as exc:
+                    logger.debug("Google-Favicon-Fallback fehlgeschlagen: %s", exc)
 
             if fav_content:
                 fav_name = f"favicon_{source_id}.ico"
@@ -240,46 +289,59 @@ class WdxApp:
                     fav_name = f"favicon_{source_id}.png"
                 elif b"JFIF" in fav_content[:10] or b"Exif" in fav_content[:10]:
                     fav_name = f"favicon_{source_id}.jpg"
-                
+
                 fav_full_path = images_dir / fav_name
                 with open(fav_full_path, "wb") as f:
                     f.write(fav_content)
-                
                 new_source["favicon"] = fav_name
                 fav_path = fav_full_path
+                logger.debug("Favicon gespeichert: %s", fav_name)
 
-        except Exception as e:
-            print(f"Favicon Worker Fehler: {e}")
+        except OSError as exc:
+            logger.error("Favicon konnte nicht auf Disk geschrieben werden: %s", exc)
+        except Exception as exc:
+            logger.exception("Unerwarteter Fehler im Favicon-Worker: %s", exc)
 
+        # --- smart color --------------------------------------------------
         if fav_path:
             try:
-                existing_colors = set()
-                if "items" in project["data"]:
-                    for item in project["data"]["items"]:
-                        if "color" in item:
-                            existing_colors.add(item["color"])
-                
-                smart_color = get_smart_color_for_source(str(fav_path), existing_colors)
-                new_source["color"] = smart_color
-                
-            except Exception as e:
-                print(f"Farbanalyse Fehler: {e}")
+                existing_colors = {
+                    item["color"]
+                    for item in project["data"].get("items", [])
+                    if "color" in item
+                }
+                new_source["color"] = get_smart_color_for_source(
+                    str(fav_path), existing_colors
+                )
+                logger.debug("Smart-Color ermittelt: %s", new_source["color"])
+            except Exception as exc:
+                logger.warning("Farbanalyse fehlgeschlagen: %s", exc)
 
-        self.root.after(0, lambda: self._finalize_source_add_safe(project, new_source))
+        self.root.after(
+            0, lambda: self._finalize_source_add_safe(project, new_source)
+        )
 
     def _finalize_source_add_safe(self, project, source):
         def update_logic(data):
             if "items" not in data:
                 data["items"] = []
             data["items"].append(source)
-            
+
         self.project_manager.update_project_file_safe(project, update_logic)
-        
+        logger.info(
+            "Quelle hinzugefügt — titel='%s' projekt='%s'",
+            source.get("title", "?"),
+            project["name"],
+        )
+
         if self.current_project_name is None:
             self.main_window.refresh_and_update()
-        
+
         if self.project_manager.get_setting("show_prompts", True):
-            messagebox.showinfo("Gespeichert", f"Inhalt wurde in '{project['name']}' gespeichert.")
+            messagebox.showinfo(
+                "Gespeichert",
+                f"Inhalt wurde in '{project['name']}' gespeichert.",
+            )
 
 
 if __name__ == "__main__":
@@ -290,3 +352,4 @@ if __name__ == "__main__":
     finally:
         if hasattr(app, "httpd"):
             app.httpd.shutdown()
+        logger.info("wdx beendet")
