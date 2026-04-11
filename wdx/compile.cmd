@@ -2,14 +2,15 @@ del __pycache__\*.*
 python -m compileall constants.py
 python -m compileall dialogs.py
 python -m compileall __main__.py
+python -m compileall wdx_logger.py
 python -m compileall minimap.py
 python -m compileall main_window.py
 python -m compileall project_manager.py
 python -m compileall project_window.py
 python -m compileall utils.py
 python -m compileall server.py
-ren .\__pycache__\dialogs.cpython-314.pyc dialogs.pyc
 ren .\__pycache__\constants.cpython-314.pyc constants.pyc
+ren .\__pycache__\dialogs.cpython-314.pyc dialogs.pyc
 ren .\__pycache__\__main__.cpython-314.pyc __main__.pyc
 ren .\__pycache__\wdx_logger.cpython-314.pyc wdx_logger.pyc
 ren .\__pycache__\minimap.cpython-314.pyc minimap.pyc
