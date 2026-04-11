@@ -1,7 +1,7 @@
 del __pycache__\*.*
 python -m compileall constants.py
 python -m compileall dialogs.py
-python -m compileall main.py
+python -m compileall __main__.py
 python -m compileall minimap.py
 python -m compileall main_window.py
 python -m compileall project_manager.py
