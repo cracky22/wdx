@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 
 VERSION = "1.4.2"
-BUILDDATE = "2026-04-20"
+BUILDDATE = "2026-04-21"
 APP_TITLE = f"wdx v{VERSION} ({BUILDDATE})"
 CODENAME = "com.crackyOS.wdx"
 
