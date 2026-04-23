@@ -152,7 +152,7 @@ class MainWindow:
     def show_settings(self):
         win = ttk.Toplevel(self.root)
         win.title("Einstellungen")
-        win.geometry("560x640")
+        win.geometry("560x780")
         try:
             win.iconbitmap("icon128.ico")
         except Exception:
