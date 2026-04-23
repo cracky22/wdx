@@ -18,6 +18,8 @@ if sys.platform == "win32":
 
 logger = get_logger(__name__)
 
+DEFAULT_CITATION_FORMAT = "{url}, zuletzt aufgerufen am {added}"
+
 
 class ProjectManager:
     def __init__(self):
@@ -28,6 +30,7 @@ class ProjectManager:
             "dark_mode": False,
             "show_prompts": True,
             "encryption_password": CODENAME,
+            "citation_format": DEFAULT_CITATION_FORMAT,
         }
 
         self.load_settings()
@@ -86,6 +89,7 @@ class ProjectManager:
                     ("dark_mode", "dark_mode", bool),
                     ("show_prompts", "show_prompts", bool),
                     ("encryption_password", "encryption_password", str),
+                    ("citation_format", "citation_format", str),
                 ]:
                     try:
                         val, _ = winreg.QueryValueEx(key, reg_key)
@@ -111,6 +115,10 @@ class ProjectManager:
                 winreg.SetValueEx(
                     key, "encryption_password", 0, winreg.REG_SZ,
                     self.config["encryption_password"],
+                )
+                winreg.SetValueEx(
+                    key, "citation_format", 0, winreg.REG_SZ,
+                    self.config.get("citation_format", DEFAULT_CITATION_FORMAT),
                 )
             logger.debug("Einstellungen in Registry gespeichert")
         except OSError as exc:
@@ -292,24 +300,37 @@ class ProjectManager:
             logger.error("Projekt '%s' konnte nicht erstellt werden: %s", name, exc)
             return False, str(exc)
 
-    def rename_project(self, project, new_name):
+    def rename_project(self, project, new_name, new_description=None):
+        """Benennt ein Projekt um und aktualisiert optional die Beschreibung."""
         new_path = WDX_DIR / new_name
-        if new_path.exists():
+        if new_path.exists() and new_path != project["path"]:
             logger.warning("Umbenennen abgelehnt — '%s' existiert bereits", new_name)
             return False, "Existiert bereits!"
         gc.collect()
         try:
-            os.rename(str(project["path"]), str(new_path))
-            project["path"] = new_path
+            old_name = project["name"]
+            # Verzeichnis nur umbenennen wenn der Name sich geändert hat
+            if new_name != project["name"]:
+                os.rename(str(project["path"]), str(new_path))
+                project["path"] = new_path
+                project["data_file"] = new_path / "project.json"
+
             project["name"] = new_name
-            project["data_file"] = new_path / "project.json"
             project["data"]["name"] = new_name
+
+            if new_description is not None:
+                project["description"] = new_description
+                project["data"]["description"] = new_description
 
             with open(project["data_file"], "w", encoding="utf-8") as f:
                 json.dump(project["data"], f, indent=4)
 
             self.save_projects()
-            logger.info("Projekt umbenannt: '%s' → '%s'", project["name"], new_name)
+            logger.info(
+                "Projekt aktualisiert: '%s' → '%s' (Beschreibung: %s)",
+                old_name, new_name,
+                new_description if new_description is not None else "unverändert",
+            )
             return True, None
         except PermissionError:
             logger.warning("Umbenennen fehlgeschlagen — Datei wird verwendet: %s", project["name"])

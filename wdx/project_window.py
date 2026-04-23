@@ -237,6 +237,7 @@ class ProjectWindow:
             self.root.bind(modifier.format("u"), lambda e: self.add_heading())
             self.root.bind(modifier.format("n"), lambda e: self.add_source())
             self.root.bind(modifier.format("f"), lambda e: self._focus_search())
+            self.root.bind(modifier.format("o"), lambda e: self.open_original_shortcut())
         self.root.bind("<Delete>", lambda e: self.delete_shortcut())
         self.search_entry.bind("<Return>", lambda e: self._search_next())
         self.search_entry.bind("<Escape>", lambda e: self._clear_search())
@@ -1550,6 +1551,10 @@ class ProjectWindow:
         if item["type"] == "source":
             self.context_menu.add_separator()
             self.context_menu.add_command(
+                label="Original öffnen (Strg+O)",
+                command=lambda: webbrowser.open(item["url"]),
+            )
+            self.context_menu.add_command(
                 label="Kopieren (Strg+c)", command=lambda: self.copy_card(item)
             )
             if self.clipboard:
@@ -1816,11 +1821,36 @@ class ProjectWindow:
         else:
             self.edit_source(item)
 
+    def open_original_shortcut(self):
+        """Öffnet die Original-URL der ausgewählten Quelle im Browser (Strg+O)."""
+        if not self.selected_source_ids:
+            return
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        if item and item.get("type") == "source" and item.get("url"):
+            webbrowser.open(item["url"])
+            logger.debug("Original geöffnet via Strg+O: %s", item["url"])
+
     def create_citation(self, source):
-        citation = f"{source['url']}, zuletzt aufgerufen am {source['added']}"
+        fmt = self.app.project_manager.get_setting(
+            "citation_format", "{url}, zuletzt aufgerufen am {added}"
+        )
+        try:
+            citation = fmt.format_map({
+                "url":      source.get("url", ""),
+                "title":    source.get("title", ""),
+                "added":    source.get("added", ""),
+                "keywords": source.get("keywords", ""),
+                "text":     source.get("text", ""),
+            })
+        except (KeyError, ValueError) as exc:
+            logger.warning("Quellenangabe-Format ungültig (%s) — Fallback verwendet", exc)
+            citation = f"{source.get('url', '')}, zuletzt aufgerufen am {source.get('added', '')}"
         pyperclip.copy(citation)
         messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
-        logger.debug("Quellenangabe erstellt für: %s", source["url"])
+        logger.debug("Quellenangabe erstellt für: %s", source.get("url"))
 
     def shortcut_citation(self):
         if not self.selected_source_ids:
