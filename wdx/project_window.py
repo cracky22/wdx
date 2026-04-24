@@ -1,14 +1,18 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import tkinter as tk
-from tkinter import messagebox, simpledialog, colorchooser
-from dialogs import SourceDialog, HeadingDialog
+from tkinter import messagebox, simpledialog, colorchooser, filedialog
+from dialogs import SourceDialog, HeadingDialog, FileCardDialog
 import datetime
 import uuid
 import webbrowser
 import pyperclip
 import json
 import os
+import re
+import shutil
+import subprocess
+import sys
 from bs4 import BeautifulSoup
 from pathlib import Path
 from PIL import Image, ImageTk
@@ -33,6 +37,393 @@ def get_contrast_color(hex_color):
         return "#000000"
     luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b
     return "#000000" if luminosity > 128 else "#ffffff"
+
+
+FILE_TYPE_ICONS = {
+    ".pdf": "📕", ".doc": "📝", ".docx": "📝", ".odt": "📝",
+    ".xls": "📊", ".xlsx": "📊", ".ods": "📊", ".csv": "📊",
+    ".ppt": "📽", ".pptx": "📽", ".odp": "📽",
+    ".txt": "📄", ".md": "📄", ".rtf": "📄",
+    ".jpg": "🖼", ".jpeg": "🖼", ".png": "🖼", ".gif": "🖼",
+    ".svg": "🖼", ".webp": "🖼", ".bmp": "🖼",
+    ".mp4": "🎬", ".mov": "🎬", ".avi": "🎬", ".mkv": "🎬",
+    ".mp3": "🎵", ".wav": "🎵", ".flac": "🎵", ".ogg": "🎵",
+    ".zip": "🗜", ".rar": "🗜", ".7z": "🗜", ".tar": "🗜",
+    ".py": "🐍", ".js": "⚙", ".html": "🌐", ".css": "🎨",
+    ".json": "⚙", ".xml": "⚙",
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Inline-Markdown-Regex (order matters: most specific first)
+# ─────────────────────────────────────────────────────────────────────────────
+_INLINE_RE = re.compile(
+    r"(!\[(?P<alt>[^\]]*)\]\((?P<imgpath>[^)]+)\))"   # image
+    r"|(\[(?P<ltext>[^\]]+)\]\((?P<lurl>[^)]+)\))"     # link
+    r"|(\*\*\*(?P<bdi>[^*\n]+?)\*\*\*)"                # ***bold+italic***
+    r"|(\*\*(?P<bd>[^*\n]+?)\*\*)"                      # **bold**
+    r"|(\*(?P<it>[^*\n]+?)\*)"                          # *italic*
+    r"|(`(?P<cd>[^`\n]+)`)"                             # `code`
+)
+
+
+class MarkdownReader(tk.Toplevel):
+    """Lesbarer Markdown-Betrachter mit Syntax-Highlighting und Bild-Support."""
+
+    _DARK = dict(
+        bg="#1e1e2e", fg="#cdd6f4", code_bg="#313244",
+        h1_fg="#cba6f7", h2_fg="#89b4fa", h3_fg="#89dceb",
+        link_fg="#89dceb", quote_fg="#a6adc8", quote_bg="#181825",
+        hr_fg="#45475a", meta_fg="#6c7086", title_fg="#cba6f7",
+        btn_bg="#313244", btn_fg="#cdd6f4", sep_fg="#45475a",
+    )
+    _LIGHT = dict(
+        bg="#ffffff", fg="#1e1e2e", code_bg="#f1f3f4",
+        h1_fg="#1a1a2e", h2_fg="#1565c0", h3_fg="#0d47a1",
+        link_fg="#1976d2", quote_fg="#555555", quote_bg="#f5f5f5",
+        hr_fg="#cccccc", meta_fg="#888888", title_fg="#1a1a2e",
+        btn_bg="#e8eaf6", btn_fg="#1e1e2e", sep_fg="#dddddd",
+    )
+
+    def __init__(self, parent, item, project_path, app):
+        super().__init__(parent)
+        self.item = item
+        self.project_path = Path(project_path)
+        self.app = app
+        self.c = self._DARK if app.dark_mode else self._LIGHT
+        self._img_refs = []  # prevent GC of PhotoImages
+
+        label = item.get("title") or item.get("filename") or item.get("url", "Reader")
+        self.title(f"Reader — {label}")
+        self.geometry("860x680")
+        self.minsize(500, 400)
+        self.configure(bg=self.c["bg"])
+        try:
+            self.iconbitmap("icon128.ico")
+        except Exception:
+            pass
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.bind("<Control-w>", lambda e: self.destroy())
+        self.bind("<Control-i>", lambda e: self.destroy())
+        self.focus_set()
+        self._build_ui()
+
+    # ── UI construction ────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        c = self.c
+        item = self.item
+
+        # ── Header ─────────────────────────────────────────────────────────
+        hdr = tk.Frame(self, bg=c["bg"], padx=24, pady=14)
+        hdr.pack(fill="x")
+
+        title_text = item.get("title") or item.get("filename") or item.get("url", "")
+        tk.Label(
+            hdr, text=title_text, font=("Helvetica", 17, "bold"),
+            bg=c["bg"], fg=c["title_fg"], wraplength=760, justify="left",
+            anchor="w",
+        ).pack(anchor="w")
+
+        # URL for source type
+        if item.get("type") == "source" and item.get("url"):
+            lbl = tk.Label(
+                hdr, text=f"🔗 {item['url']}", font=("Helvetica", 9),
+                bg=c["bg"], fg=c["link_fg"], cursor="hand2",
+                wraplength=760, justify="left", anchor="w",
+            )
+            lbl.pack(anchor="w", pady=(2, 0))
+            lbl.bind("<Button-1>", lambda e: webbrowser.open(item["url"]))
+
+        # File path for file type
+        if item.get("type") == "file" and item.get("filename"):
+            tk.Label(
+                hdr, text=f"📎 {item['filename']}", font=("Helvetica", 9),
+                bg=c["bg"], fg=c["meta_fg"], anchor="w",
+            ).pack(anchor="w", pady=(2, 0))
+
+        # Meta bar
+        meta_parts = []
+        if item.get("added"):
+            meta_parts.append(f"📅 {item['added']}")
+        if item.get("keywords"):
+            meta_parts.append(f"🏷 {item['keywords']}")
+        if meta_parts:
+            tk.Label(
+                hdr, text="   ".join(meta_parts), font=("Helvetica", 9),
+                bg=c["bg"], fg=c["meta_fg"], anchor="w",
+            ).pack(anchor="w", pady=(5, 0))
+
+        # ── Action bar ─────────────────────────────────────────────────────
+        bar = tk.Frame(self, bg=c["bg"], padx=24, pady=6)
+        bar.pack(fill="x")
+
+        def _btn(parent, text, cmd):
+            b = tk.Button(
+                parent, text=text, font=("Helvetica", 9),
+                bg=c["btn_bg"], fg=c["btn_fg"], relief="flat",
+                activebackground=c["sep_fg"], activeforeground=c["fg"],
+                padx=9, pady=4, cursor="hand2", bd=0, command=cmd,
+            )
+            b.pack(side="left", padx=(0, 6))
+            return b
+
+        _btn(bar, "📋 Text kopieren", lambda: pyperclip.copy(item.get("text", "")))
+
+        if item.get("type") == "source":
+            def _copy_cite():
+                fmt = self.app.project_manager.get_setting(
+                    "citation_format", "{url}, zuletzt aufgerufen am {added}"
+                )
+                try:
+                    cite = fmt.format_map({
+                        "url": item.get("url", ""), "title": item.get("title", ""),
+                        "added": item.get("added", ""), "keywords": item.get("keywords", ""),
+                        "text": item.get("text", ""),
+                    })
+                except (KeyError, ValueError):
+                    cite = f"{item.get('url','')}, zuletzt aufgerufen am {item.get('added','')}"
+                pyperclip.copy(cite)
+            _btn(bar, "📎 Quellenangabe", _copy_cite)
+
+        tk.Label(
+            bar, text="Esc  ·  Strg+I  zum Schließen",
+            font=("Helvetica", 8), bg=c["bg"], fg=c["meta_fg"],
+        ).pack(side="right")
+
+        # ── Separator ──────────────────────────────────────────────────────
+        tk.Frame(self, bg=c["sep_fg"], height=1).pack(fill="x")
+
+        # ── Scrollable text area ───────────────────────────────────────────
+        container = tk.Frame(self, bg=c["bg"])
+        container.pack(fill="both", expand=True)
+
+        vscroll = ttk.Scrollbar(container, orient="vertical")
+        vscroll.pack(side="right", fill="y")
+
+        self._tw = tk.Text(
+            container,
+            bg=c["bg"], fg=c["fg"],
+            font=("Helvetica", 11),
+            wrap="word",
+            padx=28, pady=18,
+            spacing1=1, spacing2=3, spacing3=1,
+            relief="flat", bd=0,
+            yscrollcommand=vscroll.set,
+            cursor="arrow",
+            exportselection=True,
+            state="normal",
+            insertwidth=0,
+        )
+        self._tw.pack(fill="both", expand=True)
+        vscroll.config(command=self._tw.yview)
+
+        # Mouse wheel
+        self._tw.bind("<MouseWheel>", lambda e: self._tw.yview_scroll(
+            int(-1 * (e.delta / 120)), "units"))
+        self._tw.bind("<Button-4>", lambda e: self._tw.yview_scroll(-1, "units"))
+        self._tw.bind("<Button-5>", lambda e: self._tw.yview_scroll(1, "units"))
+
+        self._configure_tags()
+        self._render(item.get("text", ""))
+        self._tw.config(state="disabled")
+
+    # ── Tag configuration ──────────────────────────────────────────────────
+
+    def _configure_tags(self):
+        c = self.c
+        tw = self._tw
+        tw.tag_configure("h1", font=("Helvetica", 22, "bold"), foreground=c["h1_fg"],
+                          spacing1=14, spacing3=6)
+        tw.tag_configure("h2", font=("Helvetica", 17, "bold"), foreground=c["h2_fg"],
+                          spacing1=11, spacing3=4)
+        tw.tag_configure("h3", font=("Helvetica", 14, "bold"), foreground=c["h3_fg"],
+                          spacing1=8, spacing3=3)
+        tw.tag_configure("bold", font=("Helvetica", 11, "bold"))
+        tw.tag_configure("italic", font=("Helvetica", 11, "italic"))
+        tw.tag_configure("bolditalic", font=("Helvetica", 11, "bold italic"))
+        tw.tag_configure("code_inline", font=("Courier New", 10),
+                          background=c["code_bg"], relief="flat")
+        tw.tag_configure("code_block", font=("Courier New", 10),
+                          background=c["code_bg"], foreground=c["fg"],
+                          lmargin1=12, lmargin2=12, spacing1=6, spacing3=6)
+        tw.tag_configure("blockquote", lmargin1=28, lmargin2=28,
+                          foreground=c["quote_fg"], background=c["quote_bg"],
+                          font=("Helvetica", 11, "italic"), spacing1=2, spacing3=2)
+        tw.tag_configure("list_item", lmargin1=22, lmargin2=34)
+        tw.tag_configure("hr", foreground=c["hr_fg"], font=("Helvetica", 4),
+                          spacing1=6, spacing3=6)
+        tw.tag_configure("normal", font=("Helvetica", 11))
+        tw.tag_configure("meta_text", font=("Helvetica", 9), foreground=c["meta_fg"])
+        tw.tag_configure("empty_notice", font=("Helvetica", 11, "italic"),
+                          foreground=c["meta_fg"])
+
+    # ── Markdown renderer ─────────────────────────────────────────────────
+
+    def _render(self, text):
+        if not text or not text.strip():
+            self._tw.insert(tk.END, "(Kein Text vorhanden)", "empty_notice")
+            return
+
+        lines = text.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Fenced code block
+            if line.startswith("```"):
+                i += 1
+                code_lines = []
+                while i < len(lines) and not lines[i].startswith("```"):
+                    code_lines.append(lines[i])
+                    i += 1
+                self._insert_code_block("\n".join(code_lines))
+                i += 1
+                continue
+
+            # Horizontal rule
+            if re.match(r"^[-*_]{3,}\s*$", line):
+                self._tw.insert(tk.END, "\n" + "─" * 68 + "\n\n", "hr")
+                i += 1
+                continue
+
+            # ATX headings
+            m = re.match(r"^(#{1,3})\s+(.*)", line)
+            if m:
+                level = len(m.group(1))
+                tag = ("h1", "h2", "h3")[min(level, 3) - 1]
+                self._inline(m.group(2) + "\n", (tag,))
+                i += 1
+                continue
+
+            # Blockquote
+            if line.startswith("> "):
+                self._inline(line[2:] + "\n", ("blockquote",))
+                i += 1
+                continue
+
+            # Unordered list
+            if re.match(r"^[-*+] ", line):
+                self._inline("• " + line[2:] + "\n", ("list_item",))
+                i += 1
+                continue
+
+            # Ordered list
+            m = re.match(r"^(\d+\.\s+)(.*)", line)
+            if m:
+                self._inline(m.group(1) + m.group(2) + "\n", ("list_item",))
+                i += 1
+                continue
+
+            # Empty line
+            if not line.strip():
+                self._tw.insert(tk.END, "\n", "normal")
+                i += 1
+                continue
+
+            # Normal paragraph line
+            self._inline(line + "\n", ("normal",))
+            i += 1
+
+    def _inline(self, text, base_tags=()):
+        """Insert text with inline markdown into the text widget."""
+        tw = self._tw
+        pos = 0
+        for m in _INLINE_RE.finditer(text):
+            if m.start() > pos:
+                tw.insert(tk.END, text[pos:m.start()], base_tags)
+
+            if m.group("imgpath") is not None:
+                self._insert_image(m.group("alt") or "", m.group("imgpath"))
+            elif m.group("lurl") is not None:
+                url = m.group("lurl")
+                tag_id = f"lnk_{abs(hash(url + str(m.start())))}"
+                tw.tag_configure(tag_id, foreground=self.c["link_fg"],
+                                  underline=True, font=("Helvetica", 11))
+                tw.tag_bind(tag_id, "<Button-1>", lambda e, u=url: webbrowser.open(u))
+                tw.tag_bind(tag_id, "<Enter>", lambda e: tw.config(cursor="hand2"))
+                tw.tag_bind(tag_id, "<Leave>", lambda e: tw.config(cursor="arrow"))
+                tw.insert(tk.END, m.group("ltext"), (tag_id,) + base_tags)
+            elif m.group("bdi") is not None:
+                tw.insert(tk.END, m.group("bdi"), ("bolditalic",) + base_tags)
+            elif m.group("bd") is not None:
+                tw.insert(tk.END, m.group("bd"), ("bold",) + base_tags)
+            elif m.group("it") is not None:
+                tw.insert(tk.END, m.group("it"), ("italic",) + base_tags)
+            elif m.group("cd") is not None:
+                tw.insert(tk.END, m.group("cd"), ("code_inline",))
+
+            pos = m.end()
+
+        if pos < len(text):
+            tw.insert(tk.END, text[pos:], base_tags)
+
+    def _insert_code_block(self, code_text):
+        tw = self._tw
+        c = self.c
+
+        frame = tk.Frame(tw, bg=c["code_bg"], padx=10, pady=8)
+        copy_btn = tk.Button(
+            frame, text="📋", font=("Helvetica", 8),
+            bg=c["code_bg"], fg=c["meta_fg"], relief="flat",
+            cursor="hand2", padx=3, pady=1, bd=0,
+            command=lambda: pyperclip.copy(code_text),
+        )
+        copy_btn.pack(anchor="ne")
+        tk.Label(
+            frame, text=code_text or " ",
+            font=("Courier New", 10), bg=c["code_bg"], fg=c["fg"],
+            justify="left", anchor="w",
+        ).pack(fill="x", anchor="w")
+
+        tw.insert(tk.END, "\n")
+        tw.window_create(tk.END, window=frame, padx=0, pady=2)
+        tw.insert(tk.END, "\n\n")
+
+    def _insert_image(self, alt, path_str):
+        tw = self._tw
+        path_str = path_str.strip()
+        resolved = None
+
+        p = Path(path_str)
+        if p.is_absolute() and p.exists():
+            resolved = p
+        else:
+            for base in (
+                self.project_path,
+                self.project_path / "images",
+                self.project_path / "files",
+            ):
+                candidate = base / path_str
+                if candidate.exists():
+                    resolved = candidate
+                    break
+
+        if resolved:
+            try:
+                img = Image.open(resolved).convert("RGBA")
+                max_w = 720
+                if img.width > max_w:
+                    ratio = max_w / img.width
+                    img = img.resize(
+                        (max_w, int(img.height * ratio)),
+                        Image.Resampling.LANCZOS,
+                    )
+                photo = ImageTk.PhotoImage(img)
+                self._img_refs.append(photo)
+                tw.insert(tk.END, "\n")
+                tw.image_create(tk.END, image=photo, padx=0, pady=4)
+                if alt:
+                    tw.insert(tk.END, f"\n{alt}\n", "meta_text")
+                tw.insert(tk.END, "\n")
+                return
+            except Exception:
+                pass
+
+        # Fallback
+        tw.insert(tk.END, f"[🖼 {alt or path_str}]", ("italic",))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class ProjectWindow:
@@ -238,6 +629,7 @@ class ProjectWindow:
             self.root.bind(modifier.format("n"), lambda e: self.add_source())
             self.root.bind(modifier.format("f"), lambda e: self._focus_search())
             self.root.bind(modifier.format("o"), lambda e: self.open_original_shortcut())
+            self.root.bind(modifier.format("i"), lambda e: self.show_reader())
         self.root.bind("<Delete>", lambda e: self.delete_shortcut())
         self.search_entry.bind("<Return>", lambda e: self._search_next())
         self.search_entry.bind("<Escape>", lambda e: self._clear_search())
@@ -423,7 +815,10 @@ class ProjectWindow:
     
     def _process_item_data(self, item):
         if item.get("type") == "heading":
-            return {"item": item, "is_source": False, "favicon_path": None}
+            return {"item": item, "kind": "heading", "favicon_path": None}
+        if item.get("type") == "file":
+            return {"item": item, "kind": "file", "favicon_path": None}
+        # source
         favicon_path = None
         if item.get("favicon"):
             check_path = (
@@ -433,7 +828,7 @@ class ProjectWindow:
                 favicon_path = str(check_path)
             else:
                 logger.debug("Favicon-Datei nicht gefunden: %s", check_path)
-        return {"item": item, "is_source": True, "favicon_path": favicon_path}
+        return {"item": item, "kind": "source", "favicon_path": favicon_path}
 
     def load_items_on_canvas(self):
         items_to_process = self.project["data"]["items"]
@@ -480,8 +875,11 @@ class ProjectWindow:
             item = result["item"]
             if self.project["data"].get("selected_source_id") == item["id"]:
                 self.selected_source_id = item["id"]
-            if result["is_source"]:
+            kind = result.get("kind")
+            if kind == "source":
                 self._create_source_card_gui(item, result["favicon_path"])
+            elif kind == "file":
+                self._create_file_card_gui(item)
             else:
                 self._create_heading_card_gui(item)
 
@@ -1159,6 +1557,16 @@ class ProjectWindow:
         logger.debug("Karte eingefügt: %s", new_item["id"])
 
     def show_add_menu(self, event=None):
+        self.add_menu.delete(0, tk.END)
+        self.add_menu.add_command(
+            label="Überschrift (Strg+U)", command=self.add_heading
+        )
+        self.add_menu.add_command(
+            label="Quellenangabe (Strg+N)", command=self.add_source
+        )
+        self.add_menu.add_command(
+            label="Datei anhängen …", command=self.add_file
+        )
         self.add_menu.post(
             self.add_button.winfo_rootx(),
             self.add_button.winfo_rooty() + self.add_button.winfo_height(),
@@ -1517,51 +1925,90 @@ class ProjectWindow:
     
     def show_context_menu(self, event, item):
         self.context_menu.delete(0, tk.END)
+        item_id = item["id"]
+        item_type = item.get("type", "source")
+
+        # ── Gemeinsame Aktionen ──────────────────────────────────────────
         self.context_menu.add_command(
             label="Löschen (Entf)", command=lambda: self.delete_selected_items(item)
         )
-        item_id = item["id"]
         self.context_menu.add_command(
-            label="Duplizieren (Strg+d)", command=lambda: self.duplicate_item(item)
+            label="Duplizieren (Strg+D)", command=lambda: self.duplicate_item(item)
         )
         self.context_menu.add_separator()
-        if item["type"] == "heading":
+
+        # ── Typ-spezifische Aktionen ─────────────────────────────────────
+        if item_type == "heading":
             self.context_menu.add_command(
-                label="Bearbeiten (Strg+e)", command=lambda: self.edit_heading(item)
+                label="Bearbeiten (Strg+E)", command=lambda: self.edit_heading(item)
             )
-        else:
+
+        elif item_type == "file":
+            self.context_menu.add_command(
+                label="Datei öffnen (Strg+O)",
+                command=lambda: self._open_file(item),
+            )
+            self.context_menu.add_command(
+                label="Ordner öffnen",
+                command=lambda: self._open_file_folder(item),
+            )
+            if item.get("text"):
+                self.context_menu.add_command(
+                    label="Reader öffnen (Strg+I)",
+                    command=lambda: MarkdownReader(
+                        self.root, item, self.project["path"], self.app
+                    ),
+                )
+            self.context_menu.add_command(
+                label="Bearbeiten (Strg+E)", command=lambda: self.edit_file(item)
+            )
+            self.context_menu.add_separator()
+            self.context_menu.add_command(
+                label="Kopieren (Strg+C)", command=lambda: self.copy_card(item)
+            )
+            if self.clipboard:
+                self.context_menu.add_command(
+                    label="Einfügen (Strg+V)", command=self.paste_card
+                )
+
+        else:  # source
             if item.get("saved_pages"):
                 self.context_menu.add_command(
-                    label="Gespeicherte Versionen (Strg+h)",
+                    label="Gespeicherte Versionen (Strg+H)",
                     command=lambda: self.show_saved_pages_popup(item),
                 )
                 self.context_menu.add_separator()
-            self.context_menu.add_command(
-                label="Quellenangabe erstellen (Strg+q)",
-                command=lambda: self.create_citation(item),
-            )
-            self.context_menu.add_command(
-                label="Karte bearbeiten (Strg+e)", command=lambda: self.edit_source(item)
-            )
-            self.context_menu.add_command(
-                label="Seite erneut speichern (Strg+l)",
-                command=lambda: self.reload_current_page(item),
-            )
-
-        if item["type"] == "source":
-            self.context_menu.add_separator()
             self.context_menu.add_command(
                 label="Original öffnen (Strg+O)",
                 command=lambda: webbrowser.open(item["url"]),
             )
             self.context_menu.add_command(
-                label="Kopieren (Strg+c)", command=lambda: self.copy_card(item)
+                label="Reader öffnen (Strg+I)",
+                command=lambda: MarkdownReader(
+                    self.root, item, self.project["path"], self.app
+                ),
+            )
+            self.context_menu.add_command(
+                label="Quellenangabe erstellen (Strg+Q)",
+                command=lambda: self.create_citation(item),
+            )
+            self.context_menu.add_command(
+                label="Karte bearbeiten (Strg+E)", command=lambda: self.edit_source(item)
+            )
+            self.context_menu.add_command(
+                label="Seite erneut speichern (Strg+L)",
+                command=lambda: self.reload_current_page(item),
+            )
+            self.context_menu.add_separator()
+            self.context_menu.add_command(
+                label="Kopieren (Strg+C)", command=lambda: self.copy_card(item)
             )
             if self.clipboard:
                 self.context_menu.add_command(
-                    label="Einfügen (Strg+v)", command=self.paste_card
+                    label="Einfügen (Strg+V)", command=self.paste_card
                 )
 
+        # ── Auswahl ──────────────────────────────────────────────────────
         self.context_menu.add_separator()
         if item_id in self.selected_source_ids:
             self.context_menu.add_command(
@@ -1700,14 +2147,35 @@ class ProjectWindow:
         project_path = Path(self.project["path"])
         remaining_items = self.project.get("data", {}).get("items", [])
         sites_dir = project_path / "sites"
+        files_dir = project_path / "files"
 
         for item in removed_items:
-            if item.get("type") == "heading":
-                continue
+            item_type = item.get("type")
             item_id = item.get("id")
             if not item_id:
                 continue
 
+            if item_type == "file":
+                filename = item.get("filename")
+                if filename and files_dir.exists():
+                    still_used = any(
+                        i.get("filename") == filename and i.get("type") == "file"
+                        for i in remaining_items
+                    )
+                    if not still_used:
+                        fp = files_dir / filename
+                        if fp.exists():
+                            try:
+                                fp.unlink()
+                                logger.debug("GC: Datei gelöscht: %s", filename)
+                            except OSError as exc:
+                                logger.warning("GC: Datei konnte nicht gelöscht werden (%s): %s", filename, exc)
+                continue  # file type has no HTML snapshots or favicons
+
+            if item_type == "heading":
+                continue
+
+            # source type: delete HTML snapshots
             if sites_dir.exists():
                 pattern = f"page_{item_id}_*.html"
                 found_files = list(sites_dir.glob(pattern))
@@ -1822,16 +2290,264 @@ class ProjectWindow:
             self.edit_source(item)
 
     def open_original_shortcut(self):
-        """Öffnet die Original-URL der ausgewählten Quelle im Browser (Strg+O)."""
+        """Öffnet die Original-URL bzw. Datei der ausgewählten Karte (Strg+O)."""
         if not self.selected_source_ids:
             return
         item_id = next(iter(self.selected_source_ids))
         item = next(
             (i for i in self.project["data"]["items"] if i["id"] == item_id), None
         )
-        if item and item.get("type") == "source" and item.get("url"):
+        if item is None:
+            return
+        if item.get("type") == "source" and item.get("url"):
             webbrowser.open(item["url"])
             logger.debug("Original geöffnet via Strg+O: %s", item["url"])
+        elif item.get("type") == "file":
+            self._open_file(item)
+
+    def show_reader(self):
+        """Öffnet den Markdown-Reader für die ausgewählte Karte (Strg+I)."""
+        if not self.selected_source_ids:
+            return
+        item_id = next(iter(self.selected_source_ids))
+        item = next(
+            (i for i in self.project["data"]["items"] if i["id"] == item_id), None
+        )
+        if item and item.get("type") in ("source", "file"):
+            MarkdownReader(self.root, item, self.project["path"], self.app)
+            logger.debug("Reader geöffnet für: %s", item_id)
+
+    # ── File card ──────────────────────────────────────────────────────────
+
+    def add_file(self):
+        """Datei in das Projekt kopieren und als Karte hinzufügen."""
+        filepath = filedialog.askopenfilename(
+            title="Datei auswählen", parent=self.root
+        )
+        if not filepath:
+            return
+
+        src = Path(filepath)
+        files_dir = Path(self.project["path"]) / "files"
+        files_dir.mkdir(exist_ok=True)
+
+        # Collision-safe copy
+        dest_name = src.name
+        dest = files_dir / dest_name
+        counter = 1
+        while dest.exists():
+            dest = files_dir / f"{src.stem}_{counter}{src.suffix}"
+            dest_name = dest.name
+            counter += 1
+
+        try:
+            shutil.copy2(str(src), str(dest))
+        except OSError as exc:
+            messagebox.showerror("Fehler", f"Datei konnte nicht kopiert werden:\n{exc}")
+            logger.error("Datei-Copy fehlgeschlagen: %s", exc)
+            return
+
+        # Optional metadata dialog
+        dialog = FileCardDialog(self.root, dest_name)
+        if dialog.result is None:
+            # User cancelled – remove the copied file
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+            return
+
+        new_file_item = {
+            "id": str(uuid.uuid4()),
+            "type": "file",
+            "filename": dest_name,
+            "title": dialog.result.get("title", "").strip() or dest_name,
+            "text": dialog.result.get("text", ""),
+            "keywords": dialog.result.get("keywords", ""),
+            "color": dialog.result.get("color", "#e8f4fd"),
+            "added": datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
+            "pos_x": 300 + len(self.project["data"]["items"]) * 30 % 400,
+            "pos_y": 300,
+        }
+        self.project["data"]["items"].append(new_file_item)
+        self.deselect_all_cards()
+        self._create_file_card_gui(new_file_item)
+        self.selected_source_ids.add(new_file_item["id"])
+        self.save_project()
+        self.update_last_mtime()
+        self.update_scrollregion()
+        self.reset_zoom()
+        self._update_minimap()
+        logger.info("Datei-Karte hinzugefügt: %s", dest_name)
+
+    def edit_file(self, item):
+        """Metadaten einer Datei-Karte bearbeiten."""
+        dialog = FileCardDialog(self.root, item["filename"], item)
+        if dialog.result is None:
+            return
+        item.update({
+            "title": dialog.result.get("title", "").strip() or item["filename"],
+            "text": dialog.result.get("text", ""),
+            "keywords": dialog.result.get("keywords", ""),
+            "color": dialog.result.get("color", item.get("color", "#e8f4fd")),
+        })
+        item_id = item["id"]
+        frame, canvas_id = self.source_frames[item_id]
+        self.canvas.delete(canvas_id)
+        frame.destroy()
+        del self.source_frames[item_id]
+        del self.card_widgets[item_id]
+        self._create_file_card_gui(item)
+        self.save_project()
+        self.update_last_mtime()
+        self._update_minimap()
+        logger.debug("Datei-Karte bearbeitet: %s", item_id)
+
+    def _create_file_card_gui(self, item):
+        """Erstellt eine Kachel für einen Datei-Anhang."""
+        color = item.get("color") or "#e8f4fd"
+        text_color = get_contrast_color(color)
+        item["effective_color"] = color
+        item_id = item["id"]
+        style_name = f"File.{item_id}.TFrame"
+        self.card_widgets[item_id] = {}
+
+        try:
+            self.root.style.configure(style_name, background=color)
+        except tk.TclError:
+            pass
+
+        frame = ttk.Frame(self.canvas, padding="14")
+        frame.item_data = item
+        frame.unique_style_name = style_name
+        frame.configure(style=style_name)
+        frame.config(relief="raised", borderwidth=2)
+
+        def on_enter(e, f=frame):
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=3, relief="ridge")
+
+        def on_leave(e, f=frame):
+            if f.item_data["id"] not in self.selected_source_ids:
+                f.config(borderwidth=2, relief="raised")
+
+        # File type icon
+        ext = Path(item.get("filename", "")).suffix.lower()
+        icon_char = FILE_TYPE_ICONS.get(ext, "📎")
+        icon_lbl = tk.Label(
+            frame, text=icon_char,
+            font=("Helvetica", self.base_icon_size),
+            bg=color, fg=text_color,
+        )
+        icon_lbl.pack(anchor="w")
+        self.card_widgets[item_id]["icon_label"] = icon_lbl
+        self.card_widgets[item_id]["original_icon_data"] = {"is_favicon": False}
+
+        # Title / filename
+        title_lbl = ttk.Label(
+            frame,
+            text=item.get("title") or item["filename"],
+            font=self.base_font_title,
+            foreground=text_color, wraplength=280,
+        )
+        title_lbl.pack(anchor="w")
+        self.card_widgets[item_id]["title_label"] = title_lbl
+
+        # Text preview
+        if item.get("text"):
+            preview = item["text"][:180] + ("…" if len(item["text"]) > 180 else "")
+            text_lbl = ttk.Label(
+                frame, text=f"📝 {preview}",
+                font=self.base_font_default, foreground=text_color, wraplength=300,
+            )
+            text_lbl.pack(anchor="w", pady=(4, 0))
+            self.card_widgets[item_id]["text_label"] = text_lbl
+
+        # Keywords
+        if item.get("keywords"):
+            kw_lbl = ttk.Label(
+                frame,
+                text=f"🏷 {self._wrap_keywords(item['keywords'])}",
+                font=self.base_font_default, foreground=text_color, justify="left",
+            )
+            kw_lbl.pack(anchor="w", pady=(3, 0))
+            self.card_widgets[item_id]["keywords_label"] = kw_lbl
+
+        # Date
+        added_lbl = ttk.Label(
+            frame, text=f"📅 {item['added']}",
+            font=("Helvetica", 8), foreground=text_color,
+        )
+        added_lbl.pack(anchor="w", pady=(6, 0))
+        self.card_widgets[item_id]["added_label"] = added_lbl
+
+        # Open button
+        ttk.Button(
+            frame, text="📂 Datei öffnen", bootstyle="info-outline", width=18,
+            command=lambda i=item: self._open_file(i),
+        ).pack(pady=(6, 0))
+
+        # Bind events to all children
+        for widget in [frame] + list(frame.winfo_children()):
+            widget.bind("<Button-3>", lambda e, i=item: self.show_context_menu(e, i))
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            try:
+                if isinstance(widget, (ttk.Label, tk.Label)):
+                    widget.config(background=color, foreground=text_color)
+            except Exception:
+                pass
+
+        frame.bind("<ButtonPress-1>", lambda e, iid=item_id: self.on_card_press(e, iid))
+        frame.bind("<B1-Motion>", lambda e: self.on_card_motion(e))
+        frame.bind("<ButtonRelease-1>", lambda e: self.on_card_release(e))
+
+        x, y = item.get("pos_x", 300), item.get("pos_y", 300)
+        window_id = self.canvas.create_window(x, y, window=frame, anchor="nw")
+        self.source_frames[item_id] = (frame, window_id)
+
+        if self.selected_source_id == item_id:
+            self.selected_source_ids.add(item_id)
+            self.card_original_colors[item_id] = color
+            self._apply_selection_style(item_id, color)
+            self.selected_source_id = None
+
+        if self.zoom_level != 1.0:
+            self.canvas.scale(window_id, x, y, self.zoom_level, self.zoom_level)
+            self._update_card_content_scale()
+
+    def _open_file(self, item):
+        """Öffnet eine Datei-Karte mit dem Standard-Programm."""
+        files_dir = Path(self.project["path"]) / "files"
+        filepath = files_dir / item.get("filename", "")
+        if not filepath.exists():
+            messagebox.showerror("Fehler", f"Datei nicht gefunden:\n{filepath}")
+            return
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(filepath))
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(filepath)])
+            else:
+                subprocess.Popen(["xdg-open", str(filepath)])
+        except Exception as exc:
+            messagebox.showerror("Fehler", f"Datei konnte nicht geöffnet werden:\n{exc}")
+            logger.error("Datei öffnen fehlgeschlagen: %s", exc)
+
+    def _open_file_folder(self, item):
+        """Öffnet den Ordner der Datei und wählt sie aus (wo möglich)."""
+        files_dir = Path(self.project["path"]) / "files"
+        filepath = files_dir / item.get("filename", "")
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(["explorer", "/select,", str(filepath)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(filepath)])
+            else:
+                subprocess.Popen(["xdg-open", str(files_dir)])
+        except Exception as exc:
+            messagebox.showerror("Fehler", f"Ordner konnte nicht geöffnet werden:\n{exc}")
+            logger.error("Ordner öffnen fehlgeschlagen: %s", exc)
 
     def create_citation(self, source):
         fmt = self.app.project_manager.get_setting(
