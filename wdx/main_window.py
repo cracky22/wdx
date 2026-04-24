@@ -293,7 +293,7 @@ class MainWindow:
         """Öffnet einen Dialog zum Umbenennen von Name und Beschreibung."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Projekt bearbeiten")
-        dialog.geometry("400x220")
+        dialog.geometry("400x250")
         dialog.resizable(False, False)
         dialog.grab_set()
         dialog.transient(self.root)
