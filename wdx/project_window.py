@@ -94,7 +94,7 @@ class MarkdownReader(tk.Toplevel):
 
         label = item.get("title") or item.get("filename") or item.get("url", "Reader")
         self.title(f"Reader — {label}")
-        self.geometry("860x680")
+        self.geometry("860x980")
         self.minsize(500, 400)
         self.configure(bg=self.c["bg"])
         try:
