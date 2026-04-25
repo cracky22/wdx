@@ -274,7 +274,7 @@ class FileCardDialog(tk.Toplevel):
         self.result = None
 
         self.title("Datei bearbeiten" if existing else "Datei hinzufügen")
-        self.geometry("520x560")
+        self.geometry("520x690")
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
