@@ -152,7 +152,7 @@ class MainWindow:
     def show_settings(self):
         win = ttk.Toplevel(self.root)
         win.title("Einstellungen")
-        win.geometry("560x640")
+        win.geometry("560x780")
         try:
             win.iconbitmap("icon128.ico")
         except Exception:
@@ -293,7 +293,7 @@ class MainWindow:
         """Öffnet einen Dialog zum Umbenennen von Name und Beschreibung."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Projekt bearbeiten")
-        dialog.geometry("400x220")
+        dialog.geometry("400x250")
         dialog.resizable(False, False)
         dialog.grab_set()
         dialog.transient(self.root)
