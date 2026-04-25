@@ -108,8 +108,42 @@ class SourceDialog(tk.Toplevel):
         )
         if not path:
             return
-        path_str = path.replace("\\", "/")
-        snippet = f"![Bildbeschreibung]({path_str})"
+
+        src = Path(path)
+
+        # Projektpfad über project_window verfügbar
+        project_path = None
+        if self.project_window and hasattr(self.project_window, "project"):
+            project_path = Path(self.project_window.project["path"])
+
+        if project_path:
+            images_dir = project_path / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+
+            dest_name = src.name
+            dest = images_dir / dest_name
+            counter = 1
+            while dest.exists():
+                dest = images_dir / f"{src.stem}_{counter}{src.suffix}"
+                dest_name = dest.name
+                counter += 1
+
+            try:
+                import shutil as _shutil
+                _shutil.copy2(str(src), str(dest))
+                insert_path = f"images/{dest_name}"
+            except OSError as exc:
+                import tkinter.messagebox as _mb
+                _mb.showerror(
+                    "Fehler",
+                    f"Bild konnte nicht in den Projektordner kopiert werden:\n{exc}",
+                    parent=self,
+                )
+                return
+        else:
+            insert_path = path.replace("\\", "/")
+
+        snippet = f"![Bildbeschreibung]({insert_path})"
         self.text_text.insert(tk.INSERT, snippet)
         self.text_text.focus_set()
 
