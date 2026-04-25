@@ -2348,7 +2348,7 @@ class ProjectWindow:
             return
 
         # Optional metadata dialog
-        dialog = FileCardDialog(self.root, dest_name)
+        dialog = FileCardDialog(self.root, dest_name, project_path=self.project["path"])
         if dialog.result is None:
             # User cancelled – remove the copied file
             try:
@@ -2382,7 +2382,7 @@ class ProjectWindow:
 
     def edit_file(self, item):
         """Metadaten einer Datei-Karte bearbeiten."""
-        dialog = FileCardDialog(self.root, item["filename"], item)
+        dialog = FileCardDialog(self.root, item["filename"], item, project_path=self.project["path"])
         if dialog.result is None:
             return
         item.update({
