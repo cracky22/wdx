@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox, filedialog
 import pyperclip
+from pathlib import Path
 from ttkbootstrap.constants import *
 
 
@@ -267,11 +268,12 @@ class FileCardDialog(tk.Toplevel):
 
     DEFAULT_COLOR = "#e8f4fd"
 
-    def __init__(self, parent, filename: str, existing: dict = None):
+    def __init__(self, parent, filename: str, existing: dict = None, project_path=None):
         super().__init__(parent)
         self.filename = filename
         self.existing = existing or {}
         self.result = None
+        self.project_path = Path(project_path) if project_path else None
 
         self.title("Datei bearbeiten" if existing else "Datei hinzufügen")
         self.geometry("520x690")
@@ -350,8 +352,40 @@ class FileCardDialog(tk.Toplevel):
         )
         if not path:
             return
-        path_str = path.replace("\\", "/")
-        snippet = f"![Bildbeschreibung]({path_str})"
+
+        src = Path(path)
+
+        # Bild in den wdx-Projektordner kopieren, falls Projektpfad bekannt
+        if self.project_path:
+            images_dir = self.project_path / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+
+            dest_name = src.name
+            dest = images_dir / dest_name
+            counter = 1
+            while dest.exists():
+                dest = images_dir / f"{src.stem}_{counter}{src.suffix}"
+                dest_name = dest.name
+                counter += 1
+
+            try:
+                import shutil as _shutil
+                _shutil.copy2(str(src), str(dest))
+                # Relativer Pfad — vom MarkdownReader aus project_path/images/ auflösbar
+                insert_path = f"images/{dest_name}"
+            except OSError as exc:
+                import tkinter.messagebox as _mb
+                _mb.showerror(
+                    "Fehler",
+                    f"Bild konnte nicht in den Projektordner kopiert werden:\n{exc}",
+                    parent=self,
+                )
+                return
+        else:
+            # Kein Projektpfad — absoluten Pfad als Fallback verwenden
+            insert_path = path.replace("\\", "/")
+
+        snippet = f"![Bildbeschreibung]({insert_path})"
         self.text_text.insert(tk.INSERT, snippet)
         self.text_text.focus_set()
 
