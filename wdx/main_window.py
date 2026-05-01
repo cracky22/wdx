@@ -281,6 +281,8 @@ class MainWindow:
         if success:
             self.update_project_tiles()
             logger.info("Projekt erstellt: %s", name)
+            time.sleep(0.2)
+            self.app.open_project(self.project_manager.projects[-1])
         else:
             messagebox.showerror("Fehler", res)
 
