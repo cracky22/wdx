@@ -4,6 +4,7 @@ from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, filedialog
 import re
 import math
+import time
 
 from constants import INVALID_CHARS
 from wdx_logger import get_logger
@@ -270,15 +271,18 @@ class MainWindow:
 
     # ------------------------------------------------------------------
     def create_project(self):
-        name = simpledialog.askstring("Neu", "Projektname:", parent=self.root)
+        name = simpledialog.askstring("Neues Projekt", "Projektname (Titel):", parent=self.root)
         if name:
-            desc = simpledialog.askstring("Neu", "Beschreibung:", parent=self.root)
-            success, res = self.project_manager.create_project(name, desc or "")
-            if success:
-                self.update_project_tiles()
-                logger.info("Projekt erstellt: %s", name)
-            else:
-                messagebox.showerror("Fehler", res)
+            self.root.after(200, lambda: self.ask_desc(name))
+
+    def ask_desc(self, name):
+        desc = simpledialog.askstring("Neues Projekt", "Beschreibung:", parent=self.root)
+        success, res = self.project_manager.create_project(name, desc or "")
+        if success:
+            self.update_project_tiles()
+            logger.info("Projekt erstellt: %s", name)
+        else:
+            messagebox.showerror("Fehler", res)
 
     def import_project(self):
         path = filedialog.askopenfilename(
