@@ -1,0 +1,66 @@
+﻿# wdx (Web Sources Index Repo) - LLM Project Context
+
+Dieses Dokument dient als zentrale Informationsquelle für LLMs, um die Architektur, die Struktur und die Funktionsweise des wdx-Projekts zu verstehen.
+
+## Projektübersicht
+**wdx** ist ein lokales Tool zur Organisation und Sicherung von Webquellen (z. B. für Präsentationen oder Fachreferate). Es ermöglicht das schnelle Sichern von Webseiten, durchsucht sie nach Schlagwörtern und speichert Inhalte offline.
+
+Das Projekt besteht aus zwei Hauptkomponenten:
+1. **Desktop-App (Python)**: Eine Tkinter-basierte GUI-Anwendung, die Projekte verwaltet und einen lokalen HTTP-Server bereitstellt.
+2. **Browser-Erweiterung (JavaScript / Vite)**: Eine Chrome-Extension, die auf Webseiten interagiert und Daten an die lokale Desktop-App sendet.
+
+---
+
+## Architektur & Kernkomponenten
+
+### 1. Python Desktop-App (/wdx)
+Die App ist in Python geschrieben und nutzt 	kinter zusammen mit 	tkbootstrap für das UI-Design.
+- **Einstiegspunkt**: wdx/__main__.py (bzw. main.py im Root-Verzeichnis)
+- **Lokaler Server**: wdx/server.py
+  - Startet einen HTTP-Server auf Port 8765 (constants.PORT).
+  - Stellt eine REST-API bereit: POST /api/add_source und GET /api/status.
+  - Nimmt URLs aus der Browser-Erweiterung entgegen.
+  - Lädt automatisch den HTML-Code (equests, BeautifulSoup) der Seite und das Favicon herunter und speichert diese lokal ab.
+- **UI & Projektverwaltung**:
+  - wdx/project_manager.py: Kümmert sich um das Speichern und Laden der Projekt-JSON-Dateien.
+  - wdx/main_window.py & wdx/project_window.py: Die Hauptfenster für die Verwaltung der Projekte und Quellen.
+
+### 2. Browser-Erweiterung (/wdx_extension)
+- **Framework**: Basiert auf Vite (ite.config.js) und ist für Manifest V3 konzipiert (manifest.json).
+- **Kommunikation**: Der Service Worker (Background-Script) sendet Daten an http://127.0.0.1:8765/api/add_source.
+- **UI**: Beinhaltet ein Popup (popup.html) und eventuell eine Queue-Ansicht (queue.html).
+
+### 3. Datenstruktur (/projects)
+Gespeicherte Projekte und Quellen werden lokal abgelegt. Ein Projektordner enthält:
+- project.json: Die Metadaten und Liste der gespeicherten Quellen (mit IDs, URLs, Farben etc.).
+- /sites/: Beinhaltet die heruntergeladenen HTML-Dateien (Offline-Versionen der Seiten).
+- /images/: Beinhaltet die heruntergeladenen Favicons.
+
+---
+
+## Wichtige Code-Abläufe
+
+### Wie eine Quelle hinzugefügt wird
+1. **Nutzeraktion**: Der Nutzer klickt in der Browser-Erweiterung auf "Speichern" (oder nutzt das Kontextmenü).
+2. **Erweiterung**: Die Extension sammelt URL und Metadaten und macht einen POST-Request an http://127.0.0.1:8765/api/add_source.
+3. **App-Server (server.py)**: Empfängt den Request und leitet die Daten an handle_communication in __main__.py weiter.
+4. **Download-Worker**: Ein separater Thread wird gestartet. Dieser:
+   - Lädt den HTML-Quelltext herunter (sites/).
+   - Extrahiert das Favicon aus dem HTML oder nutzt Fallbacks (z.B. Google Favicon Service) und speichert es ab (images/).
+   - Ermittelt eine "Smart Color" für das UI-Element (utils.py).
+5. **Speicherung**: Die Quelle wird in der jeweiligen project.json eingetragen (project_manager.py).
+
+---
+
+## Entwicklung & Skripte
+- **App starten**: python main.py
+- **Dependencies installieren**: pip install -r requirements.txt
+- **Erweiterung bauen**: Im Ordner wdx_extension mit 
+pm install und 
+pm run build (falls Vite-Befehle genutzt werden).
+
+## Guidelines für LLMs
+1. **Python UI-Änderungen**: Bei Anpassungen der GUI immer 	tkbootstrap (als 	tk importiert) verwenden, um das konsistente Styling (Themes "darkly" / "litera") beizubehalten.
+2. **Asynchrone Vorgänge (Python)**: Wenn langwierige Aufgaben (wie Downloads) angestoßen werden, immer in einem separaten Thread ausführen (wie im _download_worker), damit die Tkinter-GUI nicht einfriert.
+3. **Pfade**: Auf plattformunabhängige Pfadbehandlung mit pathlib achten (wird bereits in Teilen des Projekts genutzt).
+4. **Erweiterung**: Bei Änderungen an der Extension sicherstellen, dass die CORS-Richtlinien und Manifest V3-Berechtigungen (z.B. host_permissions für localhost:8765) nicht verletzt werden.
