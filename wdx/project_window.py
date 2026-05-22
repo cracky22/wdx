@@ -1579,7 +1579,8 @@ class ProjectWindow:
     def manual_export(self):
         success, file_path = self.app.project_manager.export_project(self.project)
         if success:
-            messagebox.showinfo("Exportiert", f"Projekt als '{file_path}' exportiert.")
+            if self.app.project_manager.get_setting("show_prompts", True):
+                messagebox.showinfo("Exportiert", f"Projekt als '{file_path}' exportiert.")
 
     def manual_reload(self):
         self.reload_items()
@@ -2565,7 +2566,8 @@ class ProjectWindow:
             logger.warning("Quellenangabe-Format ungültig (%s) — Fallback verwendet", exc)
             citation = f"{source.get('url', '')}, zuletzt aufgerufen am {source.get('added', '')}"
         pyperclip.copy(citation)
-        messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
+        if self.app.project_manager.get_setting("show_prompts", True):
+            messagebox.showinfo("Erfolg", "Quellenangabe kopiert.")
         logger.debug("Quellenangabe erstellt für: %s", source.get("url"))
 
     def shortcut_citation(self):
