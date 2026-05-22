@@ -96,8 +96,7 @@ ui.saveBtn.addEventListener('click', async () => {
   ui.saveBtn.disabled = true;
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const payload = { url: tab.url, title: tab.title, text: "", keywords: "" };
+    const payload = await getCurrentTabPayload();
 
     if (!isConnected && offlineQueueActive) {
         throw { payload: payload, manualOffline: true };

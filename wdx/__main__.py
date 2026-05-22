@@ -185,6 +185,8 @@ class WdxApp:
             "title": data.get("title", url),
             "text": data.get("text", ""),
             "keywords": data.get("keywords", ""),
+            "author": data.get("author", ""),
+            "date": data.get("date", ""),
             "color": "#ffffff",
             "added": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "pos_x": 300,
