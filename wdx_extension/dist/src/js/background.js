@@ -71,11 +71,41 @@ async function processQueue() {
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  let author = "";
+  let date = "";
+  try {
+      const prefs = await chrome.storage.local.get('wdx-exp-extract-context');
+      if (prefs['wdx-exp-extract-context'] === 'true') {
+          const results = await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => {
+                  const getMeta = (names) => {
+                      for (let name of names) {
+                          const el = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
+                          if (el) return el.content;
+                      }
+                      return "";
+                  };
+                  return {
+                      author: getMeta(['author', 'article:author', 'twitter:creator']),
+                      date: getMeta(['published_date', 'article:published_time', 'date']) || document.lastModified
+                  };
+              }
+          });
+          if (results && results[0]) {
+              author = results[0].result.author;
+              date = results[0].result.date;
+          }
+      }
+  } catch(e) { console.error("Smart Context failed", e); }
+
   const payload = {
     url: tab.url,
     title: tab.title || "Kein Titel",
     text: info.selectionText ? info.selectionText.trim() : "",
     keywords: "",
+    author: author,
+    date: date
   };
 
   try {

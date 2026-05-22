@@ -20,10 +20,10 @@
     <div class="header">
       <h1 class="headline">wdx</h1>
       <div class="header-actions">
-        <md-icon-button id="historyBtn">
+        <md-icon-button id="historyBtn" title="Verlauf">
           <md-icon>history</md-icon>
         </md-icon-button>
-        <md-icon-button id="settingsBtn">
+        <md-icon-button id="settingsBtn" title="Einstellungen">
           <md-icon>settings</md-icon>
         </md-icon-button>
       </div>
@@ -38,7 +38,7 @@
           <div id="statusText" class="body-large">Verbinde...</div>
         </div>
 
-        <md-icon-button id="manualConnectBtn" class="manualConnectBtn" style="display: none;">
+        <md-icon-button id="manualConnectBtn" class="manualConnectBtn" title="Manuell verbinden" style="display: none;">
           <md-icon>refresh</md-icon>
         </md-icon-button>
       </div>
@@ -46,13 +46,13 @@
 
     <div class="spacer"></div>
 
-    <md-filled-button id="saveBtn" class="full-width" >
+    <md-filled-button id="saveBtn" class="full-width" title="Speichert die aktuelle Webseite als Quelle in wdx" disabled>
       <md-icon slot="icon">save</md-icon>
       In wdx speichern
     </md-filled-button>
     
     <div id="feedback" class="feedback-msg"></div>
-    <a id="version" class="version" href="https://github.com/cracky22/wdx/releases" target="_blank"></a>
+    <a id="version" class="version" href="https://github.com/cracky22/wdx/releases" title="GitHub Releases" target="_blank"></a>
   </div>
 </body>
 </html>

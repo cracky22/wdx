@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "wdx Quellen",
-  "version": "1.4.3",
-  "description": "Browser Erweiterung für wdx",
+  "version": "1.4.4",
+  "description": "Browser Erweiterung f\u00fcr wdx",
   "permissions": [
     "contextMenus",
     "activeTab",
     "tabs",
     "notifications",
     "storage",
-    "alarms"
+    "alarms",
+    "scripting"
   ],
   "host_permissions": [
     "http://127.0.0.1:8765/*"
