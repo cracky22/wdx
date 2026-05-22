@@ -2,6 +2,7 @@ import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog, filedialog
+from ttkbootstrap.widgets.scrolled import ScrolledFrame
 import re
 import math
 import time
@@ -35,7 +36,7 @@ class MainWindow:
             logger.debug("App-Icon konnte nicht gesetzt werden: %s", exc)
         self.project_manager = app.project_manager
 
-        self.main_frame = ttk.Frame(self.root, padding="20", bootstyle="light")
+        self.main_frame = ttk.Frame(self.root, padding="20")
         self.main_frame.grid(row=0, column=0, sticky="nsew")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -62,7 +63,7 @@ class MainWindow:
         )
         self.status_label.grid(row=0, column=3, padx=20)
 
-        self.projects_frame = ttk.Frame(self.main_frame)
+        self.projects_frame = ScrolledFrame(self.main_frame, autohide=True)
         self.projects_frame.grid(row=1, column=0, sticky="nsew")
         self.main_frame.rowconfigure(1, weight=1)
 
