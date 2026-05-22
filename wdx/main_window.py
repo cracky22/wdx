@@ -364,12 +364,7 @@ class MainWindow:
             messagebox.showerror("Fehler", err)
 
     def delete_project(self, project):
-        confirm = True
-        if self._should_show_prompts():
-            confirm = messagebox.askyesno(
-                "Löschen", f"'{project['name']}' wirklich löschen?"
-            )
-        if confirm:
+        if messagebox.askyesno("Löschen", f"'{project['name']}' wirklich löschen?"):
             self.project_manager.delete_project(project)
             self.update_project_tiles()
 
