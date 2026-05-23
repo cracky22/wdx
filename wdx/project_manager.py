@@ -31,6 +31,7 @@ class ProjectManager:
             "show_prompts": True,
             "encryption_password": CODENAME,
             "citation_format": DEFAULT_CITATION_FORMAT,
+            "first_run": True,
         }
 
         self.load_settings()
@@ -90,6 +91,7 @@ class ProjectManager:
                     ("show_prompts", "show_prompts", bool),
                     ("encryption_password", "encryption_password", str),
                     ("citation_format", "citation_format", str),
+                    ("first_run", "first_run", bool),
                 ]:
                     try:
                         val, _ = winreg.QueryValueEx(key, reg_key)
@@ -107,6 +109,10 @@ class ProjectManager:
                 winreg.SetValueEx(
                     key, "dark_mode", 0, winreg.REG_DWORD,
                     1 if self.config["dark_mode"] else 0,
+                )
+                winreg.SetValueEx(
+                    key, "first_run", 0, winreg.REG_DWORD,
+                    1 if self.config.get("first_run", True) else 0,
                 )
                 winreg.SetValueEx(
                     key, "show_prompts", 0, winreg.REG_DWORD,

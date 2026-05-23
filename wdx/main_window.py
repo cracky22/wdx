@@ -68,6 +68,7 @@ class MainWindow:
         self.main_frame.rowconfigure(1, weight=1)
 
         self.update_project_tiles()
+        self.root.after(500, self.show_onboarding)
 
     
     def set_browser_connected(self, connected: bool = True):
@@ -246,6 +247,18 @@ class MainWindow:
 
         ttk.Separator(win).pack(fill="x", pady=20, padx=20)
 
+        # ── Setup ────────────────────────────────────────────────────────────
+        ttk.Label(win, text="Setup", font=("Helvetica", 12, "bold")).pack(pady=(5, 2))
+        def reset_onboarding():
+            self.app.project_manager.set_setting("first_run", True)
+            messagebox.showinfo("Reset", "Das Onboarding wird beim nächsten Start wieder angezeigt.")
+        ttk.Button(
+            win, text="Erster Start Setup wiederholen", bootstyle="warning-outline",
+            command=reset_onboarding
+        ).pack(pady=5)
+
+        ttk.Separator(win).pack(fill="x", pady=20, padx=20)
+
         # ── Speichern ────────────────────────────────────────────────────────
         def save_settings_manual():
             self.app.project_manager.set_setting(
@@ -266,6 +279,44 @@ class MainWindow:
             win, text="Speichern & Schließen",
             command=save_settings_manual, bootstyle="primary",
         ).pack(pady=10)
+
+
+    def show_onboarding(self):
+        if not self.app.project_manager.get_setting("first_run", True):
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Willkommen bei wdx")
+        dialog.geometry("450x450")
+        dialog.grab_set()
+        dialog.transient(self.root)
+        try:
+            dialog.iconbitmap("icon128.ico")
+        except:
+            pass
+        
+        ttk.Label(dialog, text="Willkommen bei wdx!", font=("Helvetica", 16, "bold")).pack(pady=(20, 10))
+        
+        desc = "wdx (Web Data Extractor) hilft dir, strukturierte Informationen und Ressourcen aus dem Web direkt in Projekten zu speichern und zu verwalten.\n\nNutze die Chrome-Erweiterung, um Webseiten mit einem Klick zu speichern."
+        ttk.Label(dialog, text=desc, wraplength=400, justify="center").pack(pady=10)
+        
+        ttk.Separator(dialog).pack(fill="x", pady=10, padx=20)
+        
+        ttk.Label(dialog, text="Wähle dein Theme:", font=("Helvetica", 10, "bold")).pack(pady=5)
+        
+        var_dark = tk.BooleanVar(value=self.app.dark_mode)
+        ttk.Checkbutton(
+            dialog, text="Dark Mode verwenden", variable=var_dark,
+            bootstyle="round-toggle",
+            command=lambda: self.app.toggle_theme(),
+        ).pack(pady=5)
+        
+        def finish():
+            self.app.project_manager.set_setting("first_run", False)
+            dialog.destroy()
+            
+        ttk.Button(dialog, text="Loslegen!", command=finish, bootstyle="success").pack(pady=20)
+        self.root.wait_window(dialog)
 
     def _should_show_prompts(self) -> bool:
         return self.app.project_manager.get_setting("show_prompts", True)
