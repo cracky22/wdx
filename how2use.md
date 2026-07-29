@@ -59,8 +59,6 @@ Installiere die Abhängigkeiten anschließend mit **pip**:
 pip install -r requirements.txt
 ```
 
-> Hinweis: `tkinter` gehört zur Python-Standardbibliothek und ist in der Regel bereits enthalten. Unter manchen Linux-Distributionen muss es ggf. separat über den Paketmanager installiert werden.
-
 ### Schritt 4: Python-Skript ausführen
 
 Im Projektordner befindet sich die Datei **main.py** bzw. **main.pyc**.
